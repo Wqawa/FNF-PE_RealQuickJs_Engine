@@ -45,6 +45,7 @@ class StoryMenuState extends MusicBeatState
 
 	override function create()
 	{
+		Song.forceEngineVersion = null; //chart version override only lasts for the current song
 		Paths.clearStoredMemory();
 		Paths.clearUnusedMemory();
 

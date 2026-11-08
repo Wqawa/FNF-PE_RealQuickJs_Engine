@@ -116,6 +116,12 @@ class GameplaySettingsSubState extends BaseOptionsMenu
 		option.changeValue = 0.1;
 		addOption(option);
 
+		var option:Option = new Option('More Lua Errors',
+			'If checked, every Lua error gets printed instead of only the first one of its kind.',
+			'moreLuaErrors',
+			BOOL);
+		addOption(option);
+
 		super();
 	}
 

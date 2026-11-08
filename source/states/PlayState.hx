@@ -177,6 +177,12 @@ class PlayState extends MusicBeatState
 	public var combo:Int = 0;
 
 	public var healthBar:Bar;
+
+	// 0.7.x and older had healthBarBG as a standalone sprite on PlayState. 1.0 folded the
+	// background into Bar.bg, so scripts doing setProperty('healthBarBG.visible', false)
+	// silently hit nothing. Hand the old name out so those still work.
+	public var healthBarBG(get, never):FlxSprite;
+	inline function get_healthBarBG():FlxSprite return (healthBar != null) ? healthBar.bg : null;
 	public var timeBar:Bar;
 	var songPercent:Float = 0;
 
@@ -208,6 +214,26 @@ class PlayState extends MusicBeatState
 	public var camGame:FlxCamera;
 	public var camOther:FlxCamera;
 	public var cameraSpeed:Float = 1;
+
+	// 0.6.3-0.7.x kept modchart objects in two dedicated maps (modchartSprites/modchartTexts).
+	// 1.0 merged everything into MusicBeatState.variables, which is exactly where
+	// makeLuaSprite/makeLuaText put them now — so hand that same map out under the old names.
+	// Read-only on purpose: writing goes through the normal make*/remove* functions.
+	public var modchartSprites(get, never):Map<String, Dynamic>;
+	inline function get_modchartSprites():Map<String, Dynamic> return variables;
+	public var modchartTexts(get, never):Map<String, Dynamic>;
+	inline function get_modchartTexts():Map<String, Dynamic> return variables;
+	public var modchartSounds(get, never):Map<String, Dynamic>;
+	inline function get_modchartSounds():Map<String, Dynamic> return variables;
+	public var modchartSaves(get, never):Map<String, Dynamic>;
+	inline function get_modchartSaves():Map<String, Dynamic> return variables;
+
+	// only used by 0.7.x's HScript helper to skip instances while injecting variables
+	public var instancesExclude:Array<String> = [];
+
+	// 0.6.3 mods store their tweens/timers here straight from runHaxeCode; 1.0 dropped both maps
+	public var modchartTweens:Map<String, flixel.tweens.FlxTween> = new Map<String, flixel.tweens.FlxTween>();
+	public var modchartTimers:Map<String, flixel.util.FlxTimer> = new Map<String, flixel.util.FlxTimer>();
 
 	public var songScore:Int = 0;
 	public var songHits:Int = 0;
@@ -437,6 +463,8 @@ class PlayState extends MusicBeatState
 				#if LUA_ALLOWED
 				if(file.toLowerCase().endsWith('.lua'))
 					new FunkinLua(folder + file);
+				else if(psychlua.FunkinJS.isJSFile(file))
+					psychlua.FunkinJS.start(folder + file);
 				#end
 
 				#if HSCRIPT_ALLOWED
@@ -567,6 +595,22 @@ class PlayState extends MusicBeatState
 		noteGroup.cameras = [camHUD];
 		comboGroup.cameras = [camHUD];
 
+		// 1.0 packs the whole HUD into uiGroup. Scripts written for 0.7.x and older position
+		// everything against PlayState.members (getObjectOrder/setObjectOrder, and a lot of
+		// mods measure their own sprites off healthBar.x/y), so flatten the group once it is
+		// fully populated: same objects, same order, just one level up where old code expects
+		// them. The group itself carries no transform, so this is visually a no-op.
+		if(uiGroup != null && uiGroup.members.length > 0)
+		{
+			var uiElements:Array<FlxSprite> = uiGroup.members.copy();
+			for(uiSpr in uiElements)
+			{
+				uiGroup.remove(uiSpr, true);
+				uiSpr.cameras = [camHUD];
+				add(uiSpr);
+			}
+		}
+
 		startingSong = true;
 
 		#if LUA_ALLOWED
@@ -593,6 +637,8 @@ class PlayState extends MusicBeatState
 				#if LUA_ALLOWED
 				if(file.toLowerCase().endsWith('.lua'))
 					new FunkinLua(folder + file);
+				else if(psychlua.FunkinJS.isJSFile(file))
+					psychlua.FunkinJS.start(folder + file);
 				#end
 
 				#if HSCRIPT_ALLOWED
@@ -1352,7 +1398,19 @@ class PlayState extends MusicBeatState
 				if (Math.isNaN(holdLength))
 					holdLength = 0.0;
 
-				var gottaHitNote:Bool = (songNotes[1] < totalColumns);
+				var gottaHitNote:Bool;
+				if(Song.isLegacyChart())
+				{
+					// 0.7.3 charts keep lanes relative to the section, mustHitSection picks the side
+					gottaHitNote = section.mustHitSection;
+					if (songNotes[1] > totalColumns - 1)
+						gottaHitNote = !section.mustHitSection;
+				}
+				else
+				{
+					// 1.0.x charts use absolute lanes: player owns the first columns, opponent the rest
+					gottaHitNote = (songNotes[1] < totalColumns);
+				}
 
 				if (i != 0) {
 					// CLEAR ANY POSSIBLE GHOST NOTES
@@ -3170,6 +3228,19 @@ class PlayState extends MusicBeatState
 
 		hscriptArray = null;
 		#end
+
+		// preStateSwitch already cleared the managers, but mods create NEW tweens/timers inside
+		// their own onDestroy (estll does), so those slip through. The next state hasn't been
+		// built yet at this point, so wiping both managers here is safe — and their callbacks
+		// live in HScript, which is dead by now, so they would crash the game a moment later.
+		flixel.tweens.FlxTween.globalManager.clear();
+		flixel.util.FlxTimer.globalManager.clear();
+
+		if(modchartTweens != null)
+			modchartTweens.clear();
+		if(modchartTimers != null)
+			modchartTimers.clear();
+
 		stagesFunc(function(stage:BaseStage) stage.destroy());
 
 		#if VIDEOS_ALLOWED
@@ -3291,6 +3362,19 @@ class PlayState extends MusicBeatState
 		var luaToLoad:String = Paths.modFolders(luaFile);
 		if(!FileSystem.exists(luaToLoad))
 			luaToLoad = Paths.getSharedPath(luaFile);
+
+		// No .lua? Look for the same name with a .js extension instead.
+		// FunkinJS handles it by deleting every `{` and turning `}` into `end`.
+		if(!FileSystem.exists(luaToLoad) && luaFile.lastIndexOf('.') > -1)
+		{
+			var jsFile:String = luaFile.substr(0, luaFile.lastIndexOf('.')) + psychlua.FunkinJS.EXTENSION;
+			var jsToLoad:String = Paths.modFolders(jsFile);
+			if(!FileSystem.exists(jsToLoad))
+				jsToLoad = Paths.getSharedPath(jsFile);
+
+			if(FileSystem.exists(jsToLoad))
+				return psychlua.FunkinJS.start(jsToLoad) != null;
+		}
 
 		if(FileSystem.exists(luaToLoad))
 		#elseif sys

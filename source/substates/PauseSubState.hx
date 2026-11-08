@@ -15,7 +15,7 @@ class PauseSubState extends MusicBeatSubstate
 	var grpMenuShit:FlxTypedGroup<Alphabet>;
 
 	var menuItems:Array<String> = [];
-	var menuItemsOG:Array<String> = ['Resume', 'Restart Song', 'Change Difficulty', 'Options', 'Exit to menu'];
+	var menuItemsOG:Array<String> = ['Resume', 'Restart Song', 'Change Difficulty', 'Options', 'Change Chart Ver', 'Exit to menu'];
 	var difficultyChoices = [];
 	var curSelected:Int = 0;
 
@@ -108,6 +108,14 @@ class PauseSubState extends MusicBeatSubstate
 		chartingText.updateHitbox();
 		chartingText.visible = PlayState.chartingMode;
 		add(chartingText);
+
+		// which lane semantics this chart is played with, and what the file itself looked like
+		var chartEngineTxt:FlxText = new FlxText(20, 15 + 96, 0, 'Chart Engine: ' + Song.chartEngineVersion + ' (file: ' + Song.detectedFormat + ')', 24);
+		chartEngineTxt.scrollFactor.set();
+		chartEngineTxt.setFormat(Paths.font('vcr.ttf'), 24);
+		chartEngineTxt.updateHitbox();
+		chartEngineTxt.x = FlxG.width - (chartEngineTxt.width + 20);
+		add(chartEngineTxt);
 
 		blueballedTxt.alpha = 0;
 		levelDifficulty.alpha = 0;
@@ -272,6 +280,25 @@ class PauseSubState extends MusicBeatSubstate
 					PlayState.instance.practiceMode = !PlayState.instance.practiceMode;
 					PlayState.changedDifficulty = true;
 					practiceText.visible = PlayState.instance.practiceMode;
+				case 'Change Chart Ver':
+					// reload the chart with the other lane semantics, handy when a mod was built
+					// for 0.7.x and gets mirrored by the 1.0 side detection
+					var nextEngine:String = Song.isLegacyChart() ? 'Pe-1.0.4' : 'Pe-0.7.3';
+					var chartSong:String = Paths.formatToSongPath(PlayState.SONG.song);
+					var chartDiff:String = Highscore.formatSong(chartSong, PlayState.storyDifficulty);
+					Song.forceEngineVersion = nextEngine;
+					try
+					{
+						Song.loadFromJson(chartDiff, chartSong);
+						MusicBeatState.resetState();
+						return;
+					}
+					catch(e:haxe.Exception)
+					{
+						Song.forceEngineVersion = null;
+						trace('ERROR while switching chart engine: ' + e.message);
+					}
+
 				case "Restart Song":
 					restartSong();
 				case "Leave Charting Mode":

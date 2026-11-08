@@ -84,6 +84,10 @@ class HScript extends Iris
 	public var origin:String;
 	override public function new(?parent:Dynamic, ?file:String, ?varsToBring:Any = null, ?manualRun:Bool = false)
 	{
+		// old 0.6.3 bare class names must be registered in Iris.proxyImports before the
+		// first script parses; doing it here keeps the engine fully booted
+		backend.ScriptClassAliases.init();
+
 		if (file == null)
 			file = '';
 
@@ -323,7 +327,7 @@ class HScript extends Iris
 				if(libPackage.length > 0)
 					str = libPackage + '.';
 
-				set(libName, Type.resolveClass(str + libName));
+				set(libName, backend.ScriptClassAliases.resolve(str + libName));
 			}
 			catch (e:IrisError) {
 				Iris.error(Printer.errorToString(e, false), this.interp.posInfos());
@@ -335,7 +339,7 @@ class HScript extends Iris
 		set('parentLua', null);
 		#end
 		set('this', this);
-		set('game', FlxG.state);
+		set('game', FlxG.state != null ? FlxG.state : PlayState.instance);
 		set('controls', Controls.instance);
 
 		set('buildTarget', LuaUtils.getBuildTarget());
@@ -393,7 +397,7 @@ class HScript extends Iris
 			else if (libName == null)
 				libName = '';
 
-			var c:Dynamic = Type.resolveClass(str + libName);
+			var c:Dynamic = backend.ScriptClassAliases.resolve(str + libName);
 			if (c == null)
 				c = Type.resolveEnum(str + libName);
 

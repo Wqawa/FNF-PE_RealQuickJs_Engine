@@ -64,7 +64,22 @@ class Song
 	public var gfVersion:String = 'gf';
 	public var format:String = 'psych_v1';
 
-	public static function convert(songJson:Dynamic) // Convert old charts to psych_v1 format
+	// --- Chart format compatibility (ported from NovaFlare) ---
+	// detectedFormat: what the chart file on disk actually is.
+	// chartEngineVersion: which lane semantics the chart currently in memory is interpreted with.
+	// 'Pe-1.0.x' / 'Pe-1.0.4' -> absolute lanes (0..cols-1 = player, cols.. = opponent)
+	// 'Pe-0.7.3' -> relative lanes + mustHitSection decides the side
+	public static var detectedFormat:String = 'unknown';
+	public static var chartEngineVersion:String = 'Pe-1.0.4';
+	public static var forceEngineVersion:Null<String> = null;
+
+	public static function isLegacyChart():Bool
+		return chartEngineVersion == 'Pe-0.7.3';
+
+	// Convert old charts to psych_v1 format.
+	// convertLanes can be turned off to keep the original relative lanes on disk-shape,
+	// PlayState then has to resolve the note side itself using Song.isLegacyChart().
+	public static function convert(songJson:Dynamic, convertLanes:Bool = true) 
 	{
 		if(songJson.gfVersion == null)
 		{
@@ -110,8 +125,11 @@ class Song
 
 			for (note in section.sectionNotes)
 			{
-				var gottaHitNote:Bool = (note[1] < 4) ? section.mustHitSection : !section.mustHitSection;
-				note[1] = (note[1] % 4) + (gottaHitNote ? 0 : 4);
+				if(convertLanes)
+				{
+					var gottaHitNote:Bool = (note[1] < 4) ? section.mustHitSection : !section.mustHitSection;
+					note[1] = (note[1] % 4) + (gottaHitNote ? 0 : 4);
+				}
 
 				if(!Std.isOfType(note[3], String))
 					note[3] = Note.defaultNoteTypes[note[3]]; //compatibility with Week 7 and 0.1-0.3 psych charts
@@ -157,30 +175,78 @@ class Song
 
 	public static function parseJSON(rawData:String, ?nameForError:String = null, ?convertTo:String = 'psych_v1'):SwagSong
 	{
-		var songJson:SwagSong = cast Json.parse(rawData);
-		if(Reflect.hasField(songJson, 'song'))
+		var parsedJson:Dynamic = Json.parse(rawData);
+		var hasWrapper:Bool = Reflect.hasField(parsedJson, 'song');
+
+		var songJson:SwagSong = cast parsedJson;
+		if(hasWrapper)
 		{
-			var subSong:SwagSong = Reflect.field(songJson, 'song');
+			var subSong:SwagSong = Reflect.field(parsedJson, 'song');
 			if(subSong != null && Type.typeof(subSong) == TObject)
 				songJson = subSong;
 		}
 
-		if(convertTo != null && convertTo.length > 0)
-		{
-			var fmt:String = songJson.format;
-			if(fmt == null) fmt = songJson.format = 'unknown';
+		// Identify the chart format. `format` is not always trustworthy (old editors wrote
+		// "psych_v1" even when the chart still had the {"song": {...}} wrapper), so the
+		// wrapper itself is what decides legacy vs 1.0.
+		var fmt:String = cast Reflect.field(songJson, 'format');
+		if(fmt == null) fmt = 'unknown';
 
+		// Sidecar files (events.json, picospeaker.json) must not overwrite the version we
+		// detected for the real chart, otherwise a wrapped events file flips the whole song.
+		var isSidecar:Bool = (nameForError == 'events' || nameForError == 'picospeaker');
+
+		var forcedLegacy:Bool = (forceEngineVersion == 'Pe-0.7.3');
+		if(!isSidecar)
+		{
+			detectedFormat = fmt.startsWith('psych_v1') ? 'Pe-1.0.x' : (hasWrapper ? 'Pe-0.7.3' : 'Pe-1.0.x');
+
+			if(forcedLegacy)
+				chartEngineVersion = 'Pe-0.7.3';
+			else
+				// Legacy charts get their lanes converted below, so in memory they are 1.0 semantics.
+				chartEngineVersion = 'Pe-1.0.4';
+		}
+
+		if(!forcedLegacy && convertTo != null && convertTo.length > 0)
+		{
 			switch(convertTo)
 			{
 				case 'psych_v1':
 					if(!fmt.startsWith('psych_v1')) //Convert to Psych 1.0 format
 					{
-						trace('converting chart $nameForError with format $fmt to psych_v1 format...');
-						songJson.format = 'psych_v1_convert';
+						if(!isSidecar) trace('converting chart $nameForError with format $fmt to psych_v1 format...');
+						Reflect.setField(songJson, 'format', 'psych_v1_convert');
 						convert(songJson);
 					}
 			}
 		}
+		else if(forcedLegacy)
+			convert(songJson, false); //still normalize fields, but keep the relative lanes
+
+		fixMissingFields(songJson);
 		return songJson;
+	}
+
+	// Fill in whatever an old chart may be missing. Older engines were a lot more forgiving
+	// about absent fields, and a null bpm in particular turns every note into NaN.
+	static function fixMissingFields(songJson:SwagSong)
+	{
+		if(songJson == null) return;
+
+		var bpm:Null<Float> = cast Reflect.field(songJson, 'bpm');
+		if(bpm == null || bpm <= 0) Reflect.setField(songJson, 'bpm', 120.0);
+
+		var speed:Null<Float> = cast Reflect.field(songJson, 'speed');
+		if(speed == null) Reflect.setField(songJson, 'speed', 1.0);
+
+		if(Reflect.field(songJson, 'needsVoices') == null) Reflect.setField(songJson, 'needsVoices', true);
+		if(Reflect.field(songJson, 'player1') == null) Reflect.setField(songJson, 'player1', 'bf');
+		if(Reflect.field(songJson, 'player2') == null) Reflect.setField(songJson, 'player2', 'dad');
+		if(Reflect.field(songJson, 'gfVersion') == null) Reflect.setField(songJson, 'gfVersion', 'gf');
+		if(Reflect.field(songJson, 'stage') == null) Reflect.setField(songJson, 'stage', 'stage');
+		if(Reflect.field(songJson, 'format') == null) Reflect.setField(songJson, 'format', 'psych_v1_convert');
+		if(Reflect.field(songJson, 'events') == null) Reflect.setField(songJson, 'events', []);
+		if(Reflect.field(songJson, 'notes') == null) Reflect.setField(songJson, 'notes', []);
 	}
 }

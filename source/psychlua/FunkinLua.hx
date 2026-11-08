@@ -57,7 +57,11 @@ class FunkinLua {
 	public var callbacks:Map<String, Dynamic> = new Map<String, Dynamic>();
 	public static var customFunctions:Map<String, Dynamic> = new Map<String, Dynamic>();
 
-	public function new(scriptName:String) {
+	// when set, this is executed instead of reading scriptName from disk.
+	// FunkinJS uses it to feed transpiled .js source into the Lua interpreter.
+	public var rawCode:String = null;
+
+	public function new(scriptName:String, ?rawCode:String = null) {
 		lua = LuaL.newstate();
 		LuaL.openlibs(lua);
 
@@ -67,6 +71,7 @@ class FunkinLua {
 		//LuaL.dostring(lua, CLENSE);
 
 		this.scriptName = scriptName.trim();
+		this.rawCode = rawCode;
 		var game:PlayState = PlayState.instance;
 		if(game != null) game.luaArray.push(this);
 
@@ -215,6 +220,42 @@ class FunkinLua {
 				runningScripts.push(script.scriptName);
 
 			return runningScripts;
+		});
+
+		// Backwards compatibility with 0.7.3 scripts that read/set globals across scripts
+		Lua_helper.add_callback(lua, "getGlobalFromScript", function(luaFile:String, global:String) {
+			var foundScript:String = findScript(luaFile);
+			if(foundScript != null)
+				for (luaInstance in game.luaArray)
+					if(luaInstance.scriptName == foundScript)
+						return luaInstance.get(global);
+
+			return null;
+		});
+		Lua_helper.add_callback(lua, "setGlobalFromScript", function(luaFile:String, global:String, val:Dynamic) {
+			var foundScript:String = findScript(luaFile);
+			if(foundScript != null)
+				for (luaInstance in game.luaArray)
+					if(luaInstance.scriptName == foundScript)
+						luaInstance.set(global, val);
+		});
+
+		// Old score shortcuts, removed in 1.0 in favour of getProperty('score') etc.
+		Lua_helper.add_callback(lua, "getScore", function() {
+			return game.songScore;
+		});
+		Lua_helper.add_callback(lua, "getMisses", function() {
+			return game.songMisses;
+		});
+		Lua_helper.add_callback(lua, "getHits", function() {
+			return game.songHits;
+		});
+
+		// 0.6.3 mods used to drive the Discord presence by hand
+		Lua_helper.add_callback(lua, "changePresence", function(details:String, ?state:String, ?smallImageKey:String, ?hasStartTimestamp:Bool, ?endTimestamp:Float) {
+			#if DISCORD_ALLOWED
+			backend.DiscordClient.changePresence(details, state, smallImageKey, hasStartTimestamp, endTimestamp);
+			#end
 		});
 
 		addLocalCallback("setOnScripts", function(varName:String, arg:Dynamic, ?ignoreSelf:Bool = false, ?exclusions:Array<String> = null) {
@@ -459,6 +500,11 @@ class FunkinLua {
 						return -1;
 					}
 				}
+				// 1.0 packs every HUD element into PlayState.uiGroup, so their index has to be
+				// read from that group instead of PlayState.members (where they no longer live)
+				var uiContainer:Dynamic = getUIContainer(leObj);
+				if(uiContainer != null) return uiContainer.members.indexOf(leObj);
+
 				var groupOrArray:Dynamic = CustomSubstate.instance != null ? CustomSubstate.instance : LuaUtils.getTargetInstance();
 				return groupOrArray.members.indexOf(leObj);
 			}
@@ -488,6 +534,17 @@ class FunkinLua {
 				}
 				else
 				{
+					// Reordering a HUD element through PlayState.members rips it out of
+					// uiGroup (remove() silently does nothing when it isn't there, insert()
+					// then drops it on top of everything). Sort it inside its real container.
+					var uiContainer:Dynamic = getUIContainer(leObj);
+					if(uiContainer != null)
+					{
+						uiContainer.remove(leObj, true);
+						uiContainer.insert(position, leObj);
+						return;
+					}
+
 					var groupOrArray:Dynamic = CustomSubstate.instance != null ? CustomSubstate.instance : LuaUtils.getTargetInstance();
 					groupOrArray.remove(leObj, true);
 					groupOrArray.insert(position, leObj);
@@ -1574,9 +1631,11 @@ class FunkinLua {
 		}
 
 		try{
-			var isString:Bool = !FileSystem.exists(scriptName);
+			var isString:Bool = (rawCode != null) || !FileSystem.exists(scriptName);
 			var result:Dynamic = null;
-			if(!isString)
+			if(rawCode != null)
+				result = LuaL.dostring(lua, rawCode);
+			else if(!isString)
 				result = LuaL.dofile(lua, scriptName);
 			else
 				result = LuaL.dostring(lua, scriptName);
@@ -1592,7 +1651,7 @@ class FunkinLua {
 				lua = null;
 				return;
 			}
-			if(isString) scriptName = 'unknown';
+			if(isString && rawCode == null) scriptName = 'unknown';
 		} catch(e:Dynamic) {
 			trace(e);
 			return;
@@ -1646,6 +1705,28 @@ class FunkinLua {
 			trace(e);
 		}
 		return LuaUtils.Function_Continue;
+	}
+
+	// 0.6.3 mods reach into FunkinLua from runHaxeCode: `FunkinLua.getVarInArray(...)`
+	// and `game.luaArray[0].getFlxEaseByString(...)`. Those moved to LuaUtils in 1.0.
+	public static function getVarInArray(instance:Dynamic, variable:String, ?allowMaps:Bool = false):Dynamic
+		return LuaUtils.getVarInArray(instance, variable, allowMaps);
+
+	public static function setVarInArray(instance:Dynamic, variable:String, value:Dynamic, ?allowMaps:Bool = false):Dynamic
+		return LuaUtils.setVarInArray(instance, variable, value, allowMaps);
+
+	public function getFlxEaseByString(?ease:String = ''):Dynamic
+		return LuaUtils.getTweenEaseByString(ease);
+
+	public function get(variable:String):Dynamic {
+		if(lua == null) {
+			return null;
+		}
+
+		Lua.getglobal(lua, variable);
+		var result:Dynamic = cast Convert.fromLua(lua, -1);
+		Lua.pop(lua, 1);
+		return result;
 	}
 
 	public function set(variable:String, data:Dynamic) {
@@ -1726,11 +1807,39 @@ class FunkinLua {
 		return null;
 	}
 
+	/**
+	 * 1.0 moved healthBar / iconP1 / scoreTxt / timeBar into PlayState.uiGroup (a FlxSpriteGroup),
+	 * but the ordering helpers (getObjectOrder / setObjectOrder) still assume those objects sit
+	 * directly in PlayState.members. Resolve the container an object really lives in first.
+	 */
+	public static function getUIContainer(obj:FlxBasic):Dynamic
+	{
+		var ps = PlayState.instance;
+		if(ps == null || obj == null) return null;
+		if(ps.uiGroup == null || !Std.isOfType(obj, FlxSprite)) return null;
+
+		var spr:FlxSprite = cast obj;
+		if(ps.uiGroup.members.indexOf(spr) > -1) return ps.uiGroup;
+		return null;
+	}
+
+	// used to collapse repeated warnings/errors, see ClientPrefs.data.moreLuaErrors
+	static var reportedTrace:Map<String, Bool> = new Map<String, Bool>();
+
 	public static function luaTrace(text:String, ignoreCheck:Bool = false, deprecated:Bool = false, color:FlxColor = FlxColor.WHITE) {
 		if(ignoreCheck || getBool('luaDebugMode')) {
 			if(deprecated && !getBool('luaDeprecatedWarnings')) {
 				return;
 			}
+
+			// only warnings/errors get collapsed, normal debug output stays untouched
+			if(!ClientPrefs.data.moreLuaErrors && (deprecated || text.indexOf('ERROR') > -1)) {
+				var scriptID:String = (lastCalledScript != null) ? lastCalledScript.scriptName : '';
+				var traceKey:String = scriptID + '|' + text;
+				if(reportedTrace.exists(traceKey)) return;
+				reportedTrace.set(traceKey, true);
+			}
+
 			PlayState.instance.addTextToDebug(text, color);
 		}
 	}

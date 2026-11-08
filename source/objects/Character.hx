@@ -182,13 +182,13 @@ class Character extends FlxSprite
 			updateHitbox();
 		}
 
-		// positioning
-		positionArray = json.position;
-		cameraPosition = json.camera_position;
+		// positioning (old character files can be missing either of these)
+		positionArray = (json.position != null) ? json.position : [0, 0];
+		cameraPosition = (json.camera_position != null) ? json.camera_position : positionArray;
 
 		// data
 		healthIcon = json.healthicon;
-		singDuration = json.sing_duration;
+		singDuration = (json.sing_duration != null) ? json.sing_duration : 4;
 		flipX = (json.flip_x != isPlayer);
 		healthColorArray = (json.healthbar_colors != null && json.healthbar_colors.length > 2) ? json.healthbar_colors : [161, 161, 161];
 		vocalsFile = json.vocals_file != null ? json.vocals_file : '';
