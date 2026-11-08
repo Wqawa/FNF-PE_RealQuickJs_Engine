@@ -64,6 +64,10 @@ class Main extends Sprite
 
 	public static function main():Void
 	{
+		#if sys
+		// 先验 JavaScriptUtils.hx 的指纹，对不上就直接炸在这儿
+		psychlua.FunkinJS.verifyUtilsIntegrity();
+		#end
 		Lib.current.addChild(new Main());
 	}
 
