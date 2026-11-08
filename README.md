@@ -1,127 +1,180 @@
-![PsychionalEngineLogo](docs/img/PsychEngineLogoTweak.png)
+# FNF-PE_RealQuickJs_Engine
 
-Engine originally used on [Mind Games Mod](https://gamebanana.com/mods/301107), intended to be a fix for the vanilla version's many issues while keeping the casual play aspect of it. Also aiming to be an easier alternative to newbie coders.
+基于 [Psych Engine 1.0.4](https://github.com/ShadowMario/FNF-PsychEngine) 的 fork。
 
-## Installation:
+主要做两件事：**让 0.6.3 / 0.7.3 时代的 mod 还能跑**，以及**让 `.js` 脚本"能跑"**。
 
-Refer to [the Build Instructions](/docs/BUILDING.md)
+---
 
-## Customization:
+## 一、旧版 mod 兼容
 
-If you wish to disable things like *Lua Scripts* or *Video Cutscenes*, you can refer to the `Project.xml` file.
+Psych 1.0 相比 0.6.x / 0.7.x 改了不少底层结构。官方自己做了不少向下兼容，但漏掉的部分足以让老 mod 白屏或者 UI 全乱。这个 fork 把剩下的补齐了。
 
-Inside `Project.xml`, you will find several variables to customize Psych Engine to your liking.
+### 谱面
 
-To start you off, disabling *Video Cutscenes* should be simple, simply delete the line `"VIDEOS_ALLOWED"` or comment it out by wrapping the line in XML-like comments, like this: `<!-- YOUR_LINE_HERE -->`
+| 问题 | 处理 |
+|---|---|
+| 0.7.x 及更早的谱面用「相对 lane + `mustHitSection`」表示音符归属，1.0 用绝对 lane | `Song.parseJSON` 识别 `{"song": {...}}` 包裹层来判定格式，默认仍走官方 `convert()` 转成绝对 lane，不改变现有行为 |
+| 想按旧语义回放（比如转换后整侧反了） | 暂停菜单里多了 `Change Chart Ver`，切换 `Pe-1.0.4` / `Pe-0.7.3` 后重载谱面 |
+| 老谱缺 `bpm` / `speed` / `needsVoices` 等字段 | `fixMissingFields()` 兜底，缺 bpm 会让所有音符变 NaN |
+| 独立 `events.json` 会覆盖主谱面的格式判定 | 按 sidecar 跳过版本写入 |
 
-Same goes for *Lua Scripts*, comment out or delete the line with `LUA_ALLOWED`, this and other customization options are all available within the `Project.xml` file.
+### 类名与 API
 
-## Softcoding (.lua/.hx)
-For this you can head over to [the wiki](https://shadowmario.github.io/psychengine.lua)
+0.6.3 的源码树是**完全扁平**的（`source/*.hx` 没有包目录），所以那个年代的脚本写的是裸类名：
 
-There you can learn how to use the 212 PlayState funcions in your mod!
+```lua
+import Boyfriend;                                  -- 现在是 objects.Character
+getPropertyFromClass('ClientPrefs', 'downScroll')  -- 现在在 backend.ClientPrefs.data 里
+getPropertyFromClass('GitarooPause', 'instance')   -- 现在是 substates.PauseSubState
+```
 
-## Credits:
-* Shadow Mario - Main Programmer and Head of Psych Engine.
-* Riveren - Main Artist/Animator of Psych Engine.
+`source/backend/ScriptClassAliases.hx` 维护了约 90 条映射，同时喂给两条路：HScript 通过 `Iris.proxyImports` 解析（`hscript-iris 1.1.3` 原生支持这张表，不需要换 fork），Lua 的 `getPropertyFromClass` / `setPropertyFromClass` 通过 `resolve()` 查表。
 
-### Special Thanks
-* bbpanzu - Ex-Team Member (Programmer).
-* crowplexus - HScript Iris, Input System v3, and Other PRs.
-* Kamizeta - Creator of Pessy, Psych Engine's mascot.
-* MaxNeton - Loading Screen Easter Egg Artist/Animator.
-* Keoiki - Note Splash Animations and Latin Alphabet.
-* SqirraRNG - Crash Handler and Base code for Chart Editor's Waveform.
-* EliteMasterEric - Runtime Shaders support and Other PRs.
-* MAJigsaw77 - .MP4 Video Loader Library (hxvlc).
-* iFlicky - Composer of Psync, Tea Time and some sound effects.
-* KadeDev - Fixed some issues on Chart Editor and Other PRs.
-* superpowers04 - LUA JIT Fork.
-* CheemsAndFriends - Creator of FlxAnimate.
-* Ezhalt - Pessy's Easter Egg Jingle.
-* MaliciousBunny - Video for the Final Update.
+### ClientPrefs
 
-***
+0.6.3 的设置项是 `ClientPrefs.downScroll` 这样的静态字段，1.0 全部收进了 `ClientPrefs.data`。`ClientPrefs` 里补了 32 个转发属性，老脚本读写都会落在同一个 `data` 上。
 
-# Features
+`globalAntialiasing → antialiasing`、`arrowHSV → arrowRGB`（做了 HSB/RGB 换算）；`noteSplashes` / `cursing` / `violence` / `controllerMode` 在 1.0 已被删掉，用静态后备变量接住，不崩，但也不生效。
 
-## Attractive animated dialogue boxes:
+### HUD 层级
 
-![Animated Dialogue Boxes](docs/img/dialogue.gif)
+1.0 把 `healthBar` / `iconP1` / `scoreTxt` / `timeBar` 全塞进了 `PlayState.uiGroup`（一个 `FlxSpriteGroup`）。而 `setObjectOrder` / `getObjectOrder` 依然按 `PlayState.members` 找索引 —— 结果是：
 
-## New Main Menu
-* A brand new menu that makes your experience even better!
-![Main Menu](docs/img/MainMenu.png)
+- `getObjectOrder('healthBar')` 返回 `-1`
+- `setObjectOrder('healthBar', N)` 的 `remove()` 静默失败，`insert()` 把它直接插进 members 顶层，等于把血条从 UI 组里拽出来甩到所有 mod 贴图上面
 
-## Mod Support
-* Probably one of the main points of this engine, you can code in .lua files outside of the source code, making your own weeks without even messing with the source!
-* Comes with a Mod Organizing/Disabling Menu.
-![Mod Support](docs/img/ModsMenu.png)
+这个 fork 在 `create()` 末尾把 `uiGroup` **展开成普通 members**（`uiGroup` 自身没有任何整体变换，展开是视觉无操作），旧 mod 那套按 members 索引做布局的代码就全部恢复了。
 
+顺带补的：
 
-## Atleast one change to every week:
-### Week 1:
-  * New Dad Left sing sprite
-  * Unused stage lights are now used
-  * Dad Battle has a spotlight effect for the breakdown
-### Week 2:
-  * Both BF and Skid & Pump does "Hey!" animations
-  * Thunders does a quick light flash and zooms the camera in slightly
-  * Added a quick transition/cutscene to Monster
-### Week 3:
-  * BF does "Hey!" during Philly Nice
-  * Blammed has a cool new colors flash during that sick part of the song
-### Week 4:
-  * Better hair physics for Mom/Boyfriend (Maybe even slightly better than Week 7's :eyes:)
-  * Henchmen die during all songs. Yeah :(
-### Week 5:
-  * Bottom Boppers and GF does "Hey!" animations during Cocoa and Eggnog
-  * On Winter Horrorland, GF bops her head slower in some parts of the song.
-### Week 6:
-  * On Thorns, the HUD is hidden during the cutscene
-  * Also there's the Background girls being spooky during the "Hey!" parts of the Instrumental
+| 对象 | 说明 |
+|---|---|
+| `healthBarBG` | 1.0 里没有这个对象，背景条在 `Bar.bg` 里，开了个只读通道 |
+| `modchartSprites` / `modchartTexts` / `modchartSounds` / `modchartSaves` | 1.0 统一成了 `MusicBeatState.variables`，用只读属性指回同一份数据 |
+| `modchartTweens` / `modchartTimers` | 1.0 直接删了，补回字段，并在 `destroy()` 里清空 |
+| `instancesExclude` | 旧 HScript 注入时用的排除表 |
 
-## Cool new Chart Editor changes and countless bug fixes
-![Chart Editor](docs/img/chart.png)
-* You can now chart "Event" notes, which are bookmarks that trigger specific actions that usually were hardcoded on the vanilla version of the game.
-* Your song's BPM can now have decimal values
-* You can manually adjust a Note's strum time if you're really going for milisecond precision
-* You can change a note's type on the Editor, it comes with five example types:
-  * Alt Animation: Forces an alt animation to play, useful for songs like Ugh/Stress
-  * Hey: Forces a "Hey" animation instead of the base Sing animation, if Boyfriend hits this note, Girlfriend will do a "Hey!" too.
-  * Hurt Notes: If Boyfriend hits this note, he plays a miss animation and loses some health.
-  * GF Sing: Rather than the character hitting the note and singing, Girlfriend sings instead.
-  * No Animation: Character just hits the note, no animation plays.
+### Bar
 
-## Multiple editors to assist you in making your own Mod
-![Master Editor Menu](docs/img/editors.png)
-* Working both for Source code modding and Downloaded builds!
+`timeBar` / `healthBar` 在 0.6.3 是 `FlxBar`（普通 sprite），0.7 起变成 `Bar extends FlxSpriteGroup`。而 `FlxSpriteGroup.set_width` 是**空实现**：
 
-## Story mode menu rework:
-![Story Mode Menu](docs/img/storymode.png)
-* Added a different BG to every song (less Tutorial)
-* All menu characters are now in individual spritesheets, makes modding it easier.
+```haxe
+override function set_width(Value:Float):Float { return Value; }  // 值直接丢掉
+```
 
-## Credits menu
-![Credits Menu](docs/img/credits.png)
-* You can add a head icon, name, description and a Redirect link for when the player presses Enter while the item is currently selected.
+所以 `setProperty('timeBar.width', 500)` 从 0.7.3 起就一直静默失效。`Bar` 里补了 `set_width` / `set_height`，转发到真正的 `barWidth` / `barHeight` 并同步缩放背景；另补 `fillDirection`（`FlxBar` 的老属性，映射到 `leftToRight`）。
 
-## Awards/Achievements
-* The engine comes with 16 example achievements that you can mess with and learn how it works (Check Achievements.hx and search for "checkForAchievement" on PlayState.hx)
-![Achievements](docs/img/Achievements.png)
+### Lua API
 
-## Options menu:
-* You can change Note colors, Delay and Combo Offset, Controls and Preferences there.
- * On Preferences you can toggle Downscroll, Middlescroll, Anti-Aliasing, Framerate, Low Quality, Note Splashes, Flashing Lights, etc.
-![Options](docs/img/Options.png)
+对照 0.7.3 源码，1.0.4 只缺下面这些，都补回来了：
 
-## Other gameplay features:
-* When the enemy hits a note, their strum note also glows.
-* Lag doesn't impact the camera movement and player icon scaling anymore.
-* Some stuff based on Week 7's changes has been put in (Background colors on Freeplay, Note splashes)
-* You can reset your Score on Freeplay/Story Mode by pressing Reset button.
-* You can listen to a song or adjust Scroll Speed/Damage taken/etc. on Freeplay by pressing Space.
-* You can enable "Combo Stacking" in Gameplay Options. This causes the combo sprites to just be one sprite with an animation rather than sprites spawning each note hit.
+`getGlobalFromScript`、`setGlobalFromScript`、`getScore`、`getMisses`、`getHits`、`changePresence`
 
+另外补了 `FunkinLua.get()`（0.7.3 的脚本互读靠它）和 `getVarInArray` / `getFlxEaseByString`（1.0 移进了 `LuaUtils`）。
 
-#### Psych Engine by ShadowMario, Friday Night Funkin' by ninjamuffin99
+### 退出时崩溃
+
+mod 在 `onDestroy` 里创建 tween 是常见写法（estll 就是）。而 `FlxGame.switchState` 的顺序是：
+
+```
+preStateSwitch.dispatch()   ← 官方在这里清了一次 tween
+_state.destroy()            ← mod 在这里又建了新的，逃过清理
+_state = nextState.create() ← 新 state 这时才建
+```
+
+那些 tween 的回调活在 HScript 里，脚本一死、0.5 秒后回调就空引用。`destroy()` 里在脚本销毁之后补了 `FlxTween.globalManager.clear()` + `FlxTimer.globalManager.clear()`（和 NovaFlare 在 GameOver 路径上的做法一致）。
+
+### 其它
+
+- `moreLuaErrors` 设置项：关掉时，重复的 Lua 警告/错误只打印一次（Gameplay Settings 里有开关）
+- `Character` 的 `position` / `camera_position` / `sing_duration` 缺字段兜底
+- `addHaxeLibrary` 走别名表解析，`addHaxeLibrary('FunkinLua')` 能正常拿到类
+
+---
+
+## 二、FunkinJS
+
+让引擎读 `.js` 脚本。
+
+实现方式一句话：**把 `{` 删掉，把 `}` 换成 `end`，然后整段交给现成的 Lua 解释器**。
+
+```js
+function onCreatePost() {              function onCreatePost()
+    setProperty('bf.x', 600)     →      setProperty('bf.x', 600)
+}                                      end
+```
+
+没有 V8，没有 QuickJS，没有 AST。
+
+转译器是词法扫描而不是无脑替换：字符串里的 `{ }`、对象字面量、`//` 注释都原样保留，只有「代码块」的花括号会被转换（判断依据是 `{` 前面那个非空白字符）。
+
+用法：把脚本放 `mods/<mod>/scripts/xxx.js`，或者 `mods/<mod>/data/<song>/xxx.js`。引擎在找不到同名 `.lua` 时会自动回退到 `.js`。
+
+**已知限制**（和原引擎一致）：不处理分号、不支持 `let` / `const`、不处理箭头函数，`for (var i = 0; ...)` 这种写法也过不了。
+
+---
+
+## 三、JavaScriptUtils.hx
+
+`source/psychlua/JavaScriptUtils.hx` 里存的是某个同类项目 issue 区的**全文存档**（30 条，7.3 万字）。纯注释文件，不参与编译。
+
+`FunkinJS.verifyUtilsIntegrity()` 在 `Main.main()` 第一行校验它的 FNV-1a 指纹，对不上就 `Sys.exit(1)` 直接终止进程 —— 不弹窗、不降级、不打日志然后继续跑。
+
+改动过该文件的话，必须同步指纹：
+
+```bash
+python .workbuddy/hash_utils.py
+```
+
+把输出填进 `FunkinJS.hx` 的 `UTILS_FNV`，否则下次启动退出码 1。
+
+> 发行版里没有 `source/` 目录，找不到文件时会放行。这个校验只防「改源码的人」。
+
+---
+
+## 构建
+
+依赖和上游一致，参照 [docs/BUILDING.md](docs/BUILDING.md)。
+
+```bash
+haxelib run lime build windows
+```
+
+Windows 上如果卡在 MSVC / Windows SDK 探测（lime 找不到 `vcvarsall`），直接注入环境变量比修 VS 安装快：
+
+```bash
+export PATH="/g/vs/program/VC/Tools/MSVC/<version>/bin/HostX64/x64:$PATH"
+export INCLUDE='<MSVC>/include;<SDK>/ucrt;<SDK>/shared;<SDK>/um;<SDK>/winrt;<SDK>/cppwinrt'
+export LIB='<MSVC>/lib/x64;<SDK>/ucrt/x64;<SDK>/um/x64'
+haxelib run lime build windows
+```
+
+首次全量约 30 分钟，之后增量几分钟。
+
+**注意**：构建前先关掉正在运行的游戏，否则 `lime.ndll` 被占用，会在复制阶段失败。
+
+---
+
+## 目录
+
+```
+source/
+├── backend/
+│   ├── ScriptClassAliases.hx    # 0.6.3 裸类名 → 现代全名
+│   ├── ClientPrefs.hx           # 含旧静态字段转发
+│   └── Song.hx                  # 谱面格式识别
+├── psychlua/
+│   ├── FunkinJS.hx              # JS 转译层 + 完整性校验
+│   └── JavaScriptUtils.hx       # issue 存档（纯注释）
+├── objects/Bar.hx               # 尺寸 / 填充方向兼容
+└── states/PlayState.hx          # uiGroup 展开、旧容器、退出清理
+```
+
+---
+
+## 致谢
+
+- [Psych Engine](https://github.com/ShadowMario/FNF-PsychEngine) —— 上游
+- [NovaFlare Engine](https://github.com/NovaFlare-Engine-Concentration/FNF-NovaFlare-Engine) —— 兼容层的思路参考（`FlxTween.globalManager.clear()` 那套）
+- 以及 issue 存档里那 30 位，虽然大概没人希望以这种方式被记住
