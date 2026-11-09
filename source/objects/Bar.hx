@@ -155,6 +155,8 @@ class Bar extends FlxSpriteGroup
 	// back), so scripts doing setProperty('timeBar.width', 500) lose it silently. Up to 0.6.3
 	// these bars were plain FlxBar objects where width/height actually worked, so route the
 	// old properties into the real bar size and keep the background in sync.
+	// get_* has to come along too: the group version measures the children (bg is barWidth + 6),
+	// so a write would read back as 506 instead of 500.
 	override function set_width(Value:Float):Float
 	{
 		var newWidth:Int = Std.int(Value);
@@ -169,6 +171,8 @@ class Bar extends FlxSpriteGroup
 		return Value;
 	}
 
+	override function get_width():Float return barWidth;
+
 	override function set_height(Value:Float):Float
 	{
 		var newHeight:Int = Std.int(Value);
@@ -182,6 +186,8 @@ class Bar extends FlxSpriteGroup
 		barHeight = newHeight;
 		return Value;
 	}
+
+	override function get_height():Float return barHeight;
 
 	// FlxBar (0.6.3) exposed fillDirection; map it onto leftToRight
 	public var fillDirection(get, set):Int;

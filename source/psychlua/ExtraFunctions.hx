@@ -194,6 +194,29 @@ class ExtraFunctions
 		Lua_helper.add_callback(lua, "getTextFromFile", function(path:String, ?ignoreModFolders:Bool = false) {
 			return Paths.getTextFromFile(path, ignoreModFolders);
 		});
+		// 抄自 NovaFlare：把 json 文件读成 lua 表。路径走 Paths.getPath，会先找 mod 目录，
+		// 后缀 .json 可写可不写。
+		Lua_helper.add_callback(lua, "readJson", function(jsonFile:String) {
+			try {
+				var path:String = Paths.getPath(jsonFile, TEXT);
+				#if sys
+				if(!FileSystem.exists(path) && FileSystem.exists(path + '.json'))
+					path += '.json';
+
+				if(!FileSystem.exists(path))
+				{
+					FunkinLua.luaTrace('readJson: could not find "' + jsonFile + '"', false, false, FlxColor.RED);
+					return null;
+				}
+				return haxe.Json.parse(File.getContent(path));
+				#else
+				return null;
+				#end
+			} catch(e:Dynamic) {
+				FunkinLua.luaTrace('readJson: ' + e, false, false, FlxColor.RED);
+			}
+			return null;
+		});
 		Lua_helper.add_callback(lua, "directoryFileList", function(folder:String) {
 			var list:Array<String> = [];
 			#if sys

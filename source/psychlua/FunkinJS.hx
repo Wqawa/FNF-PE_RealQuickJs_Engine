@@ -160,6 +160,12 @@ class FunkinJS
 				var isBlock:Bool = isCodeBlock(code, i);
 				blockStack.push(isBlock);
 				if(!isBlock) out.add('{');
+				else
+				{
+					// if (x) { 光把 { 删掉是 if (x) ... end，Lua 不认，得补上 then / do
+					var opener:String = blockOpener(code, i);
+					if(opener.length > 0) out.add(opener);
+				}
 				i++;
 				continue;
 			}
@@ -167,7 +173,33 @@ class FunkinJS
 			if(ch == '}')
 			{
 				var isBlock:Bool = (blockStack.length > 0) ? blockStack.pop() : true;
-				out.add(isBlock ? 'end' : '}');
+				if(!isBlock)
+				{
+					out.add('}');
+					i++;
+					continue;
+				}
+
+				// `} else if (x) {` 不能翻成 `end else if ... end`（Lua 里 end 后面不能挂 else），
+				// 得是 `elseif (x) then`；`} else {` 则是 `else`，此时那个块不写 end。
+				var peek:Int = skipSpaces(code, i + 1);
+				if(matchWord(code, peek, 'else'))
+				{
+					var afterElse:Int = skipSpaces(code, peek + 4);
+					if(matchWord(code, afterElse, 'if'))
+					{
+						out.add('elseif');
+						i = afterElse + 2;
+					}
+					else
+					{
+						out.add('else');
+						i = peek + 4;
+					}
+					continue;
+				}
+
+				out.add('end');
 				i++;
 				continue;
 			}
@@ -180,8 +212,7 @@ class FunkinJS
 	}
 
 	/** 判断这个 `{` 是代码块还是对象字面量。 */
-	static function isCodeBlock(code:String, bracePos:Int):Bool
-	{
+	static function isCodeBlock(code:String, bracePos:Int):Bool	{
 		var i:Int = bracePos - 1;
 		while(i >= 0)
 		{
@@ -218,6 +249,77 @@ class FunkinJS
 		chars.reverse();
 		var kw:String = chars.join('').toLowerCase();
 		return kw == 'else' || kw == 'try' || kw == 'do' || kw == 'finally';
+	}
+
+	/**
+	 * 代码块前面该补什么关键字。`if (x) {` 在 Lua 里是 `if (x) then`，
+	 * `while (x) {` 是 `while (x) do`，别的（function / else / try）本来就不用补。
+	 *
+	 * 只看括号前那个词，所以 `else if (x) {` 也能认成 if。
+	 * 表达式里出现字符串带括号的情况没处理，够用就行。
+	 */
+	static function blockOpener(code:String, bracePos:Int):String
+	{
+		var i:Int = bracePos - 1;
+		while(i >= 0 && isSpaceChar(code.charAt(i))) i--;
+		if(i < 0) return '';
+
+		if(code.charAt(i) == ')')
+		{
+			var depth:Int = 0;
+			var j:Int = i;
+			while(j >= 0)
+			{
+				var c:String = code.charAt(j);
+				if(c == ')') depth++;
+				else if(c == '(')
+				{
+					depth--;
+					if(depth == 0) break;
+				}
+				j--;
+			}
+			if(j < 0) return '';
+			i = j - 1;
+		}
+
+		// `if (x) {` 里 `if` 和 `(` 之间有空格，往回读完关键字前先跳过
+		while(i >= 0 && isSpaceChar(code.charAt(i))) i--;
+
+		var end:Int = i;
+		while(i >= 0 && isWordChar(code.charCodeAt(i))) i--;
+		if(end < i + 1) return '';
+
+		var word:String = code.substring(i + 1, end + 1).toLowerCase();
+		return switch(word)
+		{
+			case 'if' | 'elseif': ' then';
+			case 'while' | 'for': ' do';
+			default: '';
+		}
+	}
+
+	static inline function isSpaceChar(ch:String):Bool
+		return ch == ' ' || ch == '\t' || ch == '\n' || ch == '\r';
+
+	static inline function isWordChar(c:Int):Bool
+		return (c >= 97 && c <= 122) || (c >= 65 && c <= 90) || c == 95 || (c >= 48 && c <= 57);
+
+	static function skipSpaces(code:String, from:Int):Int
+	{
+		var i:Int = from;
+		while(i < code.length && isSpaceChar(code.charAt(i))) i++;
+		return i;
+	}
+
+	/** 从 at 开始是不是一个完整的单词（后面不接标识符字符），不分大小写。 */
+	static function matchWord(code:String, at:Int, word:String):Bool
+	{
+		if(at < 0 || at + word.length > code.length) return false;
+		if(code.substr(at, word.length).toLowerCase() != word) return false;
+		var next:Int = at + word.length;
+		if(next < code.length && isWordChar(code.charCodeAt(next))) return false;
+		return true;
 	}
 
 	/**

@@ -94,11 +94,30 @@ class Native
 		if (display != null)
 		{
 			final dpiScale:Float = display.dpi / 96;
-			@:privateAccess Application.current.window.width = Std.int(Main.game.width * dpiScale);
-			@:privateAccess Application.current.window.height = Std.int(Main.game.height * dpiScale);
+			var winW:Int = Std.int(Main.game.width * dpiScale);
+			var winH:Int = Std.int(Main.game.height * dpiScale);
 
-			Application.current.window.x = Std.int((Application.current.window.display.bounds.width - Application.current.window.width) / 2);
-			Application.current.window.y = Std.int((Application.current.window.display.bounds.height - Application.current.window.height) / 2);
+			// DPI 补偿是为了让 1280x720 在缩放屏上还是 1280x720 的物理像素。
+			// 但 150% 缩放的 1080p 屏上 1280*1.5 = 1920，正好铺满整块屏，看着就是全屏启动。
+			// 这里把窗口卡在屏幕的 85% 以内，爱怎么缩放都不会盖满。
+			final maxW:Int = Std.int(display.bounds.width * 0.85);
+			final maxH:Int = Std.int(display.bounds.height * 0.85);
+			if (winW > maxW)
+			{
+				winH = Std.int(winH * maxW / winW);
+				winW = maxW;
+			}
+			if (winH > maxH)
+			{
+				winW = Std.int(winW * maxH / winH);
+				winH = maxH;
+			}
+
+			@:privateAccess Application.current.window.width = winW;
+			@:privateAccess Application.current.window.height = winH;
+
+			Application.current.window.x = Std.int((Application.current.window.display.bounds.width - winW) / 2);
+			Application.current.window.y = Std.int((Application.current.window.display.bounds.height - winH) / 2);
 		}
 
 		untyped __cpp__('

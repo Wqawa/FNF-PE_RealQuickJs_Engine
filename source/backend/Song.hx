@@ -244,7 +244,19 @@ class Song
 		if(Reflect.field(songJson, 'player1') == null) Reflect.setField(songJson, 'player1', 'bf');
 		if(Reflect.field(songJson, 'player2') == null) Reflect.setField(songJson, 'player2', 'dad');
 		if(Reflect.field(songJson, 'gfVersion') == null) Reflect.setField(songJson, 'gfVersion', 'gf');
-		if(Reflect.field(songJson, 'stage') == null) Reflect.setField(songJson, 'stage', 'stage');
+
+		// 老谱面（0.6.x 那批本体的）根本没有 stage 字段。以前这里一律填 'stage'，
+		// 结果全部走 Week 1 的舞台：背景永远是 stageback，舞台事件（Philly Glow 之类）也没人接。
+		// 这里按曲名反推（spookeez→spooky、pico→philly…），推断不到才落回 'stage'。
+		// 注意必须在 StageData.loadDirectory 之前定下来，否则 forceNextDirectory 会是空的，
+		// LoadingState 就不会把 currentLevel 切到对应的 week 目录，图还是会找不到。
+		var stageField:String = cast Reflect.field(songJson, 'stage');
+		if(stageField == null || stageField.length < 1)
+		{
+			var songName:String = cast Reflect.field(songJson, 'song');
+			if(songName != null && songName.length > 0)
+				Reflect.setField(songJson, 'stage', StageData.vanillaSongStage(Paths.formatToSongPath(songName)));
+		}
 		if(Reflect.field(songJson, 'format') == null) Reflect.setField(songJson, 'format', 'psych_v1_convert');
 		if(Reflect.field(songJson, 'events') == null) Reflect.setField(songJson, 'events', []);
 		if(Reflect.field(songJson, 'notes') == null) Reflect.setField(songJson, 'notes', []);

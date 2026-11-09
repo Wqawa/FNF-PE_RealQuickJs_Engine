@@ -107,6 +107,12 @@ class FunkinLua {
 		set('startedCountdown', false);
 		set('curStage', PlayState.SONG.stage);
 
+		// 0.6.x/0.7.x 一直在给脚本塞这两个，老 mod 拿来做视差；PlayState.update 里每帧刷
+		set('cameraX', 0);
+		set('cameraY', 0);
+		// 1.0 的谱面编辑器不再跑 lua，永远是 false，但老脚本会读它做分支
+		set('inChartEditor', false);
+
 		set('isStoryMode', PlayState.isStoryMode);
 		set('difficulty', PlayState.storyDifficulty);
 
@@ -672,6 +678,13 @@ class FunkinLua {
 		});
 		Lua_helper.add_callback(lua, "noteTweenDirection", function(tag:String, note:Int, value:Dynamic, duration:Float, ?ease:String = 'linear') {
 			return noteTweenFunction(tag, note, {direction: value}, duration, ease);
+		});
+		// 抄自 NovaFlare：一次补 x/y 两个分量，effect 上跟 noteTweenX/Y 串联起来用
+		Lua_helper.add_callback(lua, "noteTweenScale", function(tag:String, note:Int, value:Dynamic, duration:Float, ?ease:String = 'linear') {
+			if(PlayState.instance == null) return null;
+			var strumNote:StrumNote = PlayState.instance.strumLineNotes.members[note % PlayState.instance.strumLineNotes.length];
+			if(strumNote == null) return null;
+			return noteTweenFunction(tag, note, {x: value, y: value}, duration, ease, strumNote.scale);
 		});
 		Lua_helper.add_callback(lua, "mouseClicked", function(?button:String = 'left') {
 			var click:Bool = FlxG.mouse.justPressed;
@@ -1368,6 +1381,17 @@ class FunkinLua {
 			#end
 		});
 
+		// 2P Engine（Lua++）的接口。hxvlc 没有"解码一次存着"的预缓存机制，
+		// 这里只把路径验一遍，至少让老 mod 不会因为函数不存在直接报 nil。
+		Lua_helper.add_callback(lua, "precacheVideo", function(videoFile:String, ?tag:String = null) {
+			#if VIDEOS_ALLOWED
+			if(videoFile == null || videoFile.length < 1) return false;
+			return FileSystem.exists(Paths.video(videoFile));
+			#else
+			return false;
+			#end
+		});
+
 		Lua_helper.add_callback(lua, "playMusic", function(sound:String, ?volume:Float = 1, ?loop:Bool = false) {
 			FlxG.sound.playMusic(Paths.music(sound), volume, loop);
 		});
@@ -1642,12 +1666,14 @@ class FunkinLua {
 
 			var resultStr:String = Lua.tostring(lua, result);
 			if(resultStr != null && result != 0) {
-				trace(resultStr);
-				#if windows
-				lime.app.Application.current.window.alert(resultStr, 'Error on lua script!');
-				#else
-				luaTrace('$scriptName\n$resultStr', true, false, FlxColor.RED);
-				#end
+				// 这里原本在 Windows 上是 window.alert：脚本里一个语法错误就弹模态框，
+				// 整个游戏卡在那儿等人点确定。改成日志 + 屏幕红字，错误照样看得见，但不拦人。
+				var errText:String = '$scriptName\n$resultStr';
+				trace('ERROR on lua script: ' + errText);
+				if(PlayState.instance != null)
+					PlayState.instance.addTextToDebug('ERROR on lua script: ' + errText, FlxColor.RED);
+				else
+					luaTrace(errText, true, false, FlxColor.RED);
 				lua = null;
 				return;
 			}
@@ -1780,12 +1806,15 @@ class FunkinLua {
 		return null;
 	}
 
-	function noteTweenFunction(tag:String, note:Int, data:Dynamic, duration:Float, ease:String)
+	function noteTweenFunction(tag:String, note:Int, data:Dynamic, duration:Float, ease:String, ?tweenTarget:Dynamic)
 	{
 		if(PlayState.instance == null) return null;
 
 		var strumNote:StrumNote = PlayState.instance.strumLineNotes.members[note % PlayState.instance.strumLineNotes.length];
 		if(strumNote == null) return null;
+
+		// 大部分补间打的是 StrumNote 本身，noteTweenScale 要打它的 scale（FlxPoint）
+		var target:Dynamic = (tweenTarget != null) ? tweenTarget : strumNote;
 
 		if(tag != null)
 		{
@@ -1794,7 +1823,7 @@ class FunkinLua {
 			LuaUtils.cancelTween(tag);
 
 			var variables = MusicBeatState.getVariables();
-			variables.set(tag, FlxTween.tween(strumNote, data, duration, {ease: LuaUtils.getTweenEaseByString(ease),
+			variables.set(tag, FlxTween.tween(target, data, duration, {ease: LuaUtils.getTweenEaseByString(ease),
 				onComplete: function(twn:FlxTween)
 				{
 					variables.remove(tag);
@@ -1803,7 +1832,7 @@ class FunkinLua {
 			}));
 			return tag;
 		}
-		else FlxTween.tween(strumNote, data, duration, {ease: LuaUtils.getTweenEaseByString(ease)});
+		else FlxTween.tween(target, data, duration, {ease: LuaUtils.getTweenEaseByString(ease)});
 		return null;
 	}
 

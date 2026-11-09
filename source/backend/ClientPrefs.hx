@@ -197,6 +197,11 @@ class ClientPrefs {
 	static inline function get_safeFrames():Float return data.safeFrames;
 	static inline function set_safeFrames(v:Float):Float return data.safeFrames = v;
 
+	// 0.6.3 有、1.0 的 data 里也还有，只是当年是静态字段
+	public static var comboStacking(get, set):Bool;
+	static inline function get_comboStacking():Bool return data.comboStacking;
+	static inline function set_comboStacking(v:Bool):Bool return data.comboStacking = v;
+
 	// 0.6.3 stored arrow colours as HSV triplets, 1.0 keeps FlxColor arrays
 	public static var arrowHSV(get, set):Array<Array<Int>>;
 	static function get_arrowHSV():Array<Array<Int>>

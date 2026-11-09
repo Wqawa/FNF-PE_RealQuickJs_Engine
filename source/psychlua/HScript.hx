@@ -148,9 +148,18 @@ class HScript extends Iris
 
 		// Some very commonly used classes
 		set('Type', Type);
+		// Iris 只给了 Std / Math / StringTools，这几个是 0.6.x 脚本里当全局用的
+		set('Reflect', Reflect);
+		set('Lambda', Lambda);
+		set('Date', Date);
+		set('EReg', EReg);
+		set('StringBuf', StringBuf);
+		set('Json', haxe.Json);
 		#if sys
 		set('File', File);
 		set('FileSystem', FileSystem);
+		set('Sys', Sys);
+		set('Bytes', haxe.io.Bytes);
 		#end
 		set('FlxG', flixel.FlxG);
 		set('FlxMath', flixel.math.FlxMath);
@@ -162,6 +171,14 @@ class HScript extends Iris
 		set('FlxTween', flixel.tweens.FlxTween);
 		set('FlxEase', flixel.tweens.FlxEase);
 		set('FlxColor', CustomFlxColor);
+		// 0.6.x 的脚本很少写 import，这些类直接当全局用
+		set('FlxObject', flixel.FlxObject);
+		set('FlxRect', flixel.math.FlxRect);
+		set('FlxAngle', flixel.math.FlxAngle);
+		set('FlxStringUtil', flixel.util.FlxStringUtil);
+		set('FlxSpriteUtil', flixel.util.FlxSpriteUtil);
+		set('FlxSave', flixel.util.FlxSave);
+		set('FlxSound', flixel.sound.FlxSound);
 		set('Countdown', backend.BaseStage.Countdown);
 		set('PlayState', PlayState);
 		set('Paths', Paths);
@@ -183,6 +200,10 @@ class HScript extends Iris
 		#if flxanimate
 		set('FlxAnimate', FlxAnimate);
 		#end
+
+		// 0.6.x 的脚本会把类名当值用（`Type.getClassName(Boyfriend)`），
+		// 只有 import 不够，别名表整张倒进变量表
+		backend.ScriptClassAliases.applyToHScript(this);
 
 		// Functions & Variables
 		set('setVar', function(name:String, value:Dynamic) {

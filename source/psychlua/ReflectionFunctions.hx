@@ -161,7 +161,19 @@ class ReflectionFunctions
 			}
 			else groupOrArray.insert(index, obj);
 		});
-		Lua_helper.add_callback(lua, "removeFromGroup", function(group:String, ?index:Int = -1, ?tag:String = null, ?destroy:Bool = true) {
+		Lua_helper.add_callback(lua, "removeFromGroup", function(group:String, ?index:Int = -1, ?tagOrDontDestroy:Dynamic = null, ?destroy:Bool = true) {
+			// 0.6.3: removeFromGroup(group, index, dontDestroy)
+			// 1.0.4: removeFromGroup(group, index, tag, destroy)
+			// 第三个参数是布尔就按老语义走，否则当成 tag
+			var tag:String = null;
+			if(tagOrDontDestroy != null)
+			{
+				if(Std.isOfType(tagOrDontDestroy, Bool))
+					destroy = !(cast tagOrDontDestroy:Bool);
+				else
+					tag = Std.string(tagOrDontDestroy);
+			}
+
 			var obj:FlxSprite = null;
 			if(tag != null)
 			{

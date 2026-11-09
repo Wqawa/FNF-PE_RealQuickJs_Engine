@@ -78,6 +78,12 @@ class ScriptClassAliases
 		// 0.6.3 kept BF in his own class, 0.7 merged him into Character
 		bind('Boyfriend', objects.Character);
 
+		// 名字带 Flx 前缀的那几个附件类，1.0 去掉了前缀
+		bind('AttachedFlxText', objects.AttachedText);
+
+		// 0.6.3 的 lua 文本是独立类，1.0 直接用 FlxText（makeLuaText 返回的就是它）
+		bind('ModchartText', flixel.text.FlxText);
+
 		// -------------------------------------------------------------- cutscenes
 		bind('CutsceneHandler', cutscenes.CutsceneHandler);
 		bind('DialogueBox', cutscenes.DialogueBox);
@@ -109,8 +115,8 @@ class ScriptClassAliases
 		bind('RainShader', shaders.RainShader);
 		bind('WiggleEffect', shaders.WiggleEffect);
 
-		// PhillyGlow used to be its own shader-ish sprite, 1.0 does it with BlendModeEffect
-		bind('PhillyGlow', shaders.BlendModeEffect);
+		// PhillyGlow 在 0.6.3 的 PhillyGlow.hx 里只是模块名（下面那两个类在它里面），
+		// 裸名 PhillyGlow 从来不是类，别给它挂映射——之前错挂 BlendModeEffect 的那条已删。
 
 		// ----------------------------------------------------------------- states
 		bind('AchievementsMenuState', states.AchievementsMenuState);
@@ -134,6 +140,58 @@ class ScriptClassAliases
 		// 0.6.3 shipped a Gitaroo-Man style pause, 1.0 just uses the normal pause
 		bind('GitarooPause', substates.PauseSubState);
 
+		// 0.6.3 的这两个名字在 1.0 都改了：OutdatedState → OutdatedSubState，
+		// VisualsUISubState → VisualsSettingsSubState
+		bind('OutdatedState', substates.OutdatedSubState);
+		bind('VisualsUISubState', options.VisualsSettingsSubState);
+
+		// ---------------------------------------------------------------- 老模块路径
+		// 0.6.3 / 0.7.3 的 stages/、editors/ 是源码根目录下的包，1.0 挪进了 states/。
+		// 老 HScript 里的 `import stages.Spooky;`、`import editors.ChartingState;` 靠这些接回来。
+		// 等价于 NovaFlare 的 InitScriptData 里那套 Iris.proxyImports 路径映射。
+		bind('stages.Spooky', states.stages.Spooky);
+		bind('stages.School', states.stages.School);
+		bind('stages.SchoolEvil', states.stages.SchoolEvil);
+		bind('stages.Philly', states.stages.Philly);
+		bind('stages.Limo', states.stages.Limo);
+		bind('stages.Mall', states.stages.Mall);
+		bind('stages.MallEvil', states.stages.MallEvil);
+		bind('stages.Tank', states.stages.Tank);
+		bind('stages.StageWeek1', states.stages.StageWeek1);
+		bind('stages.Template', states.stages.Template);
+		bind('stages.objects.TankmenBG', states.stages.objects.TankmenBG);
+		bind('stages.objects.BackgroundDancer', states.stages.objects.BackgroundDancer);
+		bind('stages.objects.BackgroundGirls', states.stages.objects.BackgroundGirls);
+		bind('stages.objects.BackgroundTank', states.stages.objects.BackgroundTank);
+		bind('stages.objects.DadBattleFog', states.stages.objects.DadBattleFog);
+		bind('stages.objects.MallCrowd', states.stages.objects.MallCrowd);
+		bind('stages.objects.PhillyGlowGradient', states.stages.objects.PhillyGlowGradient);
+		bind('stages.objects.PhillyGlowParticle', states.stages.objects.PhillyGlowParticle);
+		bind('stages.objects.PhillyTrain', states.stages.objects.PhillyTrain);
+		// 这几个 0.6.3 是裸名
+		bind('TankmenBG', states.stages.objects.TankmenBG);
+		bind('BackgroundDancer', states.stages.objects.BackgroundDancer);
+		bind('BackgroundGirls', states.stages.objects.BackgroundGirls);
+
+		bind('editors.ChartingState', states.editors.ChartingState);
+		bind('editors.CharacterEditorState', states.editors.CharacterEditorState);
+		bind('editors.DialogueCharacterEditorState', states.editors.DialogueCharacterEditorState);
+		bind('editors.DialogueEditorState', states.editors.DialogueEditorState);
+		bind('editors.EditorPlayState', states.editors.content.EditorPlayState);
+		bind('editors.MasterEditorMenu', states.editors.MasterEditorMenu);
+		bind('editors.MenuCharacterEditorState', states.editors.MenuCharacterEditorState);
+		bind('editors.NoteSplashEditorState', states.editors.NoteSplashEditorState);
+		bind('editors.WeekEditorState', states.editors.WeekEditorState);
+
+		// 0.6.3 的选项子状态现在在 options/ 下
+		bind('substates.GameplayChangersSubstate', options.GameplayChangersSubstate);
+
+		// 0.6.3 的 Section 是个独立类，1.0 只剩 SwagSection typedef（壳子在 backend/Song.hx 里）
+		bind('Section', backend.Section);
+		// PhillyGlow 的两个 sprite，0.6.3 是裸名
+		bind('PhillyGlowParticle', states.stages.objects.PhillyGlowParticle);
+		bind('PhillyGlowGradient', states.stages.objects.PhillyGlowGradient);
+
 		// ---------------------------------------------------------------- editors
 		bind('ChartingState', states.editors.ChartingState);
 		bind('CharacterEditorState', states.editors.CharacterEditorState);
@@ -153,6 +211,15 @@ class ScriptClassAliases
 		bind('FunkinLua', psychlua.FunkinLua);
 		bind('LuaUtils', psychlua.LuaUtils);
 		bind('CustomSubstate', psychlua.CustomSubstate);
+
+		// ------------------------------------------------------------------ video
+		// 1.0 把 hxcodec 换成了 hxvlc，老 mod 里 `import hxcodec.flixel.FlxVideo;`
+		// 和 `import hxcodec.VideoHandler;` 都还能解析（实现在 source/hxcodec/）
+		#if VIDEOS_ALLOWED
+		bind('hxcodec.flixel.FlxVideo', hxcodec.flixel.FlxVideo);
+		bind('hxcodec.VideoHandler', hxcodec.VideoHandler);
+		bind('vlc.MP4Handler', vlc.MP4Handler);
+		#end
 	}
 
 	static function bind(name:String, cl:Dynamic):Void
@@ -176,6 +243,24 @@ class ScriptClassAliases
 
 		if(table.exists(className)) return table.get(className);
 		return Type.resolveClass(className);
+	}
+
+	/**
+	 * 把整张表倒进 HScript 的变量表。
+	 * `import` 只能让类型引用生效，但 0.6.x 的脚本还会把类名当值用
+	 * （`Type.getClassName(Boyfriend)`、`GitarooPause.instance`），那种得是变量。
+	 *
+	 * 带点的 key（`stages.Spooky` 这种）是模块路径，hscript 里按字段路径表达式解析，
+	 * 根本不会来查变量表，倒进去也取不出来，跳过。
+	 */
+	public static function applyToHScript(interp:Dynamic):Void
+	{
+		init();
+		for(name in table.keys())
+		{
+			if(name.indexOf('.') != -1) continue;
+			interp.set(name, table.get(name));
+		}
 	}
 
 	public static function exists(className:String):Bool

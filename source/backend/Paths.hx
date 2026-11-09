@@ -166,10 +166,72 @@ class Paths
 		if (currentLevel != null && currentLevel != 'shared')
 		{
 			var levelPath = getFolderPath(file, currentLevel);
-			if (OpenFlAssets.exists(levelPath, type))
+			if (existsOnDiskOrManifest(levelPath, type))
 				return levelPath;
 		}
 		return getSharedPath(file);
+	}
+
+	/**
+	 * 文件到底在不在。
+	 *
+	 * 以前这里只看 OpenFlAssets.exists()，也就是编译时生成的资源清单。
+	 * 但素材是可以编译完再往 bin/assets 里丢的（本体的 base_game、临时放进去的图），
+	 * 那些文件在磁盘上有、清单里没有，于是被判成"不存在"：
+	 * 关卡目录里的图找不到 → 背景缺失；HealthIcon 查不到 icon-xxx → 全部退回 icon-face。
+	 *
+	 * 缓存图片的那条路（cacheBitmap）本来就是先看磁盘的，这里跟它保持一致。
+	 */
+	public static function existsOnDiskOrManifest(path:String, ?type:AssetType = null):Bool
+	{
+		#if MODS_ALLOWED
+		if(FileSystem.exists(path)) return true;
+		#end
+		return OpenFlAssets.exists(path, type);
+	}
+
+	/**
+	 * 脚本文件的统一查找：mods → assets/shared → assets 根。
+	 *
+	 * 0.6.x 的基础资源直接挂在 assets/ 根下（shared 这一层是 0.7 才有的），
+	 * 所以最后还要兜一次根目录。以前 startLuasNamed、.js 兜底、startHScriptsNamed
+	 * 三处各抄一遍这个顺序，改一处忘两处，现在都走这里。
+	 *
+	 * 前三级是相对路径，依赖进程 CWD 恰好是 bin 目录（整个 Paths 都是这个前提，
+	 * modFolders / getSharedPath 同款）。从快捷方式或别的程序拉起游戏时 CWD 可能不对，
+	 * 所以 sys 目标上再按 exe 所在目录锚定重试一遍，找到就返回绝对路径。
+	 */
+	public static function findScriptFile(file:String):String
+	{
+		#if MODS_ALLOWED
+		var modded:String = modFolders(file);
+		if(FileSystem.exists(modded)) return modded;
+		#end
+
+		var shared:String = getSharedPath(file);
+		if(existsOnDiskOrManifest(shared)) return shared;
+
+		var root:String = 'assets/$file';
+		if(existsOnDiskOrManifest(root)) return root;
+
+		#if sys
+		var appDir:String = lime.system.System.applicationDirectory;
+		if(appDir != null)
+		{
+			var absShared:String = appDir + shared;
+			if(FileSystem.exists(absShared)) return absShared;
+
+			var absRoot:String = appDir + root;
+			if(FileSystem.exists(absRoot)) return absRoot;
+
+			#if MODS_ALLOWED
+			var absMods:String = appDir + modFolders(file);
+			if(FileSystem.exists(absMods)) return absMods;
+			#end
+		}
+		#end
+
+		return null;
 	}
 
 	inline static public function getFolderPath(file:String, folder = "shared")
@@ -316,7 +378,7 @@ class Paths
 				return true;
 		}
 		#end
-		return (OpenFlAssets.exists(getPath(key, type, parentFolder, false)));
+		return existsOnDiskOrManifest(getPath(key, type, parentFolder, false), type);
 	}
 
 	static public function getAtlas(key:String, ?parentFolder:String = null, ?allowGPU:Bool = true):FlxAtlasFrames
@@ -367,9 +429,24 @@ class Paths
 		return parentFrames;
 	}
 
+	/**
+	 * 图集描述文件（.xml / .txt）优先读磁盘内容。
+	 *
+	 * 原来是把**路径**直接丢给 FlxAtlasFrames，flixel 拿到字符串会当资源 id 去查
+	 * openfl 的清单 —— 编译后才拷进 bin/assets 的图集查不到，xml 变 null，
+	 * fromSparrow 里 xml.getXml() 直接空指针（weekend1 的 phillyStreets 就是这么崩的）。
+	 */
+	static function readTextOrPath(path:String):String
+	{
+		#if MODS_ALLOWED
+		if(FileSystem.exists(path))
+			return File.getContent(path);
+		#end
+		return path;
+	}
+
 	inline static public function getSparrowAtlas(key:String, ?parentFolder:String = null, ?allowGPU:Bool = true):FlxAtlasFrames
 	{
-		if(key.contains('psychic')) trace(key, parentFolder, allowGPU);
 		var imageLoaded:FlxGraphic = image(key, parentFolder, allowGPU);
 		#if MODS_ALLOWED
 		var xmlExists:Bool = false;
@@ -377,7 +454,7 @@ class Paths
 		var xml:String = modsXml(key);
 		if(FileSystem.exists(xml)) xmlExists = true;
 
-		return FlxAtlasFrames.fromSparrow(imageLoaded, (xmlExists ? File.getContent(xml) : getPath(Language.getFileTranslation('images/$key') + '.xml', TEXT, parentFolder)));
+		return FlxAtlasFrames.fromSparrow(imageLoaded, (xmlExists ? File.getContent(xml) : readTextOrPath(getPath(Language.getFileTranslation('images/$key') + '.xml', TEXT, parentFolder))));
 		#else
 		return FlxAtlasFrames.fromSparrow(imageLoaded, getPath(Language.getFileTranslation('images/$key') + '.xml', TEXT, parentFolder));
 		#end
@@ -392,7 +469,7 @@ class Paths
 		var txt:String = modsTxt(key);
 		if(FileSystem.exists(txt)) txtExists = true;
 
-		return FlxAtlasFrames.fromSpriteSheetPacker(imageLoaded, (txtExists ? File.getContent(txt) : getPath(Language.getFileTranslation('images/$key') + '.txt', TEXT, parentFolder)));
+		return FlxAtlasFrames.fromSpriteSheetPacker(imageLoaded, (txtExists ? File.getContent(txt) : readTextOrPath(getPath(Language.getFileTranslation('images/$key') + '.txt', TEXT, parentFolder))));
 		#else
 		return FlxAtlasFrames.fromSpriteSheetPacker(imageLoaded, getPath(Language.getFileTranslation('images/$key') + '.txt', TEXT, parentFolder));
 		#end

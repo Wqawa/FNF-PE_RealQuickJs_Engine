@@ -83,7 +83,11 @@ class DeprecatedFunctions
 		Lua_helper.add_callback(lua, "setLuaSpriteCamera", function(tag:String, camera:String = '') {
 			FunkinLua.luaTrace("setLuaSpriteCamera is deprecated! Use setObjectCamera instead", false, true);
 			if(MusicBeatState.getVariables().exists(tag)) {
-				MusicBeatState.getVariables().get(tag).cameras = [LuaUtils.cameraFromString(camera)];
+				// variables is Map<String, Dynamic>; assigning .cameras on an untyped value
+				// throws "Invalid field:cameras" (it's a get/set property, not a real field),
+				// so it has to go through a typed reference first.
+				var spr:flixel.FlxBasic = cast MusicBeatState.getVariables().get(tag);
+				spr.cameras = [LuaUtils.cameraFromString(camera)];
 				return true;
 			}
 			FunkinLua.luaTrace("Lua sprite with tag: " + tag + " doesn't exist!");
@@ -157,5 +161,83 @@ class DeprecatedFunctions
 			Reflect.getProperty(LuaUtils.getTargetInstance(), group)[index].updateHitbox();
 			FunkinLua.luaTrace('updateHitboxFromGroup is deprecated! Use updateHitbox instead.', false, true);
 		});
+
+		// 0.6.3: debugPrint(text1, text2, text3, text4, text5) —— 全拼成一行
+		// 1.0.4: debugPrint(text, color)
+		// 老 mod 的 debugPrint('hp', hp) 按新签名会把 hp 当颜色名吞掉，文本还在、数值没了。
+		// 这里按"第二个参数像不像颜色"分流，两种写法都认。
+		// 注册得比 FunkinLua 里那次晚，同名会覆盖，所以不用去动原实现。
+		//
+		// 数字（Int/Float）一律不进颜色分支：1.0.4 的 color 参数本来就是 String，
+		// 数字永远不可能是合法的新语义颜色；反过来 8 位十进制数全是合法 hex 字符，
+		// 不排除的话 debugPrint('id', 16711680) 的数值会被当颜色吞掉。
+		// 实在猜不中的 mod 还有逃生门：环境变量 PE_DEBUGPRINT_LEGACY=1 强制老拼接语义。
+		Lua_helper.add_callback(lua, "debugPrint", function(text1:Dynamic = '', ?text2:Dynamic = null,
+				?text3:Dynamic = null, ?text4:Dynamic = null, ?text5:Dynamic = null) {
+			var extra:Array<Dynamic> = [];
+			for (v in [text2, text3, text4, text5])
+				if(v != null) extra.push(v);
+
+			if(!forceLegacyDebugPrint() && extra.length == 1
+				&& !Std.isOfType(extra[0], Int) && !Std.isOfType(extra[0], Float)
+				&& looksLikeColor('' + extra[0]))
+			{
+				// 新写法
+				if(PlayState.instance != null)
+					PlayState.instance.addTextToDebug('' + text1, CoolUtil.colorFromString('' + extra[0]));
+				return;
+			}
+
+			// 老写法：全拼起来
+			var text:String = '' + text1;
+			for (v in extra) text += '' + v;
+
+			if(PlayState.instance != null)
+				PlayState.instance.addTextToDebug(text, FlxColor.WHITE);
+			else
+				trace(text);
+		});
+	}
+
+	// PE_DEBUGPRINT_LEGACY 设成 1/true 后 debugPrint 一律走老拼接语义，不再猜。
+	static var legacyOnly:Null<Bool> = null;
+	static function forceLegacyDebugPrint():Bool
+	{
+		if(legacyOnly != null) return legacyOnly;
+		legacyOnly = false;
+		#if sys
+		var v:String = Sys.getEnv('PE_DEBUGPRINT_LEGACY');
+		legacyOnly = (v == '1' || v == 'true');
+		#end
+		return legacyOnly;
+	}
+
+	// CoolUtil.colorFromString 对不认识的颜色静默返回白色，没法拿来判断"这是不是颜色"，
+	// 所以这边自己认一遍：颜色名 / 6 或 8 位十六进制。
+	static var COLOR_NAMES:Array<String> = [
+		'WHITE', 'BLACK', 'RED', 'GREEN', 'BLUE', 'YELLOW', 'ORANGE', 'PURPLE', 'PINK', 'BROWN',
+		'GRAY', 'GREY', 'CYAN', 'MAGENTA', 'LIME', 'NAVY', 'TEAL', 'OLIVE', 'MAROON', 'SILVER', 'GOLD'
+	];
+
+	static function looksLikeColor(raw:String):Bool
+	{
+		var s:String = raw.trim().toUpperCase();
+		if(s.startsWith('0X') || s.startsWith('#')) s = s.substr(s.startsWith('0X') ? 2 : 1);
+
+		if(s.length == 6 || s.length == 8)
+		{
+			var allHex:Bool = true;
+			for (i in 0...s.length)
+			{
+				var c:Int = s.charCodeAt(i);
+				if(!((c >= 48 && c <= 57) || (c >= 65 && c <= 70)))
+				{
+					allHex = false;
+					break;
+				}
+			}
+			if(allHex) return true;
+		}
+		return COLOR_NAMES.contains(raw.trim().toUpperCase());
 	}
 }
