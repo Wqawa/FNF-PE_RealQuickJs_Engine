@@ -3,10 +3,10 @@
 # 参考 codename_re 的 lazy-build，但依赖已经装好的机器，不下载任何东西。
 #
 # 用法（在仓库任意位置都行）：
-#   bash building/build.sh              增量 release
+#   bash building/build.sh              增量 release（hxcpp 编译缓存默认开）
 #   bash building/build.sh -debug       debug 构建
 #   bash building/build.sh -clean       清掉 export 中间产物后全量重编
-#   bash building/build.sh -clean -cache  全量重编 + 打开 hxcpp 编译缓存（第二次全量会快很多）
+#   bash building/build.sh -no-cache    关掉 hxcpp 编译缓存（排查"缓存里是旧 obj"用）
 #   bash building/build.sh -no-assets   跳过 base_game 素材拷贝
 #   bash building/build.sh -dry         只打印计划，什么都不做
 #
@@ -20,7 +20,7 @@ MODE=release
 CLEAN=0
 ASSETS=1
 DRY=0
-CACHE=0
+CACHE=1
 EXTRA=()
 
 for arg in "$@"; do
@@ -28,7 +28,7 @@ for arg in "$@"; do
 		-debug|--debug)   MODE=debug ;;
 		-clean|--clean)   CLEAN=1 ;;
 		-no-assets)       ASSETS=0 ;;
-		-cache|--cache)   CACHE=1 ;;
+		-no-cache|--no-cache) CACHE=0 ;;
 		-dry|--dry-run)   DRY=1 ;;
 		-h|-help|--help)  sed -n '2,14p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
 		*)                EXTRA+=("$arg") ;;
@@ -162,13 +162,15 @@ if [ "$CLEAN" = 1 ]; then
 	[ "$DRY" = 0 ] && rm -rf "$ROOT/export/$MODE/windows/obj" "$ROOT/export/$MODE/windows/src"
 fi
 
-# hxcpp 编译缓存：只在全量重编时才有收益，日常增量反而要给每个文件写一遍缓存（实测慢几倍），
-# 所以默认关，-clean 之类的全量场景再加 -cache。
+# hxcpp 编译缓存：命中时直接拷 .obj，不再跑 cl.exe。首次填充要给每个文件算一遍哈希 + 写缓存，
+# 所以第一次全量会略慢；之后全量重编省一大截，日常增量本来就没几个文件要编，影响很小。
 if [ "$CACHE" = 1 ]; then
 	CACHE_DIR="${HXCPP_COMPILE_CACHE:-$ROOT/.cache/hxcpp}"
 	if [ "$DRY" = 0 ]; then mkdir -p "$CACHE_DIR" 2>/dev/null && export HXCPP_COMPILE_CACHE="$CACHE_DIR"; fi
+	say "hxcpp 缓存: $CACHE_DIR"
+else
+	say "hxcpp 缓存: 关（-no-cache）"
 fi
-say "hxcpp 缓存: ${HXCPP_COMPILE_CACHE:-(关，全量重编时加 -cache)}"
 
 # ---------------------------------------------------------------- 5/6 编译
 step "5/6 lime build windows"

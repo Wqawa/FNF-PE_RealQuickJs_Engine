@@ -36,7 +36,8 @@ bash building/build.sh -dry       # 只打印计划
 关运行中的游戏 / `-clean` → `lime build windows` → 验收 + 铺 `assets/base_game`。
 Windows 上双击 `building/Build.bat` 等价。日志在 `building/logs/`。
 
-- **hxcpp 缓存默认关**：开着增量编译从 62s 涨到 884s（每个文件都要写一遍缓存），只在 `-clean` 全量时加 `-cache` 划算
+- **hxcpp 缓存默认开**（`.cache/hxcpp`，命中时直接拷 `.obj` 不跑 cl.exe）。首次填充要算哈希 + 写缓存，
+  那次增量 152s；往后稳态增量 73s 左右（不开缓存 42~62s），全量重编省得多。怀疑缓存里躺的是旧 obj 时用 `-no-cache`。
 - `assets/base_game` 是编译**之后**才拷进 bin 的（`BASE_GAME_FILES` 故意留在 `Project.xml` 的 officialBuild 段）
 - `VIDEOS_ALLOWED` 已移出 officialBuild 段（视频要用），代价是 bin 多 111MB 的 libvlc
 
