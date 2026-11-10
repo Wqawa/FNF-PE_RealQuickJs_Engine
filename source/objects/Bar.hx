@@ -76,8 +76,7 @@ class Bar extends FlxSpriteGroup
 	}
 
 	public function updateBar()
-	{
-		if(leftBar == null || rightBar == null) return;
+	{		if(leftBar == null || rightBar == null) return;
 
 		leftBar.setPosition(bg.x, bg.y);
 		rightBar.setPosition(bg.x, bg.y);
@@ -118,6 +117,16 @@ class Bar extends FlxSpriteGroup
 			rightBar.clipRect = new FlxRect(0, 0, Std.int(bg.width), Std.int(bg.height));
 		}
 		updateBar();
+	}
+
+	// FlxSpriteGroup.color 会 transformChildren 把 leftBar / rightBar / bg 一起染色，
+	// 而 0.6.3 的 FlxBar 只染填充条本身。老 mod 用 setProperty('timeBar.color', ...) 调色时，
+	// 背景跟着变色，已填充/未填充的边界就被抹平了，看起来像整条一直是满的。
+	override function set_color(Value:Int):Int
+	{
+		if(leftBar != null) leftBar.color = Value;
+		@:bypassAccessor color = Value;
+		return Value;
 	}
 
 	private function set_percent(value:Float)
