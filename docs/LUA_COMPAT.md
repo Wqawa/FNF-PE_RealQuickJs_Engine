@@ -265,6 +265,48 @@ hex 字符，`debugPrint('id', 16711680)` 数值会被判成颜色。查了 1.0.
 - 存在性判断统一用 `existsOnDiskOrManifest`（桌面端先磁盘后清单），
   跟 `Paths.getPath` 的口径一致。
 
+### 第 8 轮：皮肤路径 / 脚本版本标记（2026-11-10）
+
+**20. 内置皮肤被挪进了子目录** — `objects/Note.hx`、`objects/NoteSplash.hx`、`objects/StrumNote.hx`、`states/LoadingState.hx`
+
+0.6.x / 0.7.x 的 `arrowSkin` / `splashSkin` 写的是 `images/` 根下的裸名（`NOTE_assets`、`noteSplashes`），
+1.0 把内置皮肤拆进了 `noteSkins/` 和 `noteSplashes/`，同名文件已经不在原位，老谱面会直接丢箭头 / 丢 splash。
+
+- `Note.resolveNoteSkin()`：裸名先按原路径找，找不到再试 `noteSkins/<名字>`；带 `/` 的显式路径不动。
+  `Note.reloadNote()` / `StrumNote` / `LoadingState` 的预加载都走它（预加载不归一化的话，正式加载有兜底但预热白做）。
+- `NoteSplash.loadSplash()`：同上，再试 `noteSplashes/<名字><皮肤后缀>`。
+- 判定原则是**能加载就原样用** —— mod 自带的扁平素材（`images/noteSplashes.png`）不受影响。
+
+顺带修了一个隐性开销：`loadSplash` 的 fallback 会把 `texture` 改写成新路径，而 `spawnSplashNote` 里拿
+`texture != loadedTexture` 判断要不要重载 —— 两边永远不相等，每打一个音符都重新加载一遍图集。
+加 `requestedSplash` 记请求名，比较改用它。（NovaFlare 也是这么做的）
+
+**21. 按脚本伪造引擎版本** — `psychlua/FunkinLua.hx`、`psychlua/ReflectionFunctions.hx`
+
+不少 mod 用 `if version == '0.6.3' then` 决定走哪条分支。文件名加 `(%run_v_x.x.x)` 就能让**这一个脚本**看到指定版本：
+
+```
+mods/xxx/scripts/legacy-thing(%run_v_0.6.3).lua
+```
+
+`FunkinLua.parseVersionTag()` 从路径里捞出标记存进 `versionOverride`，构造时用它覆盖 `version` 全局；
+`getPropertyFromClass('states.MainMenuState', 'psychEngineVersion')` 也返回这个值。
+每个脚本一个独立 Lua state，所以其它脚本和引擎自身（标题 / Discord RPC / 日志）仍是真实版本。
+`.js` 脚本走同一条构造路径，一并生效。
+
+**22. Haxe 返回类型推断的坑（差点把整套反射打废）** — `psychlua/ReflectionFunctions.hx`
+
+给 `getPropertyFromClass` 回调加了 `return funk.versionOverride;`（String）之后，Haxe 把整个匿名函数的返回类型
+**推断成了 String** —— 于是 Float / Array / 对象返回值全被 `toString`。回归里表现为：
+
+```
+FAIL|class.oldName.arrowHSV            （数组变成了字符串，type(v) ~= 'table'）
+ERR |class.fullName.Conductor           attempt to compare number with string
+FAIL|class.ClientPrefs.write            （写入后读回比较失败）
+```
+
+v073 掉 4 项、v104 掉 3 项。回调签名补上显式 `:Dynamic` 就恢复了。**以后往这类回调里加 return 一定要标返回类型。**
+
 ### 当前状态
 
 | 脚本 | 用例 | 失败 |
@@ -273,6 +315,8 @@ hex 字符，`debugPrint('id', 16711680)` 数值会被判成颜色。查了 1.0.
 | `compat_v104.lua`（1.0.4 写法） | 32 | 0 |
 | `compat_more.lua`（补充） | 37 | 0 |
 | `compat_edge.lua`（边界 + js） | 10 | 0 |
+| `versionTag(%run_v_0.7.3).lua`（版本标记） | 1 | 0 |
+| `versionPlain.lua`（版本标记不泄漏） | 1 | 0 |
 | `stages/stage.lua` / `custom_notetypes/*.lua` / `custom_events/*.lua` | 三类都能加载并收到回调 | 0 |
 | `compat_callbacks.lua`（回调计数） | onCreate / onCreatePost / onStepHit / onBeatHit / onSectionHit / onSpawnNote / opponentNoteHit 全部有触发 | — |
 

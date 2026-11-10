@@ -14,10 +14,16 @@ Psych 1.0 相比 0.6.x / 0.7.x 改了不少底层结构。官方自己做了不�
 
 | 问题 | 处理 |
 |---|---|
-| 0.7.x 及更早的谱面用「相对 lane + `mustHitSection`」表示音符归属，1.0 用绝对 lane | `Song.parseJSON` 识别 `{"song": {...}}` 包裹层来判定格式，默认仍走官方 `convert()` 转成绝对 lane，不改变现有行为 |
-| 想按旧语义回放（比如转换后整侧反了） | 暂停菜单里多了 `Change Chart Ver`，切换 `Pe-1.0.4` / `Pe-0.7.3` 后重载谱面 |
+| 0.7.x 及更早的谱面用「相对 lane + `mustHitSection`」表示音符归属，1.0 用绝对 lane | `Song.parseJSON` 识别 `{"song": {...}}` 包裹层来判定格式；判成 1.0 语义时走官方 `convert()` 转成绝对 lane |
+| 老谱面默认按哪套 lane 语义回放 | 读谱面文件的**创建时间**：早于 PE 1.0 发布（2024-10-15 01:54 UTC）走 `Pe-0.7.3`，晚的走 `Pe-1.0.4`；拿不到时间（谱面被打包进 assets）时退回 `format` 字段判定 |
+| 自动判错了，或者想手动确认 | 暂停菜单 `Change Chart Ver` 切到另一套后重载谱面，只对本局有效。暂停界面右上角显示当前引擎和判定来源（`manual` / `file date` / `chart format`） |
 | 老谱缺 `bpm` / `speed` / `needsVoices` 等字段 | `fixMissingFields()` 兜底，缺 bpm 会让所有音符变 NaN |
 | 独立 `events.json` 会覆盖主谱面的格式判定 | 按 sidecar 跳过版本写入 |
+
+按文件时间自动判定有两个边界：
+
+- 谱面没有 `{"song": {...}}` 包裹层时**不**按时间降级 —— 那个形状是 1.0 之后才有的，lane 必然已经是绝对坐标，套旧语义只会把整首歌左右镜像。
+- 创建时间本身不可靠：从压缩包里解出来的谱面，创建时间是解压那一刻，会被判成新谱面。这种情况用暂停菜单手动切。
 
 ### 类名与 API
 
@@ -91,6 +97,31 @@ _state = nextState.create() ← 新 state 这时才建
 - `Character` 的 `position` / `camera_position` / `sing_duration` 缺字段兜底
 - `addHaxeLibrary` 走别名表解析，`addHaxeLibrary('FunkinLua')` 能正常拿到类
 
+### 皮肤路径
+
+0.6.x / 0.7.x 的 `arrowSkin` / `splashSkin` 写的是 `images/` 根下的裸名（`NOTE_assets`、`noteSplashes`），1.0 把内置皮肤挪进了 `noteSkins/` 和 `noteSplashes/`，同名文件已经不在原位。
+
+| 位置 | 处理 |
+|---|---|
+| `Note.resolveNoteSkin()`（Note / StrumNote / LoadingState 共用） | 裸名先按原路径找，找不到再试 `noteSkins/<名字>`。带 `/` 的显式路径不动 |
+| `NoteSplash.loadSplash()` | 同上，找不到再试 `noteSplashes/<名字><皮肤后缀>`；同时用 `requestedSplash` 记录请求名，避免 `texture` 被解析成新路径后每次 spawn 都判定"变了"而重载图集 |
+
+判定原则是**能加载就原样用** —— mod 自带的扁平素材（`images/noteSplashes.png`）不受影响，只有确实指向 1.0 内置皮肤的裸名才改写。
+
+### 按脚本伪造引擎版本
+
+有些 mod 的 Lua 里写着 `if version == '0.6.3' then ...`，靠引擎版本决定走哪条分支，在 1.0.4 上会走进错误的那条。给文件名加个后缀，就能让**那一个脚本**看到它想要的版本：
+
+```
+mods/xxx/scripts/legacy-thing(%run_v_0.6.3).lua
+```
+
+- 这个脚本里 `version` 和 `getPropertyFromClass('states.MainMenuState', 'psychEngineVersion')` 都返回 `0.6.3`
+- 其它脚本、引擎自己（标题界面、Discord RPC、日志）仍然是真实的 `1.0.4`
+- 每个脚本一个独立的 Lua 环境，互不影响，也不用改 mod 源码
+
+实现见 `FunkinLua.versionOverride`：构造时用正则从路径里捞出 `(%run_v_x.x.x)`，只影响该脚本的 `version` 全局和版本字段查询。
+
 ---
 
 ## 二、FunkinJS
@@ -135,15 +166,20 @@ python .workbuddy/hash_utils.py
 
 ## 构建
 
-依赖和上游一致，参照 [docs/BUILDING.md](docs/BUILDING.md)。
-
 ```bash
-haxelib run lime build windows
+bash building/build.sh          # 增量 release
+bash building/build.sh -debug   # debug
+bash building/build.sh -clean   # 全量重编（改了 Project.xml / 诡异链接错误时）
 ```
 
-Windows 上如果卡在 MSVC / Windows SDK 探测（lime 找不到 `vcvarsall`），直接注入环境变量比修 VS 安装快：
+Windows 上也可以直接双击 `building/Build.bat`。脚本会自己找 Haxe / MSVC / Windows SDK、核对 `Project.xml` 要求的库、关掉正在运行的游戏，编译完自动把 `assets/base_game` 铺进 bin。细则见 [building/README.md](building/README.md)。
+
+依赖的安装步骤和上游一致，参照 [docs/BUILDING.md](docs/BUILDING.md) —— 只需配一次。
+
+脚本探测不出 MSVC 时，手动注入环境变量比修 VS 安装快：
 
 ```bash
+export HAXELIB_PATH="$PWD/.haxelib"
 export PATH="/g/vs/program/VC/Tools/MSVC/<version>/bin/HostX64/x64:$PATH"
 export INCLUDE='<MSVC>/include;<SDK>/ucrt;<SDK>/shared;<SDK>/um;<SDK>/winrt;<SDK>/cppwinrt'
 export LIB='<MSVC>/lib/x64;<SDK>/ucrt/x64;<SDK>/um/x64'
@@ -159,6 +195,10 @@ haxelib run lime build windows
 ## 目录
 
 ```
+building/
+├── build.sh                     # 一站式编译（探工具链 → 查库 → 编译 → 铺素材 → 验收）
+└── Build.bat                    # Windows 双击入口
+
 source/
 ├── backend/
 │   ├── ScriptClassAliases.hx    # 0.6.3 裸类名 → 现代全名
