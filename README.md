@@ -71,6 +71,8 @@ override function set_width(Value:Float):Float { return Value; }  // 值直接�
 
 所以 `setProperty('timeBar.width', 500)` 从 0.7.3 起就一直静默失效。`Bar` 里补了 `set_width` / `set_height`，转发到真正的 `barWidth` / `barHeight` 并同步缩放背景；另补 `fillDirection`（`FlxBar` 的老属性，映射到 `leftToRight`）。
 
+`color` 也按老语义走了：`FlxSpriteGroup.set_color` 会 `transformChildren` 把填充条、剩余条、背景一起染色，mod 调色时背景和填充同色，"已填充/未填充"的边界就没了（看起来整条一直满）。`Bar` 里 override 了 `set_color`，只染填充条。
+
 ### Lua API
 
 对照 0.7.3 源码，1.0.4 只缺下面这些，都补回来了：

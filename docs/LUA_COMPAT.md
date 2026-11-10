@@ -307,6 +307,16 @@ FAIL|class.ClientPrefs.write            （写入后读回比较失败）
 
 v073 掉 4 项、v104 掉 3 项。回调签名补上显式 `:Dynamic` 就恢复了。**以后往这类回调里加 return 一定要标返回类型。**
 
+**23. `Bar.color` 把整条染色，填充边界消失** — `objects/Bar.hx`
+
+0.6.3 的 `FlxBar.color` 只作用于填充条。1.0 的 `Bar` 是 `FlxSpriteGroup`，父类 `set_color`
+会 `transformChildren` 把 `leftBar` / `rightBar` / `bg` 一起染色，mod 用 `setProperty('timeBar.color', ...)`
+调色时背景和填充变成同一个颜色，"已填充/未填充"的边界就没了，看起来整条时间条一直是满的
+（Marios-Madness-HEIHUA pack 的 `HUD2.lua` 第 20 行）。
+
+`Bar` 里 override `set_color`，只染 `leftBar`，跳过 `rightBar` 和 `bg`。
+实测 `alone`：修复前 `bgColor` 跟着变 `0xFF3E25`，修复后保持 `0xFFFFFF`，`leftClip` 照常从 0 增长。
+
 ### 当前状态
 
 | 脚本 | 用例 | 失败 |
