@@ -130,21 +130,43 @@ mods/xxx/scripts/legacy-thing(%run_v_0.6.3).lua
 
 让引擎读 `.js` 脚本。
 
-实现方式一句话：**把 `{` 删掉，把 `}` 换成 `end`，然后整段交给现成的 Lua 解释器**。
+实现方式：**照样交给现成的 Lua 解释器，但转译比分花括号多做了几层**。
 
 ```js
-function onCreatePost() {              function onCreatePost()
-    setProperty('bf.x', 600)     →      setProperty('bf.x', 600)
-}                                      end
+let arrow = (a, b) => a + b;        →   local arrow = function(a, b) return a + b end;
+let label = `hi ${name}`;           →   local label = ("hi " .. tostring(name));
+for (let i = 0; i < 4; i++) { }     →   do local i = 0 while i < 4 do  end  i = i + 1 end
+let obj = {a: 1};                   →   local obj = {a = 1};
+if (a === b && c !== d) { }         →   if (a == b and c ~= d) then  end
+total += 1;                         →   total = total + 1;
 ```
 
-没有 V8，没有 QuickJS，没有 AST。
+没有 V8，没有 QuickJS，没有 AST —— 七遍独立的词法扫描，每遍只负责一种语法，字符串和注释全程原样跳过：
 
-转译器是词法扫描而不是无脑替换：字符串里的 `{ }`、对象字面量、`//` 注释都原样保留，只有「代码块」的花括号会被转换（判断依据是 `{` 前面那个非空白字符）。
+| 顺序 | 处理 | 例子 |
+|---|---|---|
+| 1 | 模板字符串 | `` `hi ${name}` `` → `("hi " .. tostring(name))` |
+| 2 | 箭头函数 | `(a, b) => a + b` → `function(a, b) return a + b end`；`x => { ... }` → `function(x) ... end` |
+| 3 | C 风格 for | `for (i = 0; i < 4; i++) { body }` → `do local i = 0 while i < 4 do body i = i + 1 end end` |
+| 4 | 复合赋值 | `x += 1` / `x -= 1` / `x *= 2` / `x /= 2` → `x = x + 1` 之类 |
+| 5 | 对象字面量 | `{a: 1, b: 2}` → `{a = 1, b = 2}`，嵌套递归 |
+| 6 | 运算符 | `===` → `==`，`!==` / `!=` → `~=`，`&&` → `and`，`\|\|` → `or` |
+| 7 | let / const / var | → `local` |
+| 8 | 花括号 | 代码块 → `end`，对象字面量原样保留（判断依据是 `{` 前面那个非空白字符） |
+
+每遍都是「扫描 + 重写」而不是正则替换，所以字符串里的 `=>`、注释里的 `{` 不会被误伤。
 
 用法：把脚本放 `mods/<mod>/scripts/xxx.js`，或者 `mods/<mod>/data/<song>/xxx.js`。引擎在找不到同名 `.lua` 时会自动回退到 `.js`。
 
-**已知限制**（和原引擎一致）：不处理分号、不支持 `let` / `const`、不处理箭头函数，`for (var i = 0; ...)` 这种写法也过不了。
+**还是做不了的**（不是 bug，是转译路线的边界）：
+
+- `class` / `new` / `this` —— 保持原样输出，Lua 侧会明确报语法错，不会静默错乱
+- 单行 `if (x) return;`（不写花括号）—— 需要解析语句边界，没做
+- 三元 `a ? b : c`、数组方法 `.map/.filter/.forEach`
+- `+` 同时当数字加法和字符串拼接 —— 转译层不知道类型，字符串拼接请直接写 `..`
+- 真 JS 的语义细节：原型链、松散相等、`undefined` vs `nil`、数组和 table 的区别
+
+调试转译结果：设环境变量 `PE_JS_DUMP=1`，每个脚本旁边会生成 `<脚本>.transpiled.txt`，就是实际喂给 Lua 的源码。
 
 ---
 
