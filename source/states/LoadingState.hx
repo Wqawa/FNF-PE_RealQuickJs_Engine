@@ -460,6 +460,7 @@ class LoadingState extends MusicBeatState
 			// LOAD NOTE IMAGE
 			var noteSkin:String = Note.defaultNoteSkin;
 			if(PlayState.SONG.arrowSkin != null && PlayState.SONG.arrowSkin.length > 1) noteSkin = PlayState.SONG.arrowSkin;
+			noteSkin = Note.resolveNoteSkin(noteSkin); // 老谱面的裸名 → noteSkins/，否则预加载会整个落空
 	
 			var customSkin:String = noteSkin + Note.getNoteSkinPostfix();
 			if(Paths.fileExists('images/$customSkin.png', IMAGE)) noteSkin = customSkin;

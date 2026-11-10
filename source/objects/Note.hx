@@ -10,6 +10,8 @@ import objects.StrumNote;
 
 import flixel.math.FlxRect;
 
+import openfl.utils.AssetType;
+
 using StringTools;
 
 typedef EventNote = {
@@ -97,6 +99,20 @@ class Note extends FlxSprite
 	public static var swagWidth:Float = 160 * 0.7;
 	public static var colArray:Array<String> = ['purple', 'blue', 'green', 'red'];
 	public static var defaultNoteSkin(default, never):String = 'noteSkins/NOTE_assets';
+
+	/**
+	 * 0.6.x / 0.7.x 的 `arrowSkin` 写的是 images/ 根下的裸名（`NOTE_assets`），
+	 * 1.0 把内置皮肤挪进了 `noteSkins/`（像素皮肤在 `pixelUI/noteSkins/`，前缀由调用方拼）。
+	 * 名字能直接加载就原样保留（mod 自带扁平素材），加载不了才当内置皮肤换成新路径。
+	 * 带 `/` 的显式路径一律不动。
+	 */
+	public static function resolveNoteSkin(skin:String):String
+	{
+		if(skin == null || skin.length < 1 || skin.indexOf('/') > -1) return skin;
+		if(Paths.fileExists('images/$skin.png', IMAGE)) return skin;
+		if(Paths.fileExists('images/noteSkins/$skin.png', IMAGE)) return 'noteSkins/$skin';
+		return skin;
+	}
 
 	public var noteSplashData:NoteSplashData = {
 		disabled: false,
@@ -365,6 +381,8 @@ class Note extends FlxSprite
 			skin = PlayState.SONG != null ? PlayState.SONG.arrowSkin : null;
 			if(skin == null || skin.length < 1)
 				skin = defaultNoteSkin + postfix;
+			else
+				skin = resolveNoteSkin(skin); // 老谱面的裸名（'NOTE_assets'）→ noteSkins/ 下
 		}
 		else rgbShader.enabled = false;
 

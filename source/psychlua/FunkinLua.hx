@@ -57,9 +57,24 @@ class FunkinLua {
 	public var callbacks:Map<String, Dynamic> = new Map<String, Dynamic>();
 	public static var customFunctions:Map<String, Dynamic> = new Map<String, Dynamic>();
 
+	// 文件名里的版本标记，形如 `xxx(%run_v_0.7.3).lua`。命中后这个脚本查到的引擎版本就是标记里的值，
+	// 引擎自己（标题界面 / Discord RPC / 日志）仍然用真正的 MainMenuState.psychEngineVersion。
+	public var versionOverride:String = null;
+	static final VERSION_TAG:EReg = ~/\(%run_v_([^)]+)\)/;
+
 	// when set, this is executed instead of reading scriptName from disk.
 	// FunkinJS uses it to feed transpiled .js source into the Lua interpreter.
 	public var rawCode:String = null;
+
+	/**
+	 * 从脚本路径里抠出 `(%run_v_x.x.x)` 的版本号，没有就返回 null。
+	 * 只认这一种写法，文件名别的括号不影响 —— 前缀 `%run_v_` 是硬要求。
+	 */
+	public static function parseVersionTag(path:String):String
+	{
+		if(path == null) return null;
+		return VERSION_TAG.match(path) ? VERSION_TAG.matched(1).trim() : null;
+	}
 
 	public function new(scriptName:String, ?rawCode:String = null) {
 		lua = LuaL.newstate();
@@ -72,6 +87,7 @@ class FunkinLua {
 
 		this.scriptName = scriptName.trim();
 		this.rawCode = rawCode;
+		this.versionOverride = parseVersionTag(this.scriptName);
 		var game:PlayState = PlayState.instance;
 		if(game != null) game.luaArray.push(this);
 
@@ -89,7 +105,7 @@ class FunkinLua {
 		set('Function_Continue', LuaUtils.Function_Continue);
 		set('luaDebugMode', false);
 		set('luaDeprecatedWarnings', true);
-		set('version', MainMenuState.psychEngineVersion.trim());
+		set('version', versionOverride != null ? versionOverride : MainMenuState.psychEngineVersion.trim());
 		set('modFolder', this.modFolder);
 
 		// Song/Week shit

@@ -109,8 +109,9 @@ class PauseSubState extends MusicBeatSubstate
 		chartingText.visible = PlayState.chartingMode;
 		add(chartingText);
 
-		// which lane semantics this chart is played with, and what the file itself looked like
-		var chartEngineTxt:FlxText = new FlxText(20, 15 + 96, 0, 'Chart Engine: ' + Song.chartEngineVersion + ' (file: ' + Song.detectedFormat + ')', 24);
+		// which lane semantics this chart is played with, what the file itself looked like,
+		// and where that decision came from (manual switch / file date / chart format)
+		var chartEngineTxt:FlxText = new FlxText(20, 15 + 96, 0, 'Chart Engine: ' + Song.chartEngineVersion + ' (' + Song.chartVersionSource + ', file: ' + Song.detectedFormat + ')', 24);
 		chartEngineTxt.scrollFactor.set();
 		chartEngineTxt.setFormat(Paths.font('vcr.ttf'), 24);
 		chartEngineTxt.updateHitbox();

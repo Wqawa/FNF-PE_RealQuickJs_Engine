@@ -31,7 +31,12 @@ class ReflectionFunctions
 			LuaUtils.setVarInArray(LuaUtils.getTargetInstance(), variable, allowInstances ? parseInstances(value) : value, allowMaps);
 			return value;
 		});
-		Lua_helper.add_callback(lua, "getPropertyFromClass", function(classVar:String, variable:String, ?allowMaps:Bool = false) {
+		Lua_helper.add_callback(lua, "getPropertyFromClass", function(classVar:String, variable:String, ?allowMaps:Bool = false):Dynamic {
+			// 文件名带了版本标记（xxx(%run_v_0.7.3).lua）的脚本，查版本拿到的就是它要的那个版本。
+			// 注意这里必须显式 :Dynamic —— 只写 return funk.versionOverride 的话，Haxe 会把整个回调的
+			// 返回类型推断成 String，Float / Array / 对象全部被 toString，脚本侧全废。
+			if(funk.versionOverride != null && variable == 'psychEngineVersion') return funk.versionOverride;
+
 			var myClass:Dynamic = backend.ScriptClassAliases.resolve(classVar);
 			if(myClass == null)
 			{

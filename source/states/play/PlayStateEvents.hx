@@ -1,43 +1,14 @@
 package states.play;
 
-import backend.Highscore;
-import backend.StageData;
-import backend.WeekData;
-import backend.Song;
-import backend.Rating;
-import flixel.FlxBasic;
-import flixel.FlxObject;
-import flixel.FlxSubState;
-import flixel.util.FlxSort;
-import flixel.util.FlxStringUtil;
-import flixel.util.FlxSave;
-import flixel.input.keyboard.FlxKey;
-import flixel.animation.FlxAnimationController;
 import lime.utils.Assets;
 import openfl.utils.Assets as OpenFlAssets;
-import openfl.events.KeyboardEvent;
-import haxe.Json;
-import cutscenes.DialogueBoxPsych;
-import states.StoryMenuState;
-import states.FreeplayState;
-import states.editors.ChartingState;
-import states.editors.CharacterEditorState;
-import substates.PauseSubState;
-import substates.GameOverSubstate;
-import openfl.filters.ShaderFilter;
-import shaders.ErrorHandledShader;
-import objects.VideoSprite;
 import objects.Note.EventNote;
 import objects.*;
 import states.stages.*;
 import states.stages.objects.*;
 import psychlua.*;
 import psychlua.LuaUtils;
-import psychlua.HScript;
-import psychlua.HScript.HScriptInfos;
-import crowplexus.iris.Iris;
 import crowplexus.hscript.Expr.Error as IrisError;
-import crowplexus.hscript.Printer;
 
 /**
  * 从 PlayState.hx 搬出来的歌曲事件系统（事件预缓存、事件触发、事件判定）。逻辑是逐行原样搬的，只把对 PlayState 成员的引用改成 ps.xxx，

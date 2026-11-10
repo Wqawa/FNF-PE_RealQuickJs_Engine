@@ -73,8 +73,48 @@ class Song
 	public static var chartEngineVersion:String = 'Pe-1.0.4';
 	public static var forceEngineVersion:Null<String> = null;
 
+	// --- 按谱面文件的创建时间判断该用哪套 lane 语义 ---
+	// Psych Engine 1.0.0 的正式发布时刻（GitHub tag "1.0"，2024-10-15 01:54:44 UTC），单位毫秒
+	// 以方便直接和 Date.getTime() 比。比它早写出来的谱面基本都是按 0.6.x / 0.7.x 的相对 lane 画的。
+	public static final PE_100_RELEASE:Float = 1728957284000.0;
+	// 当前谱面文件的创建时间（拿不到就是 null，比如谱面被打包进 assets）
+	public static var chartCreated:Null<Date> = null;
+	// 这次版本判定是从哪来的：'manual' / 'file date' / 'chart format'，暂停界面右上角会显示
+	public static var chartVersionSource:String = 'chart format';
+	// getChart() 读到的文件时间，交给紧接着的那次 parseJSON 消费。
+	// 用一次性中转而不是直接读 chartCreated，是为了让编辑器直接调 parseJSON 时不会拿到上一首歌的残留值。
+	static var _pendingCreated:Null<Date> = null;
+
 	public static function isLegacyChart():Bool
 		return chartEngineVersion == 'Pe-0.7.3';
+
+	// 时间够老还不够，谱面形状也得对得上：没有 {"song": {...}} 包裹层的谱面不可能早于 1.0 那次格式变更，
+	// 这种文件的 lane 一定是绝对坐标，套 mustHitSection 只会把整首歌左右镜像。两者矛盾时按 format 走。
+	static function isLegacyByFileDate(hasWrapper:Bool):Bool
+	{
+		if(!hasWrapper) return false;
+		var c:Null<Date> = chartCreated;
+		if(c == null) return false;
+		return c.getTime() < PE_100_RELEASE;
+	}
+
+	// 读文件创建时间。拿不到就返回 null（走 format 判定），不影响载入。
+	static function readFileCreated(path:String):Null<Date>
+	{
+		#if sys
+		try
+		{
+			var stat = FileSystem.stat(path);
+			#if windows
+			return stat.ctime; // Windows 的 ctime 就是创建时间
+			#else
+			return stat.mtime; // 其他系统 ctime 是 inode 变更时间，mtime 更接近"这文件什么时候来的"
+			#end
+		}
+		catch(e:haxe.Exception) {} // 权限 / 文件被删之类，当没有时间处理
+		#end
+		return null;
+	}
 
 	// Convert old charts to psych_v1 format.
 	// convertLanes can be turned off to keep the original relative lanes on disk-shape,
@@ -164,11 +204,25 @@ class Song
 		_lastPath = Paths.json('$formattedFolder/$formattedSong');
 
 		#if MODS_ALLOWED
-		if(FileSystem.exists(_lastPath))
+		var onDisk:Bool = FileSystem.exists(_lastPath);
+		if(onDisk)
 			rawData = File.getContent(_lastPath);
 		else
 		#end
 			rawData = Assets.getText(_lastPath);
+
+		// events.json / picospeaker.json 是 sidecar，它们的时间不是这首歌谱面的时间，
+		// 跟着记会把主谱面的判定冲掉。
+		var isSidecarFile:Bool = (jsonInput == 'events' || jsonInput == 'picospeaker');
+		if(!isSidecarFile)
+		{
+			#if MODS_ALLOWED
+			chartCreated = onDisk ? readFileCreated(_lastPath) : null;
+			#else
+			chartCreated = null;
+			#end
+			_pendingCreated = (rawData != null) ? chartCreated : null;
+		}
 
 		return rawData != null ? parseJSON(rawData, jsonInput) : null;
 	}
@@ -196,19 +250,29 @@ class Song
 		// detected for the real chart, otherwise a wrapped events file flips the whole song.
 		var isSidecar:Bool = (nameForError == 'events' || nameForError == 'picospeaker');
 
-		var forcedLegacy:Bool = (forceEngineVersion == 'Pe-0.7.3');
+		// 只认 getChart() 刚读到的那个时间；编辑器直接调 parseJSON 时这里是 null，
+		// 不会拿上一首歌的文件时间去判。
+		var created:Null<Date> = _pendingCreated;
+		_pendingCreated = null;
+
+		// 手动切换（暂停菜单 Change Chart Ver）> 文件创建时间 > 谱面自身的 format
+		var manual:String = forceEngineVersion;
+		var legacyMode:Bool = (manual == 'Pe-0.7.3');
+		if(manual == null && !isSidecar) legacyMode = isLegacyByFileDate(hasWrapper);
+
 		if(!isSidecar)
 		{
+			chartCreated = created;
 			detectedFormat = fmt.startsWith('psych_v1') ? 'Pe-1.0.x' : (hasWrapper ? 'Pe-0.7.3' : 'Pe-1.0.x');
 
-			if(forcedLegacy)
-				chartEngineVersion = 'Pe-0.7.3';
-			else
-				// Legacy charts get their lanes converted below, so in memory they are 1.0 semantics.
-				chartEngineVersion = 'Pe-1.0.4';
+			// Legacy charts get their lanes converted below, so in memory they are 1.0 semantics.
+			chartEngineVersion = legacyMode ? 'Pe-0.7.3' : 'Pe-1.0.4';
+			chartVersionSource = (manual != null) ? 'manual' : (created != null ? 'file date' : 'chart format');
+			if(created != null && manual == null)
+				trace('chart engine: $chartEngineVersion from file date $created ($nameForError)');
 		}
 
-		if(!forcedLegacy && convertTo != null && convertTo.length > 0)
+		if(!legacyMode && convertTo != null && convertTo.length > 0)
 		{
 			switch(convertTo)
 			{
@@ -221,7 +285,7 @@ class Song
 					}
 			}
 		}
-		else if(forcedLegacy)
+		else if(legacyMode)
 			convert(songJson, false); //still normalize fields, but keep the relative lanes
 
 		fixMissingFields(songJson);

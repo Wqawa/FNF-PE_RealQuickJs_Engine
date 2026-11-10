@@ -58,6 +58,9 @@ class NoteSplash extends FlxSprite
 	}
 
 	public var maxAnims(default, set):Int = 0;
+	// 调用方要的名字。texture 可能被解析成别的实际路径（比如裸名 → noteSplashes/xxx），
+	// 拿 texture 和请求名比较会永远不相等，每 spawn 一次就重载一遍图集。
+	public var requestedSplash:String = null;
 	public function loadSplash(?splash:String)
 	{
 		config = null;
@@ -69,8 +72,17 @@ class NoteSplash extends FlxSprite
 			if (PlayState.SONG != null && PlayState.SONG.splashSkin != null && PlayState.SONG.splashSkin.length > 0) splash = PlayState.SONG.splashSkin;
 		}
 
+		requestedSplash = splash;
 		texture = splash;
 		frames = Paths.getSparrowAtlas(texture);
+		if (frames == null && splash.indexOf('/') == -1)
+		{
+			// 0.6.x 的 splash 写的是 images/ 根下的扁平素材名（'noteSplashes'），1.0 把内置皮肤
+			// 挪进了 noteSplashes/ 子目录。根目录能加载就原样用（mod 自带素材），加载不了才当内置皮肤。
+			var nested:String = 'noteSplashes/$splash' + getSplashSkinPostfix();
+			frames = Paths.getSparrowAtlas(nested);
+			if (frames != null) texture = nested;
+		}
 		if (frames == null)
 		{
 			texture = defaultNoteSplash + getSplashSkinPostfix();
@@ -201,7 +213,7 @@ class NoteSplash extends FlxSprite
 			if (note != null && note.noteSplashData.texture != null) loadedTexture = note.noteSplashData.texture;
 			else if (PlayState.SONG != null && PlayState.SONG.splashSkin != null && PlayState.SONG.splashSkin.length > 0) loadedTexture = PlayState.SONG.splashSkin;
 
-			if (texture != loadedTexture) loadSplash(loadedTexture);
+			if (requestedSplash != loadedTexture) loadSplash(loadedTexture);
 		}
 
 		setPosition(x, y);
