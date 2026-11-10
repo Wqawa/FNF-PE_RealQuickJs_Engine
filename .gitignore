@@ -28,3 +28,6 @@ art/build_html-debug.bat
 
 # WorkBuddy 本地构建日志与备忘，不入库
 .workbuddy/
+
+# building/build.sh -cache 用的 hxcpp 编译缓存
+.cache/
