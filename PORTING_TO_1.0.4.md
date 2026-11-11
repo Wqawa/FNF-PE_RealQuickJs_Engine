@@ -10,19 +10,29 @@
 
 ## 二、依赖版本对照
 
-| 库 | 0.6.3 原要求 | 本次使用（1.0.4 栈） | 说明 |
+| 库 | 0.6.3 理想环境（PDF 教程） | Psych 1.0+ 官方（wiki / 1.0.4 的 Project.xml） | 本项目实际 |
 |---|---|---|---|
-| Haxe | 4.2.4 ~ 4.2.5 | **4.3.7** | 1.0.4 要求 4.3.4+ |
-| hxcpp | 4.2.1 | **4.3.2（git）** | 与 1.0.4 一致 |
-| lime | 7.9.0 / 8.0.1 | **8.3.1** | 工程内未锁版本，取当前激活版本 |
-| openfl | 9.1.5 / 9.2.1 | **9.5.2** | |
-| flixel | 4.11.0 / 5.2.2 | **5.6.1** | 锁版本 |
-| flixel-addons | 2.11.0 / 3.0.2 | **3.2.2** | 锁版本 |
-| flixel-ui | 2.4.0 / 2.5.0 | **2.6.5** | 0.6.3 依赖它，1.0.4 已不用 |
-| hscript | 2.1.0 / 2.5.0 | **2.5.0（官方）** | 不能用 hscript-iris，见下文 |
-| linc_luajit | git | **0.0.7** | Lua 运行时 |
-| hxCodec | 2.5.1 | **移除**，改用 **hxvlc 2.3.1** | 1.0.4 用 hxvlc |
-| discord_rpc (linc) | git | **移除**，改用 **hxdiscord_rpc 1.1.2** | 1.0.4 用 hxdiscord_rpc |
+| Haxe | 4.2.5 | 4.3.2 | **4.3.7** |
+| hxcpp | 4.2.1 | — | 4.3.2（git） |
+| flixel | 5.2.2 | 5.6.1 | **5.6.1** ✅ |
+| flixel-addons | 3.0.2 | 3.2.2 | **3.2.2** ✅ |
+| lime | 8.0.1 | 8.1.2 | **8.1.2** ✅ |
+| openfl | 9.2.1 | 9.3.3 | **9.3.3** ✅ |
+| flixel-ui | 2.5.0 | 不依赖 | **2.6.5**（0.6.3 必需） |
+| hscript | 2.5.0 | hscript-iris 1.1.3 | **官方 2.5.0**（刻意不同） |
+| linc_luajit | git | git | 0.0.7 |
+| hxCodec | 2.5.1 | 不用 | **移除** |
+| hxvlc | — | 2.0.1 | **2.0.1** ✅ |
+| discord_rpc (linc) | git | 不用 | **移除** |
+| hxdiscord_rpc | — | 1.2.4 | **1.2.4** ✅ |
+| tjson | — | 1.4.0 | 不装（0.6.3 用 haxe.Json） |
+
+带 ✅ 的是和官方清单完全一致的项。两处刻意不同：
+
+- **hscript**：1.0.4 用 hscript-iris（包名 `crowplexus.hscript`），而 0.6.3 全项目 `import hscript.*`，连 flixel 自带的 debug console 都依赖官方包名。这一项无法对齐。
+- **flixel-ui**：1.0.4 已经不依赖它，但 0.6.3 的编辑器、输入框都用，删了编不过。
+
+Haxe 保持 4.3.7（官方建议 4.3.2，同属 4.3.x 补丁系列，向后兼容，且降级会影响机器上其他工程）。
 
 > 注意：本机 `haxe/lib` 里 flixel 同时存在 `git`（6.1.2，Codename 用）和 `5,6,1`，靠 Project.xml 的 `version` 属性定向，不动全局 current。
 
@@ -36,8 +46,15 @@
 <haxedef name="hscript" />            <!-- 新增：0.6.3 的 HScript 模块靠这个宏开启 -->
 <haxelib name="flixel-ui" version="2.6.5" />
 <haxelib name="linc_luajit" if="LUA_ALLOWED"/>
-<haxelib name="hxvlc" if="VIDEOS_ALLOWED"/>   <!-- 原 hxCodec -->
-<haxelib name="hxdiscord_rpc" if="desktop"/>  <!-- 原 discord_rpc -->
+<haxelib name="hxvlc" if="VIDEOS_ALLOWED" version="2.0.1"/>       <!-- 原 hxCodec -->
+<haxelib name="hxdiscord_rpc" if="desktop" version="1.2.4"/>      <!-- 原 discord_rpc -->
+```
+
+lime / openfl 不在 Project.xml 里锁版本（1.0.4 官方也是这么做的），而是用 `haxelib set` 切全局 current：
+
+```
+haxelib set lime 8.1.2
+haxelib set openfl 9.3.3
 ```
 
 两个要点：
@@ -98,27 +115,38 @@ import hxvlc.flixel.FlxVideoSprite;
 `startVideo()` 主体重写（逻辑不变：找不到文件就 `startAndEnd()`，播完也 `startAndEnd()`）：
 
 ```haxe
-var video:FlxVideoSprite = new FlxVideoSprite(0, 0);
-video.antialiasing = ClientPrefs.globalAntialiasing;
-video.bitmap.onFormatSetup.add(function() {
-    if (video.bitmap != null && video.bitmap.bitmapData != null) {
-        var scale:Float = Math.min(FlxG.width / video.bitmap.bitmapData.width, FlxG.height / video.bitmap.bitmapData.height);
-        video.setGraphicSize(video.bitmap.bitmapData.width * scale, video.bitmap.bitmapData.height * scale);
-        video.updateHitbox();
-        video.screenCenter();
-    }
+// hxvlc 2.0.1 要先等 libvlc 初始化完成，再 load + 延迟 play
+hxvlc.util.Handle.initAsync(function(success:Bool) {
+    if (!success) { FlxG.log.warn('Couldnt initialize hxvlc'); startAndEnd(); return; }
+
+    var video:FlxVideoSprite = new FlxVideoSprite(0, 0);
+    video.active = false;
+    video.antialiasing = ClientPrefs.globalAntialiasing;
+    video.bitmap.onFormatSetup.add(function() {
+        if (video.bitmap != null && video.bitmap.bitmapData != null) {
+            var scale:Float = Math.min(FlxG.width / video.bitmap.bitmapData.width, FlxG.height / video.bitmap.bitmapData.height);
+            video.setGraphicSize(video.bitmap.bitmapData.width * scale, video.bitmap.bitmapData.height * scale);
+            video.updateHitbox();
+            video.screenCenter();
+        }
+    });
+    video.bitmap.onEndReached.add(function() {
+        remove(video);
+        video.destroy();
+        startAndEnd();
+    });
+    video.load(filepath);
+    add(video);
+    new FlxTimer().start(0.001, function(tmr:FlxTimer) { video.play(); });
 });
-video.bitmap.onEndReached.add(function() {
-    remove(video);
-    video.destroy();
-    startAndEnd();
-});
-video.precache(filepath);     // 注意：必须 precache，不能用 load
-add(video);
-new FlxTimer().start(0.001, function(tmr:FlxTimer) { video.play(); });
 ```
 
-**这里踩过坑**：hxvlc 2.x 里 `load()` + 立刻 `play()` 会黑屏（视频尺寸回调没走完），必须按官方示例用 `precache()` → `add()` → 延迟一帧再 `play()`。这是实测结论。
+**踩过的两个坑**：
+
+1. `play()` 不能紧跟在 `load()` 后面，要延后一帧。否则视频尺寸回调还没走完，画面是黑的。
+2. hxvlc 2.0.1 和 2.3.1 的接口不同：2.3.1 有 `precache()`（内部帮你处理 libvlc 初始化），2.0.1 没有，必须自己调 `Handle.initAsync()` 等初始化完成。用错版本会直接编译不过。
+
+另外 2.0.1 的 `load()` 内部会先 `FileSystem.exists()` 再 `FileSystem.absolutePath()`，文件不存在时返回 `false` 而不是抛异常，所以路径检查放在调用前就够了。
 
 **(c) 两处 `FlxG.sound.music.pitch` 加空值保护**
 
@@ -279,7 +307,7 @@ haxelib run lime build windows
 | 音频 | 通过 | ogg 解码正常（Inst / Voices `length=76800`），opening 音效可播 |
 | Lua mod | 通过 | 标准 mod 结构（`mods/TestMod/pack.json` + `scripts/bopeebo.lua`），`onCreate` 回调 + `setProperty('boyfriend.angle', 45)` 实际生效，画面角色被旋转 |
 | 缺失音效的 mod 脚本 | 通过 | Gumball cp / `Childs-Play-V2` 的自定义倒计时脚本（`playSound('3')` 等音效不存在）能完整跑完 3→2→1→Go 并换回原角色，不再卡住 |
-| 视频播放 | 通过 | 用 mp4 实测：`onFormatSetup` 回调拿到 1280x720，画面正常输出（宣传片内容可见） |
+| 视频播放 | 部分 | 在 hxvlc **2.3.1** 下实测通过（`onFormatSetup` 拿到 1280x720，画面正常）。降到官方要求的 **2.0.1** 后按官方示例重写了 `startVideo`，目前只过了编译，**没有实测播出** |
 | Discord RPC | 通过 | 标题画面初始化不崩；因无 Discord 客户端未验证在线状态显示 |
 
 ## 九、已知限制
@@ -287,6 +315,7 @@ haxelib run lime build windows
 1. **窗口缩放的实现方式变了**。0.6.3 靠 `FlxGame` 的 `zoom` 参数自适应窗口，flixel 5.6 删了这个参数，改用 `FlxG.scaleMode`（默认 `RatioScaleMode`）。在 1280×720 窗口下两者表现一致；如果把窗口拉到非 16:9 比例，新版会等比留黑边，而老版会改变游戏内部分辨率去填满。这是引擎层面的移除，无法完全复刻。
 2. **`songLength` 在全局脚本里为 0**。全局 lua（`mods/scripts/`）在音乐创建前加载，拿不到歌曲长度。原版 0.6.3 在这里会直接崩溃，所以这是修好而不是降级；歌曲内脚本不受影响。
 3. **`fix` 类的小改动都写在第五节**，没有额外改任何游戏数值、判定窗口、动画帧率。
+4. **视频只验证到编译**。hxvlc 2.0.1 要自己调 `Handle.initAsync()`，代码按官方示例写的，但没有实际播过一次。如果某个 mod 的 cutscene 黑屏，先查这里。
 
 ## 十、改动文件汇总
 
@@ -295,7 +324,7 @@ M  Project.xml
 M  source/Discord.hx              （重写：hxdiscord_rpc）
 M  source/FunkinLua.hx            （LuaL.error ×5、isboolean ×3、songLength 保护、playSound 判空）
 M  source/Main.hx                 （FlxGame 去 zoom）
-M  source/Paths.hx                （缺音频返回 null 而不是抛 IOError）
+M  source/Paths.hx                （缺音频时返回空音效，不再抛 IOError）
 M  source/PlayState.hx            （animationTimeScale ×2、hxvlc 视频、music 判空 ×2）
 M  source/editors/ChartingState.hx（@:access 换包）
 D  source/flixel/system/FlxSound.hx

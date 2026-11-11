@@ -135,10 +135,10 @@
 	<!--In case you want to use the ui package-->
 	<haxelib name="flixel-ui" version="2.6.5" />
 	<haxelib name="linc_luajit" if="LUA_ALLOWED"/>
-	<haxelib name="hxvlc" if="VIDEOS_ALLOWED"/>
+	<haxelib name="hxvlc" if="VIDEOS_ALLOWED" version="2.0.1"/>
 	<haxelib name="faxe" if='switch'/>
 	<!--<haxelib name="polymod"/> -->
-	<haxelib name="hxdiscord_rpc" if="desktop"/>
+	<haxelib name="hxdiscord_rpc" if="desktop" version="1.2.4"/>
 	<!-- <haxelib name="hxcpp-debug-server" if="desktop"/> -->
 
 	<!-- <haxelib name="markdown" /> -->

@@ -1617,31 +1617,43 @@ class PlayState extends MusicBeatState
 			return;
 		}
 
-		var video:FlxVideoSprite = new FlxVideoSprite(0, 0);
-		video.antialiasing = ClientPrefs.globalAntialiasing;
-		video.bitmap.onFormatSetup.add(function()
+		// hxvlc 2.0.1 需要先等 libvlc 初始化完成，再 load + 延迟 play
+		hxvlc.util.Handle.initAsync(function(success:Bool)
 		{
-			// 按窗口大小等比缩放并居中
-			if (video.bitmap != null && video.bitmap.bitmapData != null)
+			if(!success)
 			{
-				var scale:Float = Math.min(FlxG.width / video.bitmap.bitmapData.width, FlxG.height / video.bitmap.bitmapData.height);
-				video.setGraphicSize(video.bitmap.bitmapData.width * scale, video.bitmap.bitmapData.height * scale);
-				video.updateHitbox();
-				video.screenCenter();
+				FlxG.log.warn('Couldnt initialize hxvlc');
+				startAndEnd();
+				return;
 			}
-		});
-		video.bitmap.onEndReached.add(function()
-		{
-			remove(video);
-			video.destroy();
-			startAndEnd();
-		});
-		video.precache(filepath);
-		add(video);
 
-		new FlxTimer().start(0.001, function(tmr:FlxTimer)
-		{
-			video.play();
+			var video:FlxVideoSprite = new FlxVideoSprite(0, 0);
+			video.active = false;
+			video.antialiasing = ClientPrefs.globalAntialiasing;
+			video.bitmap.onFormatSetup.add(function()
+			{
+				// 按窗口大小等比缩放并居中
+				if (video.bitmap != null && video.bitmap.bitmapData != null)
+				{
+					var scale:Float = Math.min(FlxG.width / video.bitmap.bitmapData.width, FlxG.height / video.bitmap.bitmapData.height);
+					video.setGraphicSize(video.bitmap.bitmapData.width * scale, video.bitmap.bitmapData.height * scale);
+					video.updateHitbox();
+					video.screenCenter();
+				}
+			});
+			video.bitmap.onEndReached.add(function()
+			{
+				remove(video);
+				video.destroy();
+				startAndEnd();
+			});
+			video.load(filepath);
+			add(video);
+
+			new FlxTimer().start(0.001, function(tmr:FlxTimer)
+			{
+				video.play();
+			});
 		});
 		#else
 		FlxG.log.warn('Platform not supported!');
