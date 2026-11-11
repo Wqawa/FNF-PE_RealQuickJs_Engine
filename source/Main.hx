@@ -77,8 +77,8 @@ class Main extends Sprite
 			var ratioX:Float = stageWidth / gameWidth;
 			var ratioY:Float = stageHeight / gameHeight;
 			zoom = Math.min(ratioX, ratioY);
-			gameWidth = Math.ceil(stageWidth / zoom);
-			gameHeight = Math.ceil(stageHeight / zoom);
+			// flixel 5.6 的 FlxGame 不再接收 zoom 参数，窗口缩放由 FlxG.scaleMode（默认 RatioScaleMode）负责。
+			// 这里只算出缩放比备用，不要再反算 gameWidth/gameHeight，否则 HUD 会按放大后的尺寸布局，画面整体偏左。
 		}
 	
 		ClientPrefs.loadDefaultKeys();
@@ -87,7 +87,7 @@ class Main extends Sprite
 		#if !mobile
 		fpsVar = new FPS(10, 3, 0xFFFFFF);
 		addChild(fpsVar);
-		Lib.current.stage.align = "tl";
+		Lib.current.stage.align = openfl.display.StageAlign.TOP_LEFT;
 		Lib.current.stage.scaleMode = StageScaleMode.NO_SCALE;
 		if(fpsVar != null) {
 			fpsVar.visible = ClientPrefs.showFPS;

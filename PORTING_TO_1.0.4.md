@@ -64,17 +64,17 @@ haxelib set openfl 9.3.3
 
 ## 四、删除的库覆盖文件（7 个）
 
-0.6.3 为了修老版 flixel / lime 的 bug，在 `source/` 下放了 7 个**覆盖库源码**的文件。这些文件会让 classpath 优先使用旧实现，在新库下必然类型冲突。逐一核对新库已经包含对应修复后，全部移除（备份在 `_removed_overrides/`）：
+0.6.3 为了修老版 flixel / lime 的 bug，在 `source/` 下放了 7 个**覆盖库源码**的文件。这些文件会让 classpath 优先使用旧实现，在新库下必然类型冲突。逐一核对后，6 个移除（备份在 `_removed_overrides/`），`FPS.hx` 保留：
 
-| 文件 | 移除原因 |
+| 文件 | 处理 |
 |---|---|
-| `source/flixel/system/FlxSound.hx` | flixel 5.6 的 `FlxSound` 已移到 `flixel.sound.FlxSound`，且自带 `pitch` 字段。旧的覆盖类留在 `flixel.system` 下会变成另一个类型，全项目报 `flixel.system.FlxSound should be flixel.sound.FlxSound` |
-| `source/flixel/animation/FlxAnimationController.hx` | flixel 5.6 已内置 `finishCallback:(String)->Void` |
-| `source/flixel/addons/display/FlxRuntimeShader.hx` | flixel-addons 3.2.2 已包含同等实现 |
-| `source/flixel/addons/ui/FlxInputText.hx` | flixel-ui 2.6.5 已内置 Ctrl+C/V 支持 |
-| `source/flixel/addons/ui/FlxUIInputText.hx` | 同上 |
-| `source/lime/_internal/backend/native/NativeAudioSource.hx` | lime 8.3 的 native audio 内部结构已重写，旧补丁无法编译 |
-| `source/openfl/display/FPS.hx` | openfl 9.5.2 自带 `FPS` 类，构造函数签名一致 |
+| `source/flixel/system/FlxSound.hx` | 移除。flixel 5.6 的 `FlxSound` 已移到 `flixel.sound.FlxSound`，且自带 `pitch` 字段。旧的覆盖类留在 `flixel.system` 下会变成另一个类型，全项目报 `flixel.system.FlxSound should be flixel.sound.FlxSound` |
+| `source/flixel/animation/FlxAnimationController.hx` | 移除。flixel 5.6 已内置 `finishCallback:(String)->Void` |
+| `source/flixel/addons/display/FlxRuntimeShader.hx` | 移除。flixel-addons 3.2.2 已包含同等实现 |
+| `source/flixel/addons/ui/FlxInputText.hx` | 移除。flixel-ui 2.6.5 已内置 Ctrl+C/V 支持 |
+| `source/flixel/addons/ui/FlxUIInputText.hx` | 移除。同上 |
+| `source/lime/_internal/backend/native/NativeAudioSource.hx` | 移除。lime 8.1 的 native audio 内部结构已重写，旧补丁无法编译 |
+| `source/openfl/display/FPS.hx` | **保留**。openfl 自带的 `FPS` 只输出 `FPS: xx`，没有内存显示；0.6.3 的版本还会把帧数钳到 `ClientPrefs.framerate`（否则 60 帧上限会显示成 63/64），并在超过 3000MB 或帧数低于一半时变红。`__enterFrame(deltaTime:Float)` 的签名在 openfl 9.3.3 下依然匹配，直接用 |
 
 ## 五、代码改动明细
 
@@ -91,7 +91,21 @@ addChild(new FlxGame(gameWidth, gameHeight, initialState, zoom, framerate, frame
 addChild(new FlxGame(gameWidth, gameHeight, initialState, framerate, framerate, skipSplash, startFullscreen));
 ```
 
-原本的 `zoom` 计算逻辑保留（无害），窗口缩放在 flixel 5.6 里由 `FlxG.scaleMode` 负责，其默认值就是 `RatioScaleMode`（等比缩放），与 0.6.3 的 zoom 行为一致。
+原本的 `zoom` 计算保留，但**不能再反算 `gameWidth` / `gameHeight`**：
+
+```haxe
+if (zoom == -1)
+{
+    var ratioX:Float = stageWidth / gameWidth;
+    var ratioY:Float = stageHeight / gameHeight;
+    zoom = Math.min(ratioX, ratioY);
+    // 不要写 gameWidth = Math.ceil(stageWidth / zoom);
+}
+```
+
+老代码把画布尺寸改成"窗口尺寸 ÷ 缩放比"，再靠删掉的那个 `zoom` 参数缩回去。参数没了之后，画布被放大到 1300 多像素却没有缩放，HUD 按放大后的宽度布局，屏幕上只能显示左半边，看起来就是整体偏左。现在画布固定 1280×720，窗口缩放由 `FlxG.scaleMode`（默认 `RatioScaleMode`，等比缩放并居中）接管。
+
+另外 `stage.align` 从字符串 `"tl"` 改成了常量 `StageAlign.TOP_LEFT`。openfl 9.5.2 才修好对 `"tl"` 这类缩写的解析，9.3.3 认不了，会导致舞台对齐失效。
 
 ### 2. `source/PlayState.hx`
 
@@ -323,7 +337,8 @@ haxelib run lime build windows
 M  Project.xml
 M  source/Discord.hx              （重写：hxdiscord_rpc）
 M  source/FunkinLua.hx            （LuaL.error ×5、isboolean ×3、songLength 保护、playSound 判空）
-M  source/Main.hx                 （FlxGame 去 zoom）
+M  source/Main.hx                 （FlxGame 去 zoom、不再反算画布尺寸、stage.align 用常量）
+M  source/MainMenuState.hx        （左下角版本号 0.6.2 -> 0.6.3）
 M  source/Paths.hx                （缺音频时返回空音效，不再抛 IOError）
 M  source/PlayState.hx            （animationTimeScale ×2、hxvlc 视频、music 判空 ×2）
 M  source/editors/ChartingState.hx（@:access 换包）
@@ -333,7 +348,8 @@ D  source/flixel/addons/display/FlxRuntimeShader.hx
 D  source/flixel/addons/ui/FlxInputText.hx
 D  source/flixel/addons/ui/FlxUIInputText.hx
 D  source/lime/_internal/backend/native/NativeAudioSource.hx
-D  source/openfl/display/FPS.hx
 ```
+
+`source/openfl/display/FPS.hx` 属于 0.6.3 自带的覆盖版，保留在原位（提供内存显示和帧数钳制）。
 
 删除的 7 个文件没有真正删掉，备份在项目根目录的 `_removed_overrides/` 下，需要对照或回滚可以直接取回。
