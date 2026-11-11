@@ -353,3 +353,53 @@ D  source/lime/_internal/backend/native/NativeAudioSource.hx
 `source/openfl/display/FPS.hx` 属于 0.6.3 自带的覆盖版，保留在原位（提供内存显示和帧数钳制）。
 
 删除的 7 个文件没有真正删掉，备份在项目根目录的 `_removed_overrides/` 下，需要对照或回滚可以直接取回。
+
+---
+
+## 十一、与主仓编译栈对齐（2026-11-12）
+
+为了让这棵树能和 `FNF-PE_RealQuickJs_Engine`（PE 1.0.4 fork）共用一个 `.haxelib`，把依赖再往下压了一档，回到官方 wiki 那份清单：
+
+| 库 | 之前 | 现在（= 主仓） |
+|---|---|---|
+| lime | 8.3.1 | **8.1.2** |
+| openfl | 9.5.2 | **9.3.3** |
+| hxvlc | 2.3.1 | **2.0.1** |
+| hxdiscord_rpc | 1.1.2 | **1.2.4** |
+| linc_luajit | 0.0.7 发布版 | **git @1906c4a** |
+| flixel / flixel-addons | 5.6.1 / 3.2.2 | 不变 |
+
+`flixel-ui 2.6.5` 和 `hscript 2.5.0` 是 0.6.3 侧额外需要的，主仓原本没有，已一并放进它的 `.haxelib`。
+
+### 代码上要跟着改的两处
+
+1. **`Lua.isboolean` 返回值类型变了。** 0.0.7 里是 `Int`，git 版包了一层返回 `Bool`：
+
+   ```haxe
+   // 0.0.7：   if(Lua.isboolean(lua, -1) != 0)
+   // git 版：  if(Lua.isboolean(lua, -1))
+   ```
+
+   `FunkinLua.hx` 共 3 处，改完即过。
+
+2. **`flixel.system.FlxSound` 已废弃**，18 个文件的导入改成 `flixel.sound.FlxSound`，清掉 50+ 条 `WDeprecated`。只改 import，不涉及调用。
+
+### 编译方式
+
+不再用全局 haxelib，把库根指到主仓：
+
+```bash
+export HAXELIB_PATH=/d/FNF/FNF-PE_RealQuickJs_Engine/.haxelib
+haxelib run lime build windows
+```
+
+### 验证
+
+| 项目 | 结果 |
+|---|---|
+| Haxe 编译 | 通过，0 error |
+| 剩余警告 | 51 条 `flixel.addons.ui.FlxInputText` deprecated、6 条 Int64→Int、1 条 `FlxCamera.defaultCameras`，均为 0.6.3 旧 API，不影响运行 |
+| C++ 全量 | 19 分钟（换 hxcpp 版本必须清 `export/release/windows/obj`，否则链接报 `hx::tlsStackContext` 未定义） |
+| 产物 | `PsychEngine.exe` 27.9 MB |
+
+**注意**：换栈后必须删 obj。混用旧版本编出来的 `.obj` 会在链接阶段报 `LNK2001: hx::tlsStackContext`，看起来像代码问题，其实只是对象文件版本不一致。
