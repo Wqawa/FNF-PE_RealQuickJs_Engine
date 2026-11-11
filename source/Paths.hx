@@ -381,7 +381,29 @@ class Paths
 		// trace(gottenPath);
 		if(!currentTrackedSounds.exists(gottenPath))
 		#if MODS_ALLOWED
-			currentTrackedSounds.set(gottenPath, Sound.fromFile('./' + gottenPath));
+		{
+			var realPath:String = './' + gottenPath;
+			// openfl 9.5 的 Sound.fromFile 遇到不存在的文件会直接抛 IOError，打断调用方（比如 lua 回调）。
+			// 老版 openfl 只是返回一个空音效，这里保持老行为，避免调用方拿到 null 后崩
+			// （FlxSound 对 length 为 0 的 Sound 是安全的，不会播但也不会出错）。
+			var loaded:Sound = null;
+			if(FileSystem.exists(realPath))
+			{
+				try
+				{
+					loaded = Sound.fromFile(realPath);
+				}
+				catch(e:Dynamic)
+				{
+					trace('Failed to load sound: $realPath ($e)');
+				}
+			}
+			else
+			{
+				trace('Could not find sound asset: $realPath');
+			}
+			currentTrackedSounds.set(gottenPath, loaded != null ? loaded : new Sound());
+		}
 		#else
 		{
 			var folder:String = '';

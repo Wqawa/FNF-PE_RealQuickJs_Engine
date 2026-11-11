@@ -122,7 +122,7 @@ class FunkinLua {
 		set('scrollSpeed', PlayState.SONG.speed);
 		set('crochet', Conductor.crochet);
 		set('stepCrochet', Conductor.stepCrochet);
-		set('songLength', FlxG.sound.music.length);
+		set('songLength', FlxG.sound.music != null ? FlxG.sound.music.length : 0);
 		set('songName', PlayState.SONG.song);
 		set('songPath', Paths.formatToSongPath(PlayState.SONG.song));
 		set('startedCountdown', false);
@@ -488,7 +488,7 @@ class FunkinLua {
 		Lua_helper.add_callback(lua, "callOnLuas", function(?funcName:String, ?args:Array<Dynamic>, ignoreStops=false, ignoreSelf=true, ?exclusions:Array<String>){
 			if(funcName==null){
 				#if (linc_luajit >= "0.0.6")
-				LuaL.error(lua, "bad argument #1 to 'callOnLuas' (string expected, got nil)");
+				luaTrace("bad argument #1 to 'callOnLuas' (string expected, got nil)", true, false, FlxColor.RED);
 				#end
 				return;
 			}
@@ -506,13 +506,13 @@ class FunkinLua {
 		Lua_helper.add_callback(lua, "callScript", function(?luaFile:String, ?funcName:String, ?args:Array<Dynamic>){
 			if(luaFile==null){
 				#if (linc_luajit >= "0.0.6")
-				LuaL.error(lua, "bad argument #1 to 'callScript' (string expected, got nil)");
+				luaTrace("bad argument #1 to 'callScript' (string expected, got nil)", true, false, FlxColor.RED);
 				#end
 				return;
 			}
 			if(funcName==null){
 				#if (linc_luajit >= "0.0.6")
-				LuaL.error(lua, "bad argument #2 to 'callScript' (string expected, got nil)");
+				luaTrace("bad argument #2 to 'callScript' (string expected, got nil)", true, false, FlxColor.RED);
 				#end
 				return;
 			}
@@ -564,13 +564,13 @@ class FunkinLua {
 		Lua_helper.add_callback(lua, "getGlobalFromScript", function(?luaFile:String, ?global:String){ // returns the global from a script
 			if(luaFile==null){
 				#if (linc_luajit >= "0.0.6")
-				LuaL.error(lua, "bad argument #1 to 'getGlobalFromScript' (string expected, got nil)");
+				luaTrace("bad argument #1 to 'getGlobalFromScript' (string expected, got nil)", true, false, FlxColor.RED);
 				#end
 				return;
 			}
 			if(global==null){
 				#if (linc_luajit >= "0.0.6")
-				LuaL.error(lua, "bad argument #2 to 'getGlobalFromScript' (string expected, got nil)");
+				luaTrace("bad argument #2 to 'getGlobalFromScript' (string expected, got nil)", true, false, FlxColor.RED);
 				#end
 				return;
 			}
@@ -610,7 +610,7 @@ class FunkinLua {
 							Lua.pushnumber(lua, Lua.tonumber(luaInstance.lua, -1));
 						}else if(Lua.isstring(luaInstance.lua,-1)){
 							Lua.pushstring(lua, Lua.tostring(luaInstance.lua, -1));
-						}else if(Lua.isboolean(luaInstance.lua,-1)){
+						}else if(Lua.isboolean(luaInstance.lua,-1) != 0){
 							Lua.pushboolean(lua, Lua.toboolean(luaInstance.lua, -1));
 						}else{
 							Lua.pushnil(lua);
@@ -716,7 +716,7 @@ class FunkinLua {
 							}else if(Lua.isstring(luaInstance.lua,-2)){
 								Lua.pushstring(lua, Lua.tostring(luaInstance.lua, -2));
 								pop++;
-							}else if(Lua.isboolean(luaInstance.lua,-2)){
+							}else if(Lua.isboolean(luaInstance.lua,-2) != 0){
 								Lua.pushboolean(lua, Lua.toboolean(luaInstance.lua, -2));
 								pop++;
 							}
@@ -730,7 +730,7 @@ class FunkinLua {
 							}else if(Lua.isstring(luaInstance.lua,-1)){
 								Lua.pushstring(lua, Lua.tostring(luaInstance.lua, -1));
 								pop++;
-							}else if(Lua.isboolean(luaInstance.lua,-1)){
+							}else if(Lua.isboolean(luaInstance.lua,-1) != 0){
 								Lua.pushboolean(lua, Lua.toboolean(luaInstance.lua, -1));
 								pop++;
 							}
@@ -2213,18 +2213,23 @@ class FunkinLua {
 			FlxG.sound.playMusic(Paths.music(sound), volume, loop);
 		});
 		Lua_helper.add_callback(lua, "playSound", function(sound:String, volume:Float = 1, ?tag:String = null) {
+			var soundAsset = Paths.sound(sound);
+			if(soundAsset == null) {
+				luaTrace('playSound: Could not find sound "$sound"', false, false, FlxColor.RED);
+				return;
+			}
 			if(tag != null && tag.length > 0) {
 				tag = tag.replace('.', '');
 				if(PlayState.instance.modchartSounds.exists(tag)) {
 					PlayState.instance.modchartSounds.get(tag).stop();
 				}
-				PlayState.instance.modchartSounds.set(tag, FlxG.sound.play(Paths.sound(sound), volume, false, function() {
+				PlayState.instance.modchartSounds.set(tag, FlxG.sound.play(soundAsset, volume, false, function() {
 					PlayState.instance.modchartSounds.remove(tag);
 					PlayState.instance.callOnLuas('onSoundFinished', [tag]);
 				}));
 				return;
 			}
-			FlxG.sound.play(Paths.sound(sound), volume);
+			FlxG.sound.play(soundAsset, volume);
 		});
 		Lua_helper.add_callback(lua, "stopSound", function(tag:String) {
 			if(tag != null && tag.length > 1 && PlayState.instance.modchartSounds.exists(tag)) {
