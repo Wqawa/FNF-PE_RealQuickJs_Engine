@@ -403,3 +403,77 @@ haxelib run lime build windows
 | 产物 | `PsychEngine.exe` 27.9 MB |
 
 **注意**：换栈后必须删 obj。混用旧版本编出来的 `.obj` 会在链接阶段报 `LNK2001: hx::tlsStackContext`，看起来像代码问题，其实只是对象文件版本不一致。
+
+---
+
+## 十二、`Std.parseInt` 溢出饱和导致颜色全白（2026-11-12）
+
+### 现象
+
+所有经过十六进制字符串解析的颜色都变成**白色**：mod 的 UI 文字、时间条、`getColorFromHex()` 返回的色值。
+不受影响的只有创建时就烘焙进 bitmap 的颜色（血条的 `createFilledBar`）。
+
+### 根因
+
+cpp 目标上 `Std.parseInt` 由 hxcpp 运行时实现：
+
+```haxe
+// haxe/std/cpp/_std/Std.hx
+public static function parseInt(x:String):Null<Int> {
+    return untyped __global__.__hxcpp_parse_int(x);
+}
+```
+
+**32 位溢出时它饱和到 `IntMax`（0x7FFFFFFF），不环绕。**
+
+```
+0xff52A5EB  →  2147483647  →  0x7FFFFFFF  →  纯白
+```
+
+而 `0xFF52A5EB` 本来是蓝色（ARGB）。任何 8 位十六进制颜色都会中招，
+6 位的（如 `0xff3e25` = 16727589）在 Int 范围内，所以看起来"有的颜色正常有的变白"。
+
+### 为什么是移植引入的
+
+`FunkinLua.hx` 里这段代码和上游 tag 0.6.3 **逐字相同**，移植时没动过。差别在工具链：
+
+| | 原版 0.6.3 | 本移植 |
+|---|---|---|
+| Haxe | 4.2.5 | 4.3.7 |
+| hxcpp | 4.2.1 | 4.3.2 |
+
+同一表达式在两个 target 上的实测：
+
+| 环境 | `Std.parseInt('0xff52A5EB')` |
+|---|---|
+| Haxe `--interp` | -11360789 ✅ |
+| cpp 运行时 | 2147483647 ❌ |
+
+代码不变、语义变了。这也解释了为什么 mod 在原版 0.6.3 上正常。
+
+### 修法
+
+新增 `FunkinLua.parseHexColor()`，逐位累加让 32 位自然环绕，接受
+`RRGGBB` / `AARRGGBB` / `0xAARRGGBB` / `#RRGGBB` 四种写法。
+
+替换了 **14 处**同款写法：
+
+| 文件 | 位置 |
+|---|---|
+| `FunkinLua.hx` | `setTextColor`、`setTextBorder`、`setTimeBarColors`、`setHealthBarColors`、`cameraFlash`、`cameraFade`、`makeGraphic`、`setObjectColor`、`getColorFromHex` 等 12 处 |
+| `editors/EditorLua.hx` | `getColorFromHex` |
+| `CreditsState.hx` | `getCurrentBGColor` |
+
+### 同类隐患排查结论
+
+| 检查项 | 结论 |
+|---|---|
+| `Std.parseFloat`（7 处） | 全是时间/缩放等小数值，无风险 |
+| mod 里直接写的 `0x...` 常量 | 两包全是 6 位，在 Int 范围内，安全 |
+| 其它 `Std.parseInt`（共 31 处） | 其余是下标/音量/事件值，量级很小 |
+| 主仓 1.0.4（`FNF-PE_RealQuickJs_Engine`） | **零处**此写法，全程用 `FlxColor.fromString`，免疫 |
+
+### 一般性结论
+
+> cpp 目标上 `Std.parseInt` 溢出**饱和**而非环绕。任何可能超过 2147483647 的整数解析
+> （ARGB 颜色、时间戳、大 ID）都不能走它，必须自己逐位解析或改用 `Float`。

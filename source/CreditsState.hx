@@ -315,10 +315,7 @@ class CreditsState extends MusicBeatState
 
 	function getCurrentBGColor() {
 		var bgColor:String = creditsStuff[curSelected][4];
-		if(!bgColor.startsWith('0x')) {
-			bgColor = '0xFF' + bgColor;
-		}
-		return Std.parseInt(bgColor);
+		return FunkinLua.parseHexColor(bgColor);
 	}
 
 	private function unselectableCheck(num:Int):Bool {
