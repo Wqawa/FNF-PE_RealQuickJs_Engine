@@ -2002,15 +2002,16 @@ class FunkinLua {
 		});
 
 		Lua_helper.add_callback(lua, "setHealthBarColors", function(leftHex:String, rightHex:String) {
-			var left:FlxColor = parseHexColor(leftHex);
-			var right:FlxColor = parseHexColor(rightHex);
+			// 空字符串表示"这一侧不上色"，返回透明；上游 Std.parseInt('') 得到的就是 0
+			var left:FlxColor = (leftHex == null || leftHex.length == 0) ? FlxColor.TRANSPARENT : parseHexColor(leftHex);
+			var right:FlxColor = (rightHex == null || rightHex.length == 0) ? FlxColor.TRANSPARENT : parseHexColor(rightHex);
 
 			PlayState.instance.healthBar.createFilledBar(left, right);
 			PlayState.instance.healthBar.updateBar();
 		});
 		Lua_helper.add_callback(lua, "setTimeBarColors", function(leftHex:String, rightHex:String) {
-			var left:FlxColor = parseHexColor(leftHex);
-			var right:FlxColor = parseHexColor(rightHex);
+			var left:FlxColor = (leftHex == null || leftHex.length == 0) ? FlxColor.TRANSPARENT : parseHexColor(leftHex);
+			var right:FlxColor = (rightHex == null || rightHex.length == 0) ? FlxColor.TRANSPARENT : parseHexColor(rightHex);
 
 			PlayState.instance.timeBar.createFilledBar(right, left);
 			PlayState.instance.timeBar.updateBar();
