@@ -145,6 +145,28 @@ class MusicBeatState extends FlxUIState
 		MusicBeatState.switchState(FlxG.state);
 	}
 
+	/**
+	 * 从子界面里切状态用这个。
+	 *
+	 * flixel 5 的 switchState 会先把当前 state destroy 掉，而子界面还在它的 update 里跑，
+	 * 于是抛「Attempting to resetState while the current state is destroyed」。
+	 * 0.6.3 当年的 flixel 没这层保护，所以原代码到处都是直接切。
+	 * 做法：先关掉子界面，下一帧再切。
+	 */
+	public static function safeSwitch(?next:FlxState):Void
+	{
+		var cur:Dynamic = FlxG.state;
+		if (cur != null && Reflect.getProperty(cur, 'subState') != null)
+		{
+			try { cur.closeSubState(); } catch (e:Dynamic) {}
+		}
+
+		new FlxTimer().start(0.01, function(_) {
+			if (next == null) resetState();
+			else switchState(next);
+		});
+	}
+
 	public static function getState():MusicBeatState {
 		var curState:Dynamic = FlxG.state;
 		var leState:MusicBeatState = curState;

@@ -208,7 +208,7 @@ class PauseSubState extends MusicBeatSubstate
 					FlxG.sound.music.volume = 0;
 					PlayState.changedDifficulty = true;
 					PlayState.chartingMode = false;
-					new FlxTimer().start(0.01, function(_) MusicBeatState.resetState());
+					MusicBeatState.safeSwitch();
 					return;
 				}
 
@@ -263,9 +263,9 @@ class PauseSubState extends MusicBeatSubstate
 
 					WeekData.loadTheFirstEnabledMod();
 					if(PlayState.isStoryMode) {
-						MusicBeatState.switchState(new StoryMenuState());
+						MusicBeatState.safeSwitch(new StoryMenuState());
 					} else {
-						MusicBeatState.switchState(new FreeplayState());
+						MusicBeatState.safeSwitch(new FreeplayState());
 					}
 					PlayState.cancelMusicFadeTween();
 					FlxG.sound.playMusic(Paths.music('freakyMenu'));
@@ -296,11 +296,11 @@ class PauseSubState extends MusicBeatSubstate
 		if(noTrans)
 		{
 			FlxTransitionableState.skipNextTransOut = true;
-			FlxG.resetState();
+			MusicBeatState.safeSwitch();
 		}
 		else
 		{
-			MusicBeatState.resetState();
+			MusicBeatState.safeSwitch();
 		}
 	}
 

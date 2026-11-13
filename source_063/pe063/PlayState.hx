@@ -5013,6 +5013,15 @@ class PlayState extends MusicBeatState
 		}
 		FlxG.animationTimeScale = 1;
 		FlxG.sound.music.pitch = 1;
+
+		// 脚本都销毁完之后再清 tween/timer：mod 的 onDestroy 里经常会新建 tween
+		// （estll 那种还原窗口尺寸的写法），这些回调活在已经死掉的脚本里，
+		// 0.5s 后触发就是空引用。flixel 5 的全局管理器正好能一起收掉。
+		if (modchartTweens != null) modchartTweens.clear();
+		if (modchartTimers != null) modchartTimers.clear();
+		FlxTween.globalManager.clear();
+		FlxTimer.globalManager.clear();
+
 		super.destroy();
 	}
 
