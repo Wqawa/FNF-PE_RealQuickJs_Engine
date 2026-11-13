@@ -5,6 +5,7 @@ import android.content.Context;
 #end
 
 import debug.FPSCounter;
+import debug.LocationLabel;
 
 import flixel.graphics.FlxGraphic;
 import flixel.FlxGame;
@@ -59,6 +60,7 @@ class Main extends Sprite
 	};
 
 	public static var fpsVar:FPSCounter;
+	public static var locVar:LocationLabel;
 
 	// You can pretty much ignore everything from here on - your code should go in your states.
 
@@ -175,10 +177,16 @@ class Main extends Sprite
 		#if !mobile
 		fpsVar = new FPSCounter(10, 3, 0xFFFFFF);
 		addChild(fpsVar);
+		// 包里没开 console 时，这行字是唯一能看出「现在在哪」的东西
+		locVar = new LocationLabel(10, 44, 0xFFBBBBBB);
+		addChild(locVar);
 		Lib.current.stage.align = "tl";
 		Lib.current.stage.scaleMode = StageScaleMode.NO_SCALE;
 		if(fpsVar != null) {
 			fpsVar.visible = ClientPrefs.data.showFPS;
+		}
+		if(locVar != null) {
+			locVar.visible = ClientPrefs.data.showFPS;
 		}
 		#end
 

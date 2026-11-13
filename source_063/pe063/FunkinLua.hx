@@ -83,10 +83,32 @@ class FunkinLua {
 	static public function resolveClass(name:String):Dynamic
 	{
 		if (name == null || name.length == 0) return null;
+
 		var cls:Dynamic = Type.resolveClass(name);
-		if (cls != null) return cls;
-		if (name.indexOf('pe063.') != 0) return Type.resolveClass('pe063.' + name);
+		if (cls != null) return isOtherTreeClass(cls) ? null : cls;
+
+		if (name.indexOf('pe063.') != 0)
+		{
+			var prefixed:Dynamic = Type.resolveClass('pe063.' + name);
+			if (prefixed != null) return prefixed;
+		}
 		return null;
+	}
+
+	/** 本体/原版那两棵树的引擎类包 —— 解析到这些说明串树了 */
+	static final ENGINE_PACKAGES:Array<String> = [
+		'backend.', 'states.', 'objects.', 'options.', 'substates.', 'psychlua.',
+		'shaders.', 'cutscenes.', 'flxanimate.', 'debug.'
+	];
+
+	static function isOtherTreeClass(cl:Dynamic):Bool
+	{
+		if (cl == null) return false;
+		var clsName:String = Type.getClassName(cl);
+		if (clsName == null || clsName.indexOf('pe063.') == 0) return false;
+		for (pkg in ENGINE_PACKAGES)
+			if (clsName.indexOf(pkg) == 0) return true;
+		return false;
 	}
 	public var closed:Bool = false;
 

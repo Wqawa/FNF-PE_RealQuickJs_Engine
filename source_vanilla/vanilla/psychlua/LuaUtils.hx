@@ -51,7 +51,27 @@ class LuaUtils
 				if (packed != null) return packed;
 			}
 		}
-		return Type.resolveClass(name);
+
+		// 兜底解析到的如果是对应本体（backend.PlayState 之类）的类，宁可返回 null ——
+		// 三棵树共用一个 exe，落到别的树上比报错更难查。
+		var fallback:Dynamic = Type.resolveClass(name);
+		return isOtherTreeClass(fallback) ? null : fallback;
+	}
+
+	/** 本体那棵树的引擎类（没带 vanilla. 前缀的那些包） */
+	static final ENGINE_PACKAGES:Array<String> = [
+		'backend.', 'states.', 'objects.', 'options.', 'substates.', 'psychlua.',
+		'shaders.', 'cutscenes.', 'flxanimate.', 'debug.'
+	];
+
+	static function isOtherTreeClass(cl:Dynamic):Bool
+	{
+		if (cl == null) return false;
+		var clsName:String = Type.getClassName(cl);
+		if (clsName == null || clsName.indexOf('vanilla.') == 0) return false;
+		for (pkg in ENGINE_PACKAGES)
+			if (clsName.indexOf(pkg) == 0) return true;
+		return false;
 	}
 
 	static final CLASS_PACKAGES:Array<String> = [
