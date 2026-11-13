@@ -148,8 +148,11 @@ class Paths
 
 	inline static function getLibraryPathForce(file:String, library:String)
 	{
-		var returnPath = '$library:assets/$library/$file';
-		return returnPath;
+		// 不用 lime 的库 selector 了。原来拼的是 '$library:assets/$library/$file'，
+		// 库名、库内路径、磁盘路径是三套东西，和本体/原版那两棵树（都走普通路径）
+		// 混在一起时 bin/assets 下会多出一堆扁平目录，而且 OpenFlAssets 查不到就静默失败。
+		// 现在三棵树统一：assets/<版本>/<库名>/file。
+		return 'assets/0.6.3/$library/$file';
 	}
 
 	inline public static function getPreloadPath(file:String = '')
