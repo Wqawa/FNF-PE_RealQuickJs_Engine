@@ -225,8 +225,11 @@ WARN_COUNT=$(grep -ci "warning:" "$LOG" || true)
 say "编译 warning: $WARN_COUNT 条（上游代码的 deprecated 噪声属正常）"
 
 if [ "$ASSETS" = 1 ]; then
-	# 官方素材（base_game）铺进 bin/assets/<版本>/，见 building/prep_assets.sh
-	bash "$ROOT/building/prep_assets.sh" "$MODE"
+	# 官方素材铺进 bin/assets/<版本>/ 并校验；缺东西直接判这次构建失败 ——
+	# 资产缺失不会让游戏崩，只会安静地空着，所以必须在打包时拦住。
+	if ! bash "$ROOT/building/prep_assets.sh" "$MODE"; then
+		fail "资产不全，见上面的缺项（可用 -no-assets 跳过这一步）"
+	fi
 else
 	say "按参数跳过素材拷贝"
 fi

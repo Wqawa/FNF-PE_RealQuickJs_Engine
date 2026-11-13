@@ -6,6 +6,7 @@
 building/
   setup.sh      环境体检（Haxe / 库版本 / MSVC / SDK / rc.exe）
   build.sh      编译
+  prep_assets.sh 编译后把官方素材铺进 bin，并校验三个引擎的资产
   libs.txt      依赖清单，版本号只在这里维护一份
   Build.bat     Windows 双击入口，转发到 build.sh
   logs/         编译日志，一次一份
@@ -21,6 +22,10 @@ bash building/build.sh -debug     # debug
 bash building/build.sh -clean     # 清中间产物全量重编
 bash building/build.sh -dry       # 只打印计划，不动文件
 bash building/build.sh -no-cache  # 关 hxcpp 编译缓存（怀疑缓存里是旧 obj）
+bash building/build.sh -no-assets # 跳过素材铺放与校验
+
+# 只校验已铺好的资产，不动文件（发版前跑一次）
+bash building/prep_assets.sh --check
 ```
 
 产物 `export/<release|debug>/windows/bin/PsychEngine.exe`，日志在 `logs/`。
@@ -37,9 +42,20 @@ bash building/build.sh -no-cache  # 关 hxcpp 编译缓存（怀疑缓存里是�
 | 3/6 MSVC | 扫 `D:/VS2019/BuildTools`、VS2022 等位置，取最新版本和 SDK | 提示装 Build Tools 的 C++ 工作负载 |
 | 4/6 预处理 | 关掉运行中的游戏；`-clean` 时清 obj/src；打开 hxcpp 编译缓存 | — |
 | 5/6 编译 | `haxelib run lime build windows` | 失败时摘出前 10 条 error |
-| 6/6 验收 | exe 是否存在 / 时间戳 / 大小 / warning 数 | 时间戳没变会提醒用 `-clean` |
+| 6/6 验收 | exe 是否存在 / 时间戳 / 大小 / warning 数；铺素材并校验 | 资产缺项直接判这次构建失败 |
 
-素材铺放在第 6 步之后，调 `.workbuddy/prep_assets.sh`（只有那一份实现，没在这里重复写）。
+第 6 步的素材部分走 `prep_assets.sh`，它做三件事：
+
+1. **铺**：`assets/base_game`（官方素材的单一源，713 个文件）硬链接进
+   `bin/assets/{body,1.0.4}`，再补 `0.6.3` 缺的周目录。已有文件不覆盖 —— 版本目录优先。
+   桌面构建跳过 `*.mp3`（三棵树的 `SOUND_EXT` 都是 `ogg`），顺带清掉老构建残留的多余 mp3。
+2. **建目录**：`mods/{body,1.0.4,0.6.3,global}` 和默认的 `engine.txt`
+   （`mods/<版本>/` 不存在时 `Mods.updateModList()` 会直接崩）。
+3. **校验**：base_game 是否零缺、`weekList.txt` 的每条是否有 json、
+   舞台 json 里 `directory` 指的周目录是否非空、音频是否都有 `.ogg`、有没有 0 字节文件。
+
+资产缺失不会让游戏崩，只会安静地空白（freeplay 列表空、舞台缺图、选歌没声音），
+所以必须在打包时拦住。只想知道现状不铺：`prep_assets.sh --check`。
 
 ## 环境版本
 
@@ -56,8 +72,9 @@ bash building/build.sh -no-cache  # 关 hxcpp 编译缓存（怀疑缓存里是�
 
 ## 注意
 
-- `assets/base_game` 是编译**之后**才铺进 `bin/assets/body` 和 `bin/assets/1.0.4` 的
-  （`Project.xml` 的 `BASE_GAME_FILES` 故意留在 officialBuild 段）。
+- `assets/base_game` 是编译**之后**才铺进 `bin/assets/<版本>/` 的（见上面的第 6 步）。
+  `assets/body`、`assets/1.0.4`、`assets/0.6.3` 里只放各版本自己的东西，官方素材不要往里抄 ——
+  那样仓库里会多出两份 470M。
 - 改了 `Project.xml` 的 define、增删 `.hx` 文件、换 Haxe/hxcpp 版本之后会全量重编（本机约 3~4 分钟）；
   平时改代码是增量，一分钟左右。
 - hxcpp 编译缓存在 `.cache/hxcpp`（已 gitignore，可以随便删）。怀疑缓存里是旧 obj 了加 `-no-cache`。
