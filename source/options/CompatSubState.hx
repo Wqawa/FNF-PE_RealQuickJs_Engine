@@ -18,9 +18,9 @@ class CompatSubState extends BaseOptionsMenu
 			BOOL);
 		addOption(option);
 
-		option = new Option('Legacy Time Bar',
-			'Restore the 0.6.3 time bar: missing a zoom/segment no longer halves its alpha.',
-			'compatLegacyTimeBar',
+		option = new Option('Legacy Hold Notes',
+			'Dropped hold-note segments stay fully opaque and keep following the strum, like 0.6.3.',
+			'compatLegacySustain',
 			BOOL);
 		addOption(option);
 
