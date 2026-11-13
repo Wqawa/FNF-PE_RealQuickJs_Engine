@@ -2544,13 +2544,14 @@ class FunkinLua {
 			{
 				return true;
 			}
-			return FileSystem.exists(Paths.getPath('assets/$filename', TEXT));
+			// getPath 自己会拼 assets/0.6.3/，这里再写一层 assets/ 就成了 assets/0.6.3/assets/…
+			return FileSystem.exists(Paths.getPath(filename, TEXT));
 			#else
 			if(absolute)
 			{
 				return Assets.exists(filename);
 			}
-			return Assets.exists(Paths.getPath('assets/$filename', TEXT));
+			return Assets.exists(Paths.getPath(filename, TEXT));
 			#end
 		});
 		Lua_helper.add_callback(lua, "saveFile", function(path:String, content:String, ?absolute:Bool = false)

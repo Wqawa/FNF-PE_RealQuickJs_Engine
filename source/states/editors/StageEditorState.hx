@@ -615,8 +615,10 @@ class StageEditorState extends MusicBeatState implements PsychUIEventHandler.Psy
 
 		var folderList:Array<String> = [''];
 		#if sys
-		for (folder in FileSystem.readDirectory('assets/'))
-			if(FileSystem.isDirectory('assets/$folder') && folder != 'shared' && !Mods.ignoreModFolders.contains(folder))
+		// assets/ 下面现在是按版本分的目录，直接扫会把 body/1.0.4/0.6.3 当成 stage 名列出来
+		var assetsRoot:String = 'assets/${Paths.VERSION_DIR}/';
+		for (folder in FileSystem.readDirectory(assetsRoot))
+			if(FileSystem.isDirectory('$assetsRoot$folder') && folder != 'shared' && !Mods.ignoreModFolders.contains(folder))
 				folderList.push(folder);
 		#end
 
