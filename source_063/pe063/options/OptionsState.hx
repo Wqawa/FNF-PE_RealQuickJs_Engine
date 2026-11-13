@@ -112,10 +112,9 @@ class OptionsState extends MusicBeatState
 			MusicBeatState.switchState(new MainMenuState());
 		}
 
-		// ACCEPT 是「按住」语义（FlxActionDigital.check()），子界面打开后父状态
-		// 仍在 update（persistentUpdate 默认 true），不判断 subState 就会每帧重建
-		// 一次子界面，表现成「点了进不去」。
-		if (controls.ACCEPT && subState == null) {
+		// 子界面打开期间父状态不会 update（persistentUpdate 默认 false），这里不用再判 subState。
+		// 真正要挡的是子界面自己：0.6.3 的 ACCEPT 是「按住」语义，见 EngineSelectSubState 里的 acceptLatch。
+		if (controls.ACCEPT) {
 			openSelectedSubstate(options[curSelected]);
 		}
 	}

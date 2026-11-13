@@ -32,28 +32,18 @@ class EngineSelectSubState extends MusicBeatSubstate
 	var curSelected:Int = 0;
 	var errorText:FlxText;
 
-	static function diag(msg:String):Void
-	{
-		#if sys
-		try {
-			sys.FileSystem.createDirectory('./testout');
-			var f = sys.io.File.append('./testout/engine_select_063.log', false);
-			f.writeString(msg + '\n');
-			f.close();
-		} catch (e:Dynamic) {}
-		#end
-		trace('[engine-select-063] ' + msg);
-	}
+	// 0.6.3 的 controls.ACCEPT 是「按住」语义（FlxActionDigital.check()，按住期间恒为 true），
+	// 而这个界面正是用 ACCEPT 打开的 —— 打开的同一帧和之后每一帧它都还是 true。
+	// 不挡一下的话，第一帧就 confirmSelection()，curSelected 又默认指向当前引擎，
+	// 于是立刻 close()；父菜单看到按键没松又开一次 → 界面一闪就回去、create 日志刷屏。
+	// 等到 ACCEPT 真正松手才算数。
+	var acceptLatch:Bool = true;
 
 	override function create()
 	{
-		diag('create start');
 		super.create();
-		diag('super.create ok');
 
-		diag('loading menuDesat: ' + Paths.image('menuDesat'));
 		var bg:FlxSprite = new FlxSprite().loadGraphic(Paths.image('menuDesat'));
-		diag('bg ok');
 		bg.antialiasing = ClientPrefs.globalAntialiasing;
 		bg.color = 0xFF71bdfd;
 		bg.updateHitbox();
@@ -70,7 +60,6 @@ class EngineSelectSubState extends MusicBeatSubstate
 		current.scrollFactor.set();
 		add(current);
 
-		diag('font: ' + Paths.font('vcr.ttf'));
 		grpOptions = new FlxTypedGroup<Alphabet>();
 		add(grpOptions);
 
@@ -97,17 +86,22 @@ class EngineSelectSubState extends MusicBeatSubstate
 		errorText.scrollFactor.set();
 		add(errorText);
 
-		diag('alphabet group built: ' + grpOptions.length);
 		curSelected = keys.indexOf(Engine.current());
 		if (curSelected < 0) curSelected = 0;
 		changeSelection();
 
-		diag('create ok, current=' + Engine.current());
 	}
+
 
 	override function update(elapsed:Float)
 	{
 		super.update(elapsed);
+
+		if (acceptLatch)
+		{
+			if (!controls.ACCEPT) acceptLatch = false;
+			return;
+		}
 
 		if (controls.UI_UP_P)
 			changeSelection(-1);
@@ -153,9 +147,10 @@ class EngineSelectSubState extends MusicBeatSubstate
 
 		if (chosen == Engine.current())
 		{
+			// 不 close()：现在按键还按着，父菜单下一帧就会再开一次，白闪一下。
+			// 留在原地，按 BACK 退出。
 			var snd = Paths.sound('cancelMenu');
 			if (snd != null) FlxG.sound.play(snd);
-			close();
 			return;
 		}
 
