@@ -190,6 +190,19 @@ python .workbuddy/hash_utils.py
 
 ## 构建
 
+不想记这些命令的话，直接跑聚合入口（先选中文/英文，再按编号选功能）：
+
+```bash
+bash manage.sh            # Linux / macOS / Git Bash
+manage.bat                # Windows 双击
+```
+
+菜单里包含：环境体检、装环境、补库、编译（release/debug/全量）、铺素材+校验资产、
+只校验资产、Lua 兼容审计、重建 vanilla import 表。`bash manage.sh --zh 4` 这种写法
+可以跳过菜单直接跑某一项，给快捷方式或 CI 用。
+
+底层还是这几个脚本，要单独调也行：
+
 ```bash
 bash building/build.sh          # 增量 release
 bash building/build.sh -debug   # debug
