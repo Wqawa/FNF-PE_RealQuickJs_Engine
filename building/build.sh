@@ -94,14 +94,31 @@ say "依赖齐全（清单见 building/libs.txt）"
 step "3/6 MSVC / Windows SDK"
 
 pick_msvc() {
-	# 优先用环境里已有的，其次扫 VS2019 BuildTools（本机路径），最后才猜默认安装。
+	# 优先用环境里已有的，其次问 vswhere（装在哪个盘、哪个版本都认），最后才猜常见路径。
 	# 返回 Windows 风格路径（D:/...），MSVC 的 INCLUDE/LIB 只认这个。
 	if [ -n "${MSVC_DIR:-}" ] && [ -d "$MSVC_DIR" ]; then printf '%s' "$MSVC_DIR"; return; fi
-	local base ver
+
+	local vswhere base ver
+	for vswhere in \
+		"C:/Program Files (x86)/Microsoft Visual Studio/Installer/vswhere.exe" \
+		"C:/Program Files/Microsoft Visual Studio/Installer/vswhere.exe"; do
+		[ -f "$vswhere" ] || continue
+		base="$("$vswhere" -latest -products '*' \
+			-requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 \
+			-property installationPath 2>/dev/null | tr -d '\r' | head -1 | sed 's|\\|/|g')"
+		[ -n "$base" ] && [ -d "$base/VC/Tools/MSVC" ] && {
+			ver="$(ls -1 "$base/VC/Tools/MSVC" 2>/dev/null | sort -V | tail -1)"
+			[ -n "$ver" ] && { printf '%s' "$base/VC/Tools/MSVC/$ver"; return; }
+		}
+	done
+
 	for base in \
+		"G:/vs/program/VC/Tools/MSVC" \
 		"D:/VS2019/BuildTools/VC/Tools/MSVC" \
 		"C:/Program Files/Microsoft Visual Studio/2022/BuildTools/VC/Tools/MSVC" \
 		"C:/Program Files/Microsoft Visual Studio/2022/Community/VC/Tools/MSVC" \
+		"C:/Program Files/Microsoft Visual Studio/2022/Professional/VC/Tools/MSVC" \
+		"C:/Program Files/Microsoft Visual Studio/2022/Enterprise/VC/Tools/MSVC" \
 		"C:/Program Files (x86)/Microsoft Visual Studio/2019/BuildTools/VC/Tools/MSVC"; do
 		[ -d "$base" ] || continue
 		ver="$(ls -1 "$base" 2>/dev/null | sort -V | tail -1)"
