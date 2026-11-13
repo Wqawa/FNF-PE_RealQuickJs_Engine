@@ -230,7 +230,7 @@ class ReflectionFunctions
 			return Reflect.callMethod(null, parent, parseInstances(args));
 		});
 		Lua_helper.add_callback(lua, "callMethodFromClass", function(className:String, funcToRun:String, ?args:Array<Dynamic>) {
-			return callMethodFromObject(Type.resolveClass(className), funcToRun, parseInstances(args));
+			return callMethodFromObject(backend.ScriptClassAliases.resolve(className), funcToRun, parseInstances(args));
 		});
 
 		Lua_helper.add_callback(lua, "createInstance", function(variableToSave:String, className:String, ?args:Array<Dynamic>) {
@@ -239,7 +239,7 @@ class ReflectionFunctions
 			if(MusicBeatState.getVariables().get(variableToSave) == null)
 			{
 				if(args == null) args = [];
-				var myType:Dynamic = Type.resolveClass(className);
+				var myType:Dynamic = backend.ScriptClassAliases.resolve(className);
 		
 				if(myType == null)
 				{
@@ -310,7 +310,7 @@ class ReflectionFunctions
 				var lastIndex:Int = argStr.lastIndexOf('::');
 
 				var split:Array<String> = (lastIndex > -1) ? argStr.substring(0, lastIndex).split('.') : argStr.split('.');
-				arg = (lastIndex > -1) ? Type.resolveClass(argStr.substring(lastIndex+2)) : PlayState.instance;
+				arg = (lastIndex > -1) ? backend.ScriptClassAliases.resolve(argStr.substring(lastIndex+2)) : PlayState.instance;
 				for (j in 0...split.length)
 				{
 					//trace('Op2: ${Type.getClass(args[i])}, ${split[j]}');

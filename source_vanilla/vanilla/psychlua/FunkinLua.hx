@@ -454,7 +454,21 @@ class FunkinLua {
 					}
 				}
 				var groupOrArray:Dynamic = CustomSubstate.instance != null ? CustomSubstate.instance : LuaUtils.getTargetInstance();
-				return groupOrArray.members.indexOf(leObj);
+				var idx:Int = groupOrArray.members.indexOf(leObj);
+				if(idx < 0)
+				{
+					// 1.0 把 healthBar / iconP1 / scoreTxt 都塞进了 PlayState.uiGroup，按 members 查不到。
+					// 这里给一个「在 UI 之上」的位置：否则 mod 的
+					// setObjectOrder(o, getObjectOrder('healthBar') + 1) 会算成 0，
+					// 对象被插到最底层，整个被舞台背景盖住 —— 看着就像贴图没加载出来。
+					var ui:Dynamic = Reflect.getProperty(groupOrArray, 'uiGroup');
+					if(ui != null)
+					{
+						var subIdx:Int = Reflect.getProperty(ui, 'members').indexOf(leObj);
+						if(subIdx >= 0) return groupOrArray.members.length + subIdx;
+					}
+				}
+				return idx;
 			}
 			luaTrace('getObjectOrder: Object $obj doesn\'t exist!', false, false, FlxColor.RED);
 			return -1;
@@ -483,6 +497,10 @@ class FunkinLua {
 				else
 				{
 					var groupOrArray:Dynamic = CustomSubstate.instance != null ? CustomSubstate.instance : LuaUtils.getTargetInstance();
+					// getObjectOrder 对 uiGroup 里的东西返回「members 长度 + 组内下标」，
+					// 可能超出长度，insert 前先夹一下，落到最上层
+					if(position < 0) position = 0;
+					if(position > groupOrArray.members.length) position = groupOrArray.members.length;
 					groupOrArray.remove(leObj, true);
 					groupOrArray.insert(position, leObj);
 				}

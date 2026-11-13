@@ -29,6 +29,11 @@ class LuaUtils
 	 * 迁移到 vanilla.* 之后，Lua/HScript 仍然会用原包名反射（states.PlayState 等）。
 	 * 同一个 exe 里本体也有 states.PlayState，所以必须先尝试 vanilla.*，
 	 * 否则原版模组会悄悄操作到本体类上。
+	 *
+	 * 1.0.4 的类都在包目录里（backend. / states. / objects. …），而脚本写的是**裸名**：
+	 * getPropertyFromClass('ClientPrefs', 'healthBarAlpha') 这种。只试 'vanilla.' 前缀
+	 * 拼不出 vanilla.backend.ClientPrefs，返回 null → 属性读成 nil → 例如血条皮肤的
+	 * alpha 变 0，看着像贴图没加载出来（实际图集是好的）。
 	 */
 	public static function resolveClass(name:String):Dynamic
 	{
@@ -38,9 +43,21 @@ class LuaUtils
 		{
 			var namespaced:Dynamic = Type.resolveClass('vanilla.' + name);
 			if (namespaced != null) return namespaced;
+
+			// 裸名补包：vanilla.<包>.<类>
+			for (pkg in CLASS_PACKAGES)
+			{
+				var packed:Dynamic = Type.resolveClass('vanilla.' + pkg + '.' + name);
+				if (packed != null) return packed;
+			}
 		}
 		return Type.resolveClass(name);
 	}
+
+	static final CLASS_PACKAGES:Array<String> = [
+		'backend', 'states', 'objects', 'options', 'substates', 'psychlua',
+		'shaders', 'cutscenes', 'flxanimate', 'debug'
+	];
 
 	public static function resolveEnum(name:String):Dynamic
 	{

@@ -70,6 +70,24 @@ class FunkinLua {
 	#end
 	public var camTarget:FlxCamera;
 	public var scriptName:String = '';
+
+	/**
+	 * 裸类名 → pe063.* 全名。
+	 *
+	 * 这棵树整体加了 pe063. 前缀，但脚本里写的还是 0.6.3 时代的裸名：
+	 *   getPropertyFromClass('ClientPrefs', 'healthBarAlpha')
+	 * Type.resolveClass('ClientPrefs') 在这棵树里永远是 null，属性读成 nil，
+	 * 于是 setProperty('xxx.alpha', nil) 把 alpha 写成 0 —— 表现是贴图根本不出现，
+	 * 连 flixel 的占位方块都没有（frames 其实是好的）。
+	 */
+	static public function resolveClass(name:String):Dynamic
+	{
+		if (name == null || name.length == 0) return null;
+		var cls:Dynamic = Type.resolveClass(name);
+		if (cls != null) return cls;
+		if (name.indexOf('pe063.') != 0) return Type.resolveClass('pe063.' + name);
+		return null;
+	}
 	public var closed:Bool = false;
 
 	#if hscript
@@ -887,7 +905,7 @@ class FunkinLua {
 			#if hscript
 			initHaxeModule();
 			try {
-				retVal = hscript.execute(codeToRun);
+				retVal = hscript.executeAuto(codeToRun, resolveClass);
 			}
 			catch (e:Dynamic) {
 				luaTrace(scriptName + ":" + lastCalledFunction + " - " + e, false, false, FlxColor.RED);
@@ -909,7 +927,9 @@ class FunkinLua {
 				if(libPackage.length > 0)
 					str = libPackage + '.';
 
-				hscript.variables.set(libName, Type.resolveClass(str + libName));
+				var leClass:Dynamic = Type.resolveClass(str + libName);
+				if(leClass == null) leClass = resolveClass(libName);
+				hscript.variables.set(libName, leClass);
 			}
 			catch (e:Dynamic) {
 				luaTrace(scriptName + ":" + lastCalledFunction + " - " + e, false, false, FlxColor.RED);
@@ -1052,26 +1072,26 @@ class FunkinLua {
 			@:privateAccess
 			var killMe:Array<String> = variable.split('.');
 			if(killMe.length > 1) {
-				var coverMeInPiss:Dynamic = getVarInArray(Type.resolveClass(classVar), killMe[0]);
+				var coverMeInPiss:Dynamic = getVarInArray(resolveClass(classVar), killMe[0]);
 				for (i in 1...killMe.length-1) {
 					coverMeInPiss = getVarInArray(coverMeInPiss, killMe[i]);
 				}
 				return getVarInArray(coverMeInPiss, killMe[killMe.length-1]);
 			}
-			return getVarInArray(Type.resolveClass(classVar), variable);
+			return getVarInArray(resolveClass(classVar), variable);
 		});
 		Lua_helper.add_callback(lua, "setPropertyFromClass", function(classVar:String, variable:String, value:Dynamic) {
 			@:privateAccess
 			var killMe:Array<String> = variable.split('.');
 			if(killMe.length > 1) {
-				var coverMeInPiss:Dynamic = getVarInArray(Type.resolveClass(classVar), killMe[0]);
+				var coverMeInPiss:Dynamic = getVarInArray(resolveClass(classVar), killMe[0]);
 				for (i in 1...killMe.length-1) {
 					coverMeInPiss = getVarInArray(coverMeInPiss, killMe[i]);
 				}
 				setVarInArray(coverMeInPiss, killMe[killMe.length-1], value);
 				return true;
 			}
-			setVarInArray(Type.resolveClass(classVar), variable, value);
+			setVarInArray(resolveClass(classVar), variable, value);
 			return true;
 		});
 
@@ -3469,6 +3489,39 @@ class HScript
 		HScript.parser.line = 1;
 		HScript.parser.allowTypes = true;
 		return interp.execute(HScript.parser.parseString(codeToRun));
+	}
+
+	/**
+	 * 碰到 Unknown variable 就自动补一个全局类再重跑。
+	 *
+	 * 这份 globals 是 new() 里手写的一小串（FlxG / PlayState / ClientPrefs …），
+	 * 脚本用到表外的类直接报错，以前只能 addHaxeLibrary('类名', '包名') 手动塞 ——
+	 * 而且类名还得知道包路径。这里从报错里捞出类名，交给 resolveClass（带 pe063. 兜底）
+	 * 补进变量表，最多补 8 个。补不到才把原异常抛出去。
+	 */
+	public function executeAuto(codeToRun:String, resolver:String->Dynamic):Dynamic
+	{
+		var tries:Int = 0;
+		while (true)
+		{
+			try {
+				return execute(codeToRun);
+			}
+			catch (e:Dynamic) {
+				if (tries >= 8) throw e;
+				var msg:String = Std.string(e);
+				var at:Int = msg.indexOf('Unknown variable');
+				if (at < 0) throw e;
+				var rest:String = msg.substr(at + 'Unknown variable'.length).trim();
+				var name:String = rest.split(' ')[0].split('\n')[0].trim();
+				if (name.length == 0) throw e;
+				var cls:Dynamic = resolver(name);
+				if (cls == null) throw e;
+				interp.variables.set(name, cls);
+				tries++;
+			}
+		}
+		return null;
 	}
 }
 #end
