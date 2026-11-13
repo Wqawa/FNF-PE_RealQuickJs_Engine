@@ -2,6 +2,7 @@ package pe063;
 
 import pe063.Controls.Control;
 import flixel.FlxG;
+import flixel.util.FlxTimer;
 import flixel.FlxSprite;
 import flixel.FlxSubState;
 import flixel.addons.transition.FlxTransitionableState;
@@ -199,10 +200,15 @@ class PauseSubState extends MusicBeatSubstate
 					var poop = Highscore.formatSong(name, curSelected);
 					PlayState.SONG = Song.loadFromJson(poop, name);
 					PlayState.storyDifficulty = curSelected;
-					MusicBeatState.resetState();
+					// 不能在这个子界面的 update 里直接 switchState：
+					// flixel 会先 destroy 当前 state，子界面还在跑 → "Attempting to resetState
+					// while the current state is destroyed"。先关子界面，下一帧再切。
+					PlayState.instance.paused = true;
+					close();
 					FlxG.sound.music.volume = 0;
 					PlayState.changedDifficulty = true;
 					PlayState.chartingMode = false;
+					new FlxTimer().start(0.01, function(_) MusicBeatState.resetState());
 					return;
 				}
 
