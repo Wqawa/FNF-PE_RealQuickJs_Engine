@@ -78,7 +78,8 @@ else
 			continue
 		fi
 
-		curfile="$LIBROOT/$name/.current"
+		# haxelib 把点号库名落成逗号目录（funkin.vis → funkin,vis），拼路径时要跟着换
+		curfile="$LIBROOT/${name//./,}/.current"
 		# .current 有的写 2.6.5，有的写 2,6,5（目录名风格），统一成点分再比
 		cur=""
 		[ -f "$curfile" ] && cur="$(tr -d '\r\n' < "$curfile" 2>/dev/null | tr ',' '.')"
@@ -128,8 +129,18 @@ else
 	ok "MSVC $MSVC_PATH"
 fi
 
-SDK_BASE="C:/Program Files (x86)/Windows Kits/10"
-[ -d "$SDK_BASE" ] || SDK_BASE="C:/Program Files/Windows Kits/10"
+# SDK_DIR 指向 Windows Kits 的版本根（例如 G:/Windows Kits/10）；没设就扫各盘的标准位置
+SDK_BASE="${SDK_DIR:-}"
+if [ -z "$SDK_BASE" ] || [ ! -d "$SDK_BASE/Include" ]; then
+	SDK_BASE=""
+	for base in \
+		"C:/Program Files (x86)/Windows Kits/10" \
+		"C:/Program Files/Windows Kits/10" \
+		"D:/Windows Kits/10" "E:/Windows Kits/10" "F:/Windows Kits/10" \
+		"G:/Windows Kits/10" "H:/Windows Kits/10"; do
+		[ -d "$base/Include" ] && { SDK_BASE="$base"; break; }
+	done
+fi
 SDK_VER=""
 if [ -d "$SDK_BASE/Include" ]; then
 	if [ -d "$SDK_BASE/Include/10.0.19041.0" ]; then

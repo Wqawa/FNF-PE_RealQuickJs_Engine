@@ -70,10 +70,16 @@ HAXE_DIR="$(cd "$(dirname "$HAXE_BIN")" && pwd)"
 NEKO_DIR="$HAXE_DIR/../neko"
 [ -d "$NEKO_DIR" ] || NEKO_DIR="$HAXE_DIR"
 export PATH="$HAXE_DIR:$NEKO_DIR:$PATH"
-export HAXELIB_PATH="$ROOT/.haxelib"
-
 say "haxe: $("$HAXE_BIN" --version 2>/dev/null)"
-say "haxelib 仓库: $HAXELIB_PATH"
+
+# 仓库自带库目录时优先用它（环境隔离），没有就退回全局 haxelib。
+# 硬写 HAXELIB_PATH 会让没建 .haxelib 的机器上所有库都"消失"。
+if [ -d "$ROOT/.haxelib" ]; then
+	export HAXELIB_PATH="$ROOT/.haxelib"
+	say "haxelib 仓库: $HAXELIB_PATH（仓库内）"
+else
+	say "haxelib 仓库: $(haxelib config 2>/dev/null || echo '?')（全局）"
+fi
 
 # ---------------------------------------------------------------- 2/6 依赖库
 step "2/6 haxelib 依赖"
@@ -103,27 +109,32 @@ pick_msvc() {
 	done
 }
 
-pick_sdk() {
-	if [ -n "${SDK_DIR:-}" ] && [ -d "$SDK_DIR" ]; then printf '%s' "$SDK_DIR"; return; fi
-	local base ver
+# SDK_DIR 直接指向 Windows Kits 的版本根（…/Windows Kits/10）；没设就扫各盘的标准位置
+pick_sdk_base() {
+	local base
 	for base in \
-		"C:/Program Files (x86)/Windows Kits/10/Include" \
-		"C:/Program Files/Windows Kits/10/Include"; do
-		[ -d "$base" ] || continue
-		# 19041 是这套 hxcpp 验证过的版本，有就用它；没有再取最新的
-		if [ -d "$base/10.0.19041.0" ]; then printf '10.0.19041.0'; return; fi
-		ver="$(ls -1 "$base" 2>/dev/null | grep -E '^10\.' | sort -V | tail -1)"
-		[ -n "$ver" ] && { printf '%s' "$ver"; return; }
+		"${SDK_DIR:-}" \
+		"C:/Program Files (x86)/Windows Kits/10" \
+		"C:/Program Files/Windows Kits/10" \
+		"D:/Windows Kits/10" "E:/Windows Kits/10" "F:/Windows Kits/10" \
+		"G:/Windows Kits/10" "H:/Windows Kits/10"; do
+		[ -n "$base" ] && [ -d "$base/Include" ] && { printf '%s' "$base"; return; }
 	done
 }
 
 MSVC_PATH="$(pick_msvc || true)"
-SDK_VER="$(pick_sdk || true)"
+SDK_BASE="$(pick_sdk_base || true)"
 [ -n "$MSVC_PATH" ] || fail "找不到 MSVC。装 VS Build Tools 的「使用 C++ 的桌面开发」，或设 MSVC_DIR。"
-[ -n "$SDK_VER" ]    || fail "找不到 Windows 10/11 SDK。装 VS Build Tools 时勾上 Windows SDK，或设 SDK_DIR。"
+[ -n "$SDK_BASE" ]  || fail "找不到 Windows 10/11 SDK。装 VS Build Tools 时勾上 Windows SDK，或设 SDK_DIR。"
 
-SDK_BASE="C:/Program Files (x86)/Windows Kits/10"
-[ -d "$SDK_BASE" ] || SDK_BASE="C:/Program Files/Windows Kits/10"
+# 19041 是这套 hxcpp 验证过的版本，有就用它；没有再取最新的
+SDK_VER=""
+if [ -d "$SDK_BASE/Include/10.0.19041.0" ]; then
+	SDK_VER="10.0.19041.0"
+else
+	SDK_VER="$(ls -1 "$SDK_BASE/Include" 2>/dev/null | grep -E '^10\.' | sort -V | tail -1)"
+fi
+[ -n "$SDK_VER" ] || fail "SDK 目录下没有 10.x 版本：$SDK_BASE/Include"
 
 export PATH="$MSVC_PATH/bin/Hostx64/x64:$PATH"
 # rc.exe / mt.exe 在 Windows SDK 的 bin 下，hxcpp 链接资源时会直接找 rc.exe
