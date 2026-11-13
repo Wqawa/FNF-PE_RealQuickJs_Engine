@@ -403,8 +403,9 @@ class PlayStateJudge
 			if (ps.guitarHeroSustains && note.isSustainNote) gainHealth = false;
 			if (gainHealth)
 			{
-				// 0.6.3 每次命中固定回 0.023；1.0.4 按音符 hitHealth * healthGain 算，量小很多
-				if (ClientPrefs.data.compatLegacyHealth) ps.health += 0.023;
+				// 0.6.3 每次命中 0.023，乘上 Gameplay 里的 Health Gain Multiplier；
+				// 1.0.4 是 note.hitHealth * healthGain，基数本来就更小
+				if (ClientPrefs.data.compatLegacyHealth) ps.health += 0.023 * ps.healthGain;
 				else ps.health += note.hitHealth * ps.healthGain;
 			}
 
