@@ -69,6 +69,8 @@ if [ ! -f "$LIBS_FILE" ]; then
 	bad "找不到 building/libs.txt"
 else
 	while read -r name ver flag; do
+		# 清单被检出成 CRLF 时 read 会把 \r 一起塞进变量，害得版本比较永远失败
+		name="${name%$'\r'}"; ver="${ver%$'\r'}"; flag="${flag%$'\r'}"
 		case "${name:-}" in ''|\#*) continue ;; esac
 		[ -z "${ver:-}" ] && continue
 		# haxe 本身不是 haxelib 库，版本在上面的第 1 节单独查
