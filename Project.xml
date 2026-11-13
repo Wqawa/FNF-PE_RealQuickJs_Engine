@@ -34,6 +34,8 @@
 
 	<section if="officialBuild">
 		<define name="TITLE_SCREEN_EASTER_EGG"/>
+		<!-- 故意留在这个段里：开了之后 lime 会把 470M 基础素材打进包，
+		     而我们是用 .workbuddy/prep_assets.sh 事后铺进 bin/assets/<版本>/。 -->
 		<define name="BASE_GAME_FILES" />
 	</section>
 
@@ -43,6 +45,10 @@
 	<!-- ____________________________ Window Settings ___________________________ -->
 
 	<!--These window settings apply to all targets-->
+	<!-- allow-high-dpi 不能删。进程不 DPI aware 的话，Windows 会把 1280x720 的逻辑窗口
+	     整张位图拉伸到物理分辨率，模糊；而 aware 之后窗口按物理像素走，150% 屏上
+	     会算出 1.275 这种非整数缩放。当前方案是「aware + camera 全部 1:1 + 整体交给
+	     openfl stage 缩放」，细节见 docs/HANDOFF_DUAL_ENGINE.md 和 backend.NativeScaleMode。 -->
 	<window width="1280" height="720" fps="60" background="#000000" hardware="true" vsync="false" allow-high-dpi="true" />
 
 	<!--HTML5-specific-->
@@ -64,6 +70,8 @@
 	<set name="BUILD_DIR" value="export/32bit" if="32bits" />
 
 	<classpath name="source" />
+	<!-- 原版 Psych Engine 1.0.4 源码，整体放在 vanilla.* 命名空间；engine.txt=vanilla 时使用 -->
+	<classpath name="source_vanilla" />
 
 	<!-- __________________________ Game Assets & Etc. __________________________ -->
 	
@@ -71,29 +79,60 @@
 	<define name="CRASH_HANDLER" if="desktop release" />
 
 	<!-- Assets -->
-	<assets path="assets/fonts" />
-	<assets path="assets/shared"        exclude="*.ogg" if="web"/>
-	<assets path="assets/shared"        exclude="*.mp3" unless="web"/>
-	<assets path="assets/embed"         exclude="*.ogg" if="web" embed="true"/>
-	<assets path="assets/embed"         exclude="*.mp3" unless="web" embed="true"/>
-	<assets path="assets/videos"        if="VIDEOS_ALLOWED"/>
-	<assets path="assets/songs"         exclude="*.ogg" if="web"/>
-	<assets path="assets/songs"         exclude="*.mp3" unless="web"/>
-	<assets path="assets/week_assets"   rename="assets" exclude="*.ogg" if="web"/>
-	<assets path="assets/week_assets"   rename="assets" exclude="*.mp3" unless="web"/>
+	<!--
+	  资产按版本分组，运行时路径 = assets/<VERSION_DIR>/...（见 backend.Paths.VERSION_DIR）
+	    body  = 修改版 1.0.4，默认加载
+	    1.0.4 = 原版 Psych Engine 1.0.4，Options -> Switch Engine 切过去
+	  两组声明是对称的，改一边记得改另一边。
+
+	  1.0.4 那份也必须打进来：图集 xml 走 FlxXmlAsset -> OpenFlAssets.getXml，
+	  只认编译期清单，纯磁盘文件读不到（图片有 BitmapData.fromFile 兜底，xml 没有）。
+	  exe 不会因此变大 —— native 目标默认不 embed，只是把路径注册进 bin/manifest。
+	-->
+
+	<!-- ===== body（修改版 1.0.4） ===== -->
+	<assets path="assets/body/fonts" />
+	<assets path="assets/body/shared"        exclude="*.ogg" if="web"/>
+	<assets path="assets/body/shared"        exclude="*.mp3" unless="web"/>
+	<assets path="assets/body/embed"         exclude="*.ogg" if="web" embed="true"/>
+	<assets path="assets/body/embed"         exclude="*.mp3" unless="web" embed="true"/>
+	<assets path="assets/body/videos"        if="VIDEOS_ALLOWED"/>
+	<assets path="assets/body/songs"         exclude="*.ogg" if="web"/>
+	<assets path="assets/body/songs"         exclude="*.mp3" unless="web"/>
+	<assets path="assets/body/week_assets"   rename="assets/body" exclude="*.ogg" if="web"/>
+	<assets path="assets/body/week_assets"   rename="assets/body" exclude="*.mp3" unless="web"/>
 	<section if="TITLE_SCREEN_EASTER_EGG">
-		<assets path="assets/secrets" rename="assets/shared" exclude="*.ogg" if="web"/>
-		<assets path="assets/secrets" rename="assets/shared" exclude="*.mp3"  unless="web"/>
+		<assets path="assets/body/secrets" rename="assets/body/shared" exclude="*.ogg" if="web"/>
+		<assets path="assets/body/secrets" rename="assets/body/shared" exclude="*.mp3"  unless="web"/>
+	</section>
+	<section if="TRANSLATIONS_ALLOWED">
+		<assets path="assets/body/translations" rename="assets/body" exclude="*.ogg" if="web"/>
+		<assets path="assets/body/translations" rename="assets/body" exclude="*.mp3"  unless="web"/>
 	</section>
 
+	<!-- ===== 1.0.4（原版） ===== -->
+	<assets path="assets/1.0.4/fonts" />
+	<assets path="assets/1.0.4/shared"       exclude="*.ogg" if="web"/>
+	<assets path="assets/1.0.4/shared"       exclude="*.mp3" unless="web"/>
+	<assets path="assets/1.0.4/embed"        exclude="*.ogg" if="web" embed="true"/>
+	<assets path="assets/1.0.4/embed"        exclude="*.mp3" unless="web" embed="true"/>
+	<assets path="assets/1.0.4/videos"       if="VIDEOS_ALLOWED"/>
+	<assets path="assets/1.0.4/songs"        exclude="*.ogg" if="web"/>
+	<assets path="assets/1.0.4/songs"        exclude="*.mp3" unless="web"/>
+	<assets path="assets/1.0.4/week_assets"  rename="assets/1.0.4" exclude="*.ogg" if="web"/>
+	<assets path="assets/1.0.4/week_assets"  rename="assets/1.0.4" exclude="*.mp3" unless="web"/>
+	<section if="TITLE_SCREEN_EASTER_EGG">
+		<assets path="assets/1.0.4/secrets" rename="assets/1.0.4/shared" exclude="*.ogg" if="web"/>
+		<assets path="assets/1.0.4/secrets" rename="assets/1.0.4/shared" exclude="*.mp3"  unless="web"/>
+	</section>
 	<section if="TRANSLATIONS_ALLOWED">
-		<assets path="assets/translations" rename="assets" exclude="*.ogg" if="web"/>
-		<assets path="assets/translations" rename="assets" exclude="*.mp3"  unless="web"/>
+		<assets path="assets/1.0.4/translations" rename="assets/1.0.4" exclude="*.ogg" if="web"/>
+		<assets path="assets/1.0.4/translations" rename="assets/1.0.4" exclude="*.mp3"  unless="web"/>
 	</section>
 
 	<section if="BASE_GAME_FILES">
-		<assets path="assets/base_game" rename="assets" exclude="*.ogg" if="web"/>
-		<assets path="assets/base_game" rename="assets" exclude="*.mp3"  unless="web"/>
+		<assets path="assets/base_game" rename="assets/body" exclude="*.ogg" if="web"/>
+		<assets path="assets/base_game" rename="assets/body" exclude="*.mp3"  unless="web"/>
 		<haxelib name="grig.audio" if="BASE_GAME_FILES"/>
 		<haxelib name="funkin.vis" if="BASE_GAME_FILES"/>
 	</section>
@@ -101,9 +140,9 @@
 	<define name="CHECK_FOR_UPDATES" if="desktop officialBuild"/>
 
 	<section if="MODS_ALLOWED">
-		<assets path='example_mods' rename='mods' embed='false' type='template' unless="mac"/>
-		<assets path='example_mods' rename='mods' embed='false' if="mac"/>
-		<assets path='list.txt' rename='modsList.txt' />
+		<assets path='example_mods' rename='mods/body' embed='false' type='template' unless="mac"/>
+		<assets path='example_mods' rename='mods/body' embed='false' if="mac"/>
+		<assets path='list.txt' rename='mods/body/modsList.txt' />
 	</section>
 	<assets path='art/readme.txt' rename='do NOT readme.txt' />
 
@@ -186,6 +225,9 @@
 	<!--Macro fixes-->
 	<haxeflag name="--macro" value="allowPackage('flash')" />
 	<haxeflag name="--macro" value="include('my.pack')" />
+	<!-- Haxe 只编译被引用到的模块，不 include 的话 vanilla 整棵树会被静默跳过。
+	     vanilla.unused 是上游遗留的废代码（引用了没装的 faxe/heaps 库），单独排除。 -->
+	<haxeflag name="--macro" value="include('vanilla', true, ['vanilla.unused'])" />
 
 	<haxedef name="hscriptPos" if="HSCRIPT_ALLOWED" />
 

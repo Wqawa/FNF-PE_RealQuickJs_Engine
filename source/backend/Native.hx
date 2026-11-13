@@ -93,15 +93,16 @@ class Native
 		final display:Null<Display> = System.getDisplay(0);
 		if (display != null)
 		{
+			// 窗口按 DPI 放大，再卡在屏幕 85% 以内，免得全屏启动。
+			// 这里允许非整数倍：缩放本身不归 flixel 管了，camera 一律 1:1 布局，
+			// 窗口比画布大的那部分由 openfl 的 stage 统一缩放（见 NativeScaleMode）。
 			final dpiScale:Float = display.dpi / 96;
 			var winW:Int = Std.int(Main.game.width * dpiScale);
 			var winH:Int = Std.int(Main.game.height * dpiScale);
 
-			// DPI 补偿是为了让 1280x720 在缩放屏上还是 1280x720 的物理像素。
-			// 但 150% 缩放的 1080p 屏上 1280*1.5 = 1920，正好铺满整块屏，看着就是全屏启动。
-			// 这里把窗口卡在屏幕的 85% 以内，爱怎么缩放都不会盖满。
 			final maxW:Int = Std.int(display.bounds.width * 0.85);
 			final maxH:Int = Std.int(display.bounds.height * 0.85);
+
 			if (winW > maxW)
 			{
 				winH = Std.int(winH * maxW / winW);

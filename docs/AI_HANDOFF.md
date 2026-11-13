@@ -2,6 +2,9 @@
 
 > 最后更新 2026-11-10 13:10。逐条修复记录在 `docs/LUA_COMPAT.md`（**改兼容层必须同步更新它**），
 > 逐日流水账在 `.workbuddy/memory/YYYY-MM-DD.md`。
+>
+> **2026-11-13 起另有一份 `docs/HANDOFF_DUAL_ENGINE.md`**：讲 0.6.3 移植、原版 1.0.4 并进
+> 同一个 exe、以及 `Std.parseInt` 颜色饱和和窗口缩放两个坑。看那份之前先看这份了解本体。
 
 ---
 

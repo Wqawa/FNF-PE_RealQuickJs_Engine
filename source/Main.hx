@@ -64,6 +64,13 @@ class Main extends Sprite
 
 	public static function main():Void
 	{
+		// engine.txt 在 bin 根目录：vanilla 走原版 1.0.4，其他一律走本体
+		if (Engine.isVanilla())
+		{
+			Lib.current.addChild(new vanilla.Main());
+			return;
+		}
+
 		#if sys
 		// 先验 JavaScriptUtils.hx 的指纹，对不上就直接炸在这儿
 		psychlua.FunkinJS.verifyUtilsIntegrity();
@@ -163,8 +170,14 @@ class Main extends Sprite
 		#if !mobile
 		fpsVar = new FPSCounter(10, 3, 0xFFFFFF);
 		addChild(fpsVar);
-		Lib.current.stage.align = "tl";
-		Lib.current.stage.scaleMode = StageScaleMode.NO_SCALE;
+		// 缩放整体交给 openfl：stage 按 1280x720 的内容缩到窗口大小，
+		// flixel 那边 camera 一律 1:1（backend.NativeScaleMode），
+		// 挂 ShaderFilter 的 camera 就不会再因为各自 buffer 取整而错开。
+		Lib.current.stage.align = "";
+		Lib.current.stage.scaleMode = StageScaleMode.SHOW_ALL;
+		// FlxGame 的 _state 要等 create() 之后才存在，直接赋 scaleMode 的话 setter
+		// 会立刻 onResize 到一个 null state 上，起来就崩。推迟到第一帧 update 之前。
+		FlxG.signals.preUpdate.add(applyNativeScaleMode);
 		if(fpsVar != null) {
 			fpsVar.visible = ClientPrefs.data.showFPS;
 		}
@@ -206,8 +219,21 @@ class Main extends Sprite
 		});
 	}
 
-	static function resetSpriteCache(sprite:Sprite):Void {
-		@:privateAccess {
+	/**
+	 * 把 flixel 的缩放模式换成 1:1 的那套（见 backend.NativeScaleMode）。
+	 * 只跑一次，挂到 preUpdate 上是为了等 FlxGame 的 state 建好。
+	 */
+	static function applyNativeScaleMode():Void
+	{
+		FlxG.signals.preUpdate.remove(applyNativeScaleMode);
+		// FlxGame.create() 里又写了一次 NO_SCALE，那一步是 addChild 之后异步跑的，
+		// 所以 stage 这边也得等到这里再设一遍，不然会被盖回去。
+		Lib.current.stage.align = "";
+		Lib.current.stage.scaleMode = StageScaleMode.SHOW_ALL;
+		FlxG.scaleMode = new backend.NativeScaleMode();
+	}
+
+	static function resetSpriteCache(sprite:Sprite):Void {		@:privateAccess {
 		        sprite.__cacheBitmap = null;
 			sprite.__cacheBitmapData = null;
 		}

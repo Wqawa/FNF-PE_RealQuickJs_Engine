@@ -34,7 +34,16 @@ class Paths
 			dumpExclusions.push(key);
 	}
 
-	public static var dumpExclusions:Array<String> = ['assets/shared/music/freakyMenu.$SOUND_EXT'];
+	/**
+	 * 资产和模组的版本目录名。
+	 *
+	 * 运行时所有基础资源都走 assets/<VERSION_DIR>/...，模组走 mods/<VERSION_DIR>/...。
+	 * 本体是 body，原版那份在 vanilla.backend.Paths 里是 1.0.4，两边各写各的。
+	 * 目前有 body / 1.0.4，往后接 0.6.3 时再加一个目录就行。
+	 */
+	public static var VERSION_DIR:String = 'body';
+
+	public static var dumpExclusions:Array<String> = ['assets/$VERSION_DIR/shared/music/freakyMenu.$SOUND_EXT'];
 	// haya I love you for the base cache dump I took to the max
 	public static function clearUnusedMemory()
 	{
@@ -211,7 +220,7 @@ class Paths
 		var shared:String = getSharedPath(file);
 		if(existsOnDiskOrManifest(shared)) return shared;
 
-		var root:String = 'assets/$file';
+		var root:String = 'assets/$VERSION_DIR/$file';
 		if(existsOnDiskOrManifest(root)) return root;
 
 		#if sys
@@ -235,10 +244,10 @@ class Paths
 	}
 
 	inline static public function getFolderPath(file:String, folder = "shared")
-		return 'assets/$folder/$file';
+		return 'assets/$VERSION_DIR/$folder/$file';
 
 	inline public static function getSharedPath(file:String = '')
-		return 'assets/shared/$file';
+		return 'assets/$VERSION_DIR/shared/$file';
 
 	inline static public function txt(key:String, ?folder:String)
 		return getPath('data/$key.txt', TEXT, folder, true);
@@ -264,7 +273,7 @@ class Paths
 		var file:String = modsVideo(key);
 		if(FileSystem.exists(file)) return file;
 		#end
-		return 'assets/videos/$key.$VIDEO_EXT';
+		return 'assets/$VERSION_DIR/videos/$key.$VIDEO_EXT';
 	}
 
 	inline static public function sound(key:String, ?modsAllowed:Bool = true):Sound
@@ -359,7 +368,7 @@ class Paths
 		var file:String = modFolders(folderKey);
 		if(FileSystem.exists(file)) return file;
 		#end
-		return 'assets/$folderKey';
+		return 'assets/$VERSION_DIR/$folderKey';
 	}
 
 	public static function fileExists(key:String, type:AssetType, ?ignoreMods:Bool = false, ?parentFolder:String = null)
@@ -525,7 +534,18 @@ class Paths
 
 	#if MODS_ALLOWED
 	inline static public function mods(key:String = '')
-		return 'mods/' + key;
+		return 'mods/$VERSION_DIR/$key';
+
+	/**
+	 * 全局模组目录。放在 mods/global/，和版本目录平级，所以哪个版本跑都能读到。
+	 * modsList.txt 里标了 runsGlobally 的模组会优先从这里找。
+	 */
+	inline static public function globalMods(key:String = '')
+		return 'mods/global/$key';
+
+	/** 当前版本自己的 modsList.txt，各版本互不干扰。 */
+	inline static public function modsListPath():String
+		return 'mods/$VERSION_DIR/modsList.txt';
 
 	inline static public function modsJson(key:String)
 		return modFolders('data/' + key + '.json');
@@ -559,11 +579,16 @@ class Paths
 
 		for(mod in Mods.getGlobalMods())
 		{
+			// 全局模组优先看 mods/global/，老位置（本版本的 mods 目录）留着当兼容
+			var globalCheck:String = globalMods(mod + '/' + key);
+			if(FileSystem.exists(globalCheck))
+				return globalCheck;
+
 			var fileToCheck:String = mods(mod + '/' + key);
 			if(FileSystem.exists(fileToCheck))
 				return fileToCheck;
 		}
-		return 'mods/' + key;
+		return mods(key);
 	}
 	#end
 

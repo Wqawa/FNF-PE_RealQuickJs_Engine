@@ -109,9 +109,12 @@ class Mods
 		#if MODS_ALLOWED
 		if(mods)
 		{
-			// Global mods first
+			// Global mods first（mods/global/ 优先，老位置当兼容）
 			for(mod in Mods.getGlobalMods())
 			{
+				var gFolder:String = Paths.globalMods(mod + '/' + fileToFind);
+				if(FileSystem.exists(gFolder) && !foldersToCheck.contains(gFolder)) foldersToCheck.push(gFolder);
+
 				var folder:String = Paths.mods(mod + '/' + fileToFind);
 				if(FileSystem.exists(folder) && !foldersToCheck.contains(folder)) foldersToCheck.push(folder);
 			}
@@ -160,7 +163,7 @@ class Mods
 
 		#if MODS_ALLOWED
 		try {
-			for (mod in CoolUtil.coolTextFile('modsList.txt'))
+			for (mod in CoolUtil.coolTextFile(Paths.modsListPath()))
 			{
 				//trace('Mod: $mod');
 				if(mod.trim().length < 1) continue;
@@ -186,7 +189,7 @@ class Mods
 		var list:Array<Array<Dynamic>> = [];
 		var added:Array<String> = [];
 		try {
-			for (mod in CoolUtil.coolTextFile('modsList.txt'))
+			for (mod in CoolUtil.coolTextFile(Paths.modsListPath()))
 			{
 				var dat:Array<String> = mod.split("|");
 				var folder:String = dat[0];
@@ -220,7 +223,15 @@ class Mods
 			fileStr += values[0] + '|' + (values[1] ? '1' : '0');
 		}
 
-		File.saveContent('modsList.txt', fileStr);
+		// 版本目录可能是第一次跑（比如刚切到原版），mods/<ver>/ 还不存在，
+		// 直接 saveContent 会抛 file_open。先建目录，写失败也不要连累启动。
+		var listPath:String = Paths.modsListPath();
+		var listDir:String = haxe.io.Path.directory(listPath);
+		if(listDir != null && listDir.length > 0 && !FileSystem.exists(listDir))
+			FileSystem.createDirectory(listDir);
+
+		try File.saveContent(listPath, fileStr)
+		catch(e:Dynamic) trace('Mods: failed to save $listPath: $e');
 		updatedOnState = true;
 		//trace('Saved modsList.txt');
 		#end

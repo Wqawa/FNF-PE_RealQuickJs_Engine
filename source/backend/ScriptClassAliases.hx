@@ -220,6 +220,9 @@ class ScriptClassAliases
 		bind('hxcodec.VideoHandler', hxcodec.VideoHandler);
 		bind('vlc.MP4Handler', vlc.MP4Handler);
 		#end
+
+		// vanilla 模式下整张表改指向原版引擎的同名类
+		if(Engine.isVanilla()) remapToVanilla();
 	}
 
 	static function bind(name:String, cl:Dynamic):Void
@@ -233,6 +236,40 @@ class ScriptClassAliases
 	}
 
 	/**
+	 * vanilla 模式下把整张表换成 `vanilla.*` 的同名类。
+	 * 同时把本体类的全限定名也注册进 proxyImports —— hscript 的
+	 * `import states.PlayState` 走 Interp.getOrImportClass，那里先查 proxyImports，
+	 * 不注册的话就会拿到本体那一份。
+	 */
+	static function remapToVanilla():Void
+	{
+		if(remapped) return;
+		remapped = true;
+
+		var pairs:Array<Array<Dynamic>> = [];
+		for(name in table.keys()) pairs.push([name, table.get(name)]);
+
+		for(pair in pairs)
+		{
+			var name:String = pair[0];
+			var cl:Dynamic = pair[1];
+			var fqn:String = Type.getClassName(cl);
+			if(fqn == null) continue;
+
+			var van:Dynamic = Type.resolveClass('vanilla.' + fqn);
+			if(van == null) continue;
+
+			table.set(name, van);
+			#if HSCRIPT_ALLOWED
+			Iris.proxyImports.set(name, van);
+			Iris.proxyImports.set(fqn, van);
+			#end
+		}
+	}
+
+	static var remapped:Bool = false;
+
+	/**
 	 * Resolve a class by name. Old bare names win, everything else falls through to the
 	 * normal haxe class lookup so modern scripts keep working.
 	 */
@@ -242,6 +279,14 @@ class ScriptClassAliases
 		init();
 
 		if(table.exists(className)) return table.get(className);
+
+		// vanilla 模式下，脚本要的是原版引擎的类，不是本体的同名类
+		if(Engine.isVanilla() && !className.startsWith('vanilla.'))
+		{
+			var van:Dynamic = Type.resolveClass('vanilla.' + className);
+			if(van != null) return van;
+		}
+
 		return Type.resolveClass(className);
 	}
 

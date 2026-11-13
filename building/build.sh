@@ -140,6 +140,8 @@ SDK_BASE="C:/Program Files (x86)/Windows Kits/10"
 [ -d "$SDK_BASE" ] || SDK_BASE="C:/Program Files/Windows Kits/10"
 
 export PATH="$MSVC_PATH/bin/Hostx64/x64:$PATH"
+# rc.exe / mt.exe 在 Windows SDK 的 bin 下，hxcpp 链接资源时会直接找 rc.exe
+export PATH="$SDK_BASE/bin/$SDK_VER/x64:$PATH"
 export INCLUDE="$MSVC_PATH/include;$SDK_BASE/Include/$SDK_VER/ucrt;$SDK_BASE/Include/$SDK_VER/shared;$SDK_BASE/Include/$SDK_VER/um;$SDK_BASE/Include/$SDK_VER/winrt"
 export LIB="$MSVC_PATH/lib/x64;$SDK_BASE/Lib/$SDK_VER/ucrt/x64;$SDK_BASE/Lib/$SDK_VER/um/x64"
 
@@ -209,16 +211,8 @@ WARN_COUNT=$(grep -ci "warning:" "$LOG" || true)
 say "编译 warning: $WARN_COUNT 条（上游代码的 deprecated 噪声属正常）"
 
 if [ "$ASSETS" = 1 ]; then
-	if [ -f "$BIN/.assets_ready" ]; then
-		say "base_game 素材已铺过（删 $BIN/.assets_ready 可重铺）"
-	else
-		if [ -d "$ROOT/assets/base_game" ]; then
-			cp -r "$ROOT/assets/base_game/." "$BIN/assets/" && touch "$BIN/.assets_ready"
-			say "已铺 base_game 素材"
-		else
-			say "没有 assets/base_game，跳过素材拷贝"
-		fi
-	fi
+	# 素材铺放只有一份实现，在 .workbuddy/prep_assets.sh，别在这儿再抄一遍
+	bash "$ROOT/.workbuddy/prep_assets.sh" "$MODE"
 else
 	say "按参数跳过素材拷贝"
 fi
@@ -226,3 +220,8 @@ fi
 say ""
 say "全部完成。可以跑了："
 say "  cd \"$BIN\" && ./PsychEngine.exe"
+
+# 原版侧现在也有 Options → Switch Engine，不再生成 返回本体.bat；老版本留下的顺手清掉。
+if [ "$DRY" = 0 ]; then
+	rm -f "$BIN/返回本体.bat"
+fi
