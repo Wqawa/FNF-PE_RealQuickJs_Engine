@@ -84,6 +84,10 @@ class HScript extends Iris
 	public var origin:String;
 	override public function new(?parent:Dynamic, ?file:String, ?varsToBring:Any = null, ?manualRun:Bool = false)
 	{
+		// 跑脚本之前先把「现代全名 → vanilla.*」灌进 Iris.proxyImports，
+		// 否则 import backend.Xxx 会解析到本体的类上（三棵树共用一个 exe）
+		IsolatedImports.register();
+
 		if (file == null)
 			file = '';
 
