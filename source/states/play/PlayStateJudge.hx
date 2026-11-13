@@ -401,10 +401,7 @@ class PlayStateJudge
 			}
 			var gainHealth:Bool = true; // prevent health gain, *if* sustains are treated as a singular note
 			if (ps.guitarHeroSustains && note.isSustainNote) gainHealth = false;
-			if (ClientPrefs.data.compatLegacyHealth)
-				ps.health += 0.023; // 0.6.3 的固定回血量
-			else if (gainHealth)
-				ps.health += note.hitHealth * ps.healthGain;
+			if (gainHealth) ps.health += note.hitHealth * ps.healthGain;
 
 		}
 		else //Notes that count as a miss if you hit them (Hurt notes for example)

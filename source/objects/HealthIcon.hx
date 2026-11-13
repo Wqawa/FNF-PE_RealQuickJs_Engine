@@ -31,20 +31,20 @@ class HealthIcon extends FlxSprite
 			
 			var graphic = Paths.image(name, allowGPU);
 
+			var iSize:Float = Math.round(graphic.width / graphic.height);
+			loadGraphic(graphic, true, Math.floor(graphic.width / iSize), Math.floor(graphic.height));
+
 			if(ClientPrefs.data.compatLegacyIcons)
 			{
-				// 0.6.3 的算法：帧固定 150x150、偏移按 2 等分居中。
-				// 1.0.4 用 round(宽/高) 猜帧数、偏移除以帧数，遇到 300x300 这种
-				// “一倍尺寸”的 mod 图标会算成 offset=(300-150)/1=150，
-				// 整张图就被往上顶掉一半 —— 头上被切掉那种。
-				loadGraphic(graphic, true, 150, 150);
+				// 0.6.3 只按 2 等分居中算偏移；1.0.4 多除了一个帧数，
+				// 300x300 这种“一倍尺寸”的单帧图标会算成 (300-150)/1 = 150，
+				// 整张图被往上顶掉一半 —— 头顶被裁。分帧规则保持原样，
+				// 强塞 150x150 会把这类异形图切成 0 帧，直接变占位方块。
 				iconOffsets[0] = (width - 150) / 2;
 				iconOffsets[1] = (height - 150) / 2;
 			}
 			else
 			{
-				var iSize:Float = Math.round(graphic.width / graphic.height);
-				loadGraphic(graphic, true, Math.floor(graphic.width / iSize), Math.floor(graphic.height));
 				iconOffsets[0] = (width - 150) / iSize;
 				iconOffsets[1] = (height - 150) / iSize;
 			}

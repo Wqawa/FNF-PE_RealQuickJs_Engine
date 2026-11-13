@@ -18,12 +18,6 @@ class CompatSubState extends BaseOptionsMenu
 			BOOL);
 		addOption(option);
 
-		option = new Option('Legacy Hold Notes',
-			'Dropped hold-note segments stay fully opaque and keep following the strum, like 0.6.3.',
-			'compatLegacySustain',
-			BOOL);
-		addOption(option);
-
 		option = new Option('Legacy Health Gain',
 			'Each hit heals 0.023 like 0.6.3 instead of the reduced 1.0.4 amount.',
 			'compatLegacyHealth',

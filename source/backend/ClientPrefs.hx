@@ -87,8 +87,6 @@ import states.TitleState;
 	// ------------------------------------------------------------------
 	/** 0.6.3 式 HUD：把 uiGroup 展开成平铺 members（老脚本按索引排层级要靠它） */
 	public var compatLegacyUI:Bool = false;
-	/** 0.6.3 式长音条：漏掉一段也不会让整条变半透明（谱面里的 sustain） */
-	public var compatLegacySustain:Bool = false;
 	/** 0.6.3 式回血：命中音符 +0.023（1.0.4 调低了） */
 	public var compatLegacyHealth:Bool = false;
 	/** 0.6.3 式小图标：换一套裁剪/缩放算法，修 1.0.4 上图标被裁边 */

@@ -510,13 +510,8 @@ class Note extends FlxSprite
 
 		if (tooLate && !inEditor)
 		{
-			// 1.0.4 把「漏掉」的音符压到 0.3 透明度；长音条是按段生成的，
-			// 漏一段就会让整条尾巴看着半透明。0.6.3 没有这个处理，开兼容时跳过。
-			if (!(ClientPrefs.data.compatLegacySustain && isSustainNote))
-			{
-				if (alpha > 0.3)
-					alpha = 0.3;
-			}
+			if (alpha > 0.3)
+				alpha = 0.3;
 		}
 	}
 
