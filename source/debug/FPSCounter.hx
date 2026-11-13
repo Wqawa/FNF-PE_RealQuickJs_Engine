@@ -62,11 +62,42 @@ class FPSCounter extends TextField
 
 	public dynamic function updateText():Void { // so people can override it in hscript
 		text = 'FPS: ${currentFPS}'
-		+ '\nMemory: ${flixel.util.FlxStringUtil.formatBytes(memoryMegas)}';
+		+ '\nMemory: ${flixel.util.FlxStringUtil.formatBytes(memoryMegas)}'
+		+ '\n${whereAmI()}';
 
 		textColor = 0xFFFFFFFF;
 		if (currentFPS < FlxG.drawFramerate * 0.5)
 			textColor = 0xFFFF0000;
+	}
+
+	/**
+	 * 现在在哪：<版本>/<状态类名>，进 PlayState 之后再带歌名。
+	 *
+	 * 直接拼进 FPS 同一个 TextField，字号/颜色/更新节奏天然和 FPS 那两行一致；
+	 * 单独做一个 TextField 会跟 Memory 挤在一起，低帧率变红时也不会有反应。
+	 * 读歌名走 Reflect，不 import PlayState，避免状态类互相依赖。
+	 */
+	static function whereAmI():String
+	{
+		var state:Dynamic = FlxG.state;
+		if (state == null) return 'body/(no state)';
+
+		var cls:Null<String> = Type.getClassName(Type.getClass(state));
+		if (cls != null) cls = cls.split('.').pop();
+
+		var out:String = 'body/' + cls;
+
+		var song:Dynamic = Reflect.getProperty(state, 'SONG');
+		if (song != null)
+		{
+			var name:Dynamic = Reflect.getProperty(song, 'song');
+			if (name != null)
+			{
+				var s:String = Std.string(name);
+				if (s.length > 0) out += ' · ' + s;
+			}
+		}
+		return out;
 	}
 
 	inline function get_memoryMegas():Float

@@ -7,7 +7,6 @@ import flixel.FlxState;
 import openfl.Assets;
 import openfl.Lib;
 import pe063.debug.FPSCounter;
-import pe063.debug.LocationLabel;
 import openfl.display.Sprite;
 import openfl.events.Event;
 import openfl.display.StageScaleMode;
@@ -36,8 +35,7 @@ class Main extends Sprite
 	var skipSplash:Bool = true; // Whether to skip the flixel splash screen that appears in release mode.
 	var startFullscreen:Bool = false; // Whether to start the game in fullscreen on desktop targets
 	public static var fpsVar:FPSCounter;
-	public static var locVar:LocationLabel;
-
+	
 	// You can pretty much ignore everything from here on - your code should go in your states.
 
 	public static function main():Void
@@ -89,15 +87,10 @@ class Main extends Sprite
 		#if !mobile
 		fpsVar = new FPSCounter(10, 3, 0xFFFFFF);
 		addChild(fpsVar);
-		locVar = new LocationLabel(10, 44, 0xFFBBBBBB);
-		addChild(locVar);
 		Lib.current.stage.align = openfl.display.StageAlign.TOP_LEFT;
 		Lib.current.stage.scaleMode = StageScaleMode.NO_SCALE;
 		if(fpsVar != null) {
 			fpsVar.visible = ClientPrefs.showFPS;
-		}
-		if(locVar != null) {
-			locVar.visible = ClientPrefs.showFPS;
 		}
 		#end
 
