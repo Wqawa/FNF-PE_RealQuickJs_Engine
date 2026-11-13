@@ -30,7 +30,7 @@
 # 基准源码先拉一份（不用放进仓库）
 git clone --depth 1 --branch 0.6.3 https://github.com/ShadowMario/FNF-PsychEngine .workbuddy/upstream/pe063
 
-python tools/lua_compat_audit.py --ref .workbuddy/upstream/pe063/source --label "PE 0.6.3"
+bash manage.sh --zh 8  # 原 tools/lua_compat_audit.py --ref .workbuddy/upstream/pe063/source --label "PE 0.6.3"
 ```
 
 工具干四件事，全部静态比对，不跑游戏：

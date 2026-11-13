@@ -190,44 +190,20 @@ python .workbuddy/hash_utils.py
 
 ## 构建
 
-不想记这些命令的话，直接跑聚合入口（先选中文/英文，再按编号选功能）：
+所有脚本都合并成了根目录一个 `manage.sh`（Windows 双击 `manage.bat`，它只负责找 bash）：
 
 ```bash
-bash manage.sh            # Linux / macOS / Git Bash
-manage.bat                # Windows 双击
+bash manage.sh          # 先选中文/英文，再按编号选功能
+bash manage.sh --zh 2   # 跳过菜单：直接编译 release
+bash manage.sh --en 6   # 跳过菜单：只校验资产
 ```
 
-菜单里包含：环境体检、装环境、补库、编译（release/debug/全量）、铺素材+校验资产、
-只校验资产、Lua 兼容审计、重建 vanilla import 表。`bash manage.sh --zh 4` 这种写法
-可以跳过菜单直接跑某一项，给快捷方式或 CI 用。
+菜单里的功能：环境体检、编译 release / debug / 全量重编、铺素材并校验、只校验资产、
+补/修 haxelib 库、Lua 兼容审计、重建 vanilla 的 HScript import 表。
 
-底层还是这几个脚本，要单独调也行：
-
-```bash
-bash building/build.sh          # 增量 release
-bash building/build.sh -debug   # debug
-bash building/build.sh -clean   # 全量重编（改了 Project.xml / 诡异链接错误时）
-```
-
-Windows 上也可以直接双击 `building/Build.bat`。脚本会自己找 Haxe / MSVC / Windows SDK、核对 `Project.xml` 要求的库、关掉正在运行的游戏，编译完自动把 `assets/base_game` 铺进 bin。细则见 [building/README.md](building/README.md)。
-
-依赖的安装步骤和上游一致，参照 [docs/BUILDING.md](docs/BUILDING.md) —— 只需配一次。
-
-脚本探测不出 MSVC 时，手动注入环境变量比修 VS 安装快：
-
-```bash
-export HAXELIB_PATH="$PWD/.haxelib"
-export PATH="/g/vs/program/VC/Tools/MSVC/<version>/bin/HostX64/x64:$PATH"
-export INCLUDE='<MSVC>/include;<SDK>/ucrt;<SDK>/shared;<SDK>/um;<SDK>/winrt;<SDK>/cppwinrt'
-export LIB='<MSVC>/lib/x64;<SDK>/ucrt/x64;<SDK>/um/x64'
-haxelib run lime build windows
-```
-
-首次全量约 30 分钟，之后增量几分钟。
-
-**注意**：构建前先关掉正在运行的游戏，否则 `lime.ndll` 被占用，会在复制阶段失败。
-
----
+编译产物 `export/<release|debug>/windows/bin/PsychEngine.exe`；编译日志在 `.cache/build-<mode>.log`。
+从零装环境（装 Haxe 本体）照 [docs/BUILDING.md](docs/BUILDING.md) 的上游步骤走一次，
+之后日常都交给 `manage.sh`。
 
 ## 目录
 

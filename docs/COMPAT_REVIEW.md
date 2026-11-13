@@ -31,7 +31,7 @@
 | 对象/字段 | PlayState 补 cameraX/Y、inChartEditor、comboStacking 转发；Bar 补 width/height getter | `states/PlayState.hx`、`objects/Bar.hx` |
 | 路径 | 存在性判断改成"先磁盘后清单"；stage/notetype/event 三类脚本找文件兜 `assets/` 根 | `backend/Paths.hx:185`、`states/PlayState.hx:2438` |
 | 实体 | `Section` 纯数据壳、hxcodec 3.x / hxvlc / MP4Handler 三个名字一套实现 | `source/hxcodec/` |
-| 验证 | 静态审计工具 + 自动开局回归（137 项断言） | `tools/lua_compat_audit.py`、`.workbuddy/luatest/` |
+| 验证 | 静态审计工具 + 自动开局回归（137 项断言） | `manage.sh`（功能 8）、`.workbuddy/luatest/` |
 
 这套组合拳方向是对的：不是逐个 mod 打补丁，而是把 API 面和路径面系统补齐。
 

@@ -1,3 +1,6 @@
+> **2026-11-13 晚：** 所有编译/素材/审计脚本已合并进仓库根目录的 `manage.sh` + `manage.bat`，
+> 本文里出现的 `building/*.sh`、`tools/*.py`、`setup/*` 命令都已作废，只当历史记录看。
+
 # AI 交接文档 — FNF-PE_RealQuickJs_Engine
 
 > 最后更新 2026-11-10 13:10。逐条修复记录在 `docs/LUA_COMPAT.md`（**改兼容层必须同步更新它**），

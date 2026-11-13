@@ -7,15 +7,12 @@ import crowplexus.iris.Iris;
  *
  * 三棵树编在一个 exe 里，`import backend.ClientPrefs` 和本体的全名一字不差，
  * 而 hscript-iris 解析 import 时先查 Iris.proxyImports、再落到 Type.resolveClass ——
- * 后者会命中**本体**的类。所以跑脚本之前先把这张表灌进 proxyImports，
- * 原版模式的脚本就只会看到 vanilla.* 的类。
+ * 后者会命中**本体**的类。所以跑脚本之前先把这张表灌进 proxyImports。
  *
- * 表是扫 source_vanilla/vanilla/ 的包名 + 顶格类型声明生成的
- * （tools/gen_vanilla_imports.py），增删类之后重跑一次。
+ * 由仓库根目录的 manage.sh（功能 10）扫描本目录生成，别手改。
  */
 class IsolatedImports
 {
-	/** 相对 vanilla 包的全名，例如 'backend.ClientPrefs'、'states.PlayState' */
 	public static var CLASSES:Array<String> = [
 		'Main',
 		'backend.Achievement',
