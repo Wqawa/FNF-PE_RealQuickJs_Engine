@@ -29,28 +29,31 @@ class HealthIcon extends FlxSprite
 			if(!Paths.fileExists('images/' + name + '.png', IMAGE)) name = 'icons/icon-' + char; //Older versions of psych engine's support
 			if(!Paths.fileExists('images/' + name + '.png', IMAGE)) name = 'icons/icon-face'; //Prevents crash from missing icon
 			
-			var graphic = Paths.image(name, allowGPU);
-
-			var iSize:Float = Math.round(graphic.width / graphic.height);
-			loadGraphic(graphic, true, Math.floor(graphic.width / iSize), Math.floor(graphic.height));
-
 			if(ClientPrefs.data.compatLegacyIcons)
 			{
-				// 0.6.3 只按 2 等分居中算偏移；1.0.4 多除了一个帧数，
-				// 300x300 这种“一倍尺寸”的单帧图标会算成 (300-150)/1 = 150，
-				// 整张图被往上顶掉一半 —— 头顶被裁。分帧规则保持原样，
-				// 强塞 150x150 会把这类异形图切成 0 帧，直接变占位方块。
+				// 直接搬 0.6.3：先无帧加载拿到真实尺寸，再按「宽/2、高」切两帧。
+				// 它算宽度用的是第二帧加载后的 width（= 单帧宽），所以 300x300 的
+				// 一倍尺寸图标 offset 是 0，不会像 1.0.4 那样算成 150 把头顶顶掉。
+				var file:Dynamic = Paths.image(name, allowGPU);
+				loadGraphic(file);
+				loadGraphic(file, true, Math.floor(width / 2), Math.floor(height));
 				iconOffsets[0] = (width - 150) / 2;
-				iconOffsets[1] = (height - 150) / 2;
+				iconOffsets[1] = (width - 150) / 2;
 			}
 			else
 			{
+				var graphic = Paths.image(name, allowGPU);
+				var iSize:Float = Math.round(graphic.width / graphic.height);
+				loadGraphic(graphic, true, Math.floor(graphic.width / iSize), Math.floor(graphic.height));
 				iconOffsets[0] = (width - 150) / iSize;
 				iconOffsets[1] = (height - 150) / iSize;
 			}
 			updateHitbox();
 
-			animation.add(char, [for(i in 0...frames.frames.length) i], 0, false, isPlayer);
+			if(ClientPrefs.data.compatLegacyIcons)
+				animation.add(char, [0, 1], 0, false, isPlayer);
+			else
+				animation.add(char, [for(i in 0...frames.frames.length) i], 0, false, isPlayer);
 			animation.play(char);
 			this.char = char;
 
