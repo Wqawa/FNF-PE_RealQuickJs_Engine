@@ -228,6 +228,65 @@ public static var VERSION_DIR:String = '1.0.4';
 - **`base_game` 在 1.0.4 那边用硬链接**（`cp -rl`），省 470M。改 `assets/base_game`
   里的文件会同时影响两边 —— 它是共享素材源，本来就是给两边用的，不算 bug。
 
+## 六点六、0.6.3 也接进来了（2026-11-13 中午）
+
+现在同一个 exe 里跑三棵树，靠 `bin/engine.txt` 选：
+
+| engine.txt | 走哪棵 | 源码 |
+|---|---|---|
+| `body`（默认） | 本仓 fork | `source/` |
+| `vanilla` | 原版 PE 1.0.4 | `source_vanilla/vanilla/` |
+| `pe063` | 0.6.3 | `source_063/pe063/` |
+
+`Engine.BODY / VANILLA / PE063`，`Engine.current()` 认这三个值，不认识就回 body。
+三份 Options 菜单里都有 `Switch Engine`，选完写 engine.txt + `Sys.exit(0)`。
+
+### 0.6.3 是怎么搬过来的
+
+1. `D:/FNF/PsychEngine_0.6.3/source` 整个拷到 `source_063/pe063/`
+2. 跑 `.workbuddy/tmp/ns_pe063.py source_063/pe063` 加前缀（package → `pe063.*`，import 跟着改）
+3. `Project.xml` 加 `<classpath name="source_063" />` 和 `haxelib name="flixel-ui"/"hscript"`
+4. `Paths` 里 `getPreloadPath` → `assets/0.6.3/`，`mods()` → `mods/0.6.3/`
+
+**前缀化漏掉的四处**（脚本只管 package 和 import，下面这些是手工补的）：
+
+| 漏的东西 | 表现 | 修法 |
+|---|---|---|
+| `@:access(...)` / `@:allow(...)` 里的类路径 | `Cannot access private constructor` | 参数里加 `pe063.` |
+| `@:allow(DiscordClient)` 这种**模块内的类** | 权限失效 | 脚本只认文件名 stem，模块内的类要单独补 |
+| 内联包引用 `editors.Xxx` / `options.Xxx` | `Type not found : editors.ChartingState` | 正则 `(?<![\w.])(editors\|animateatlas\|options)\.([A-Z])` |
+| `import Discord.DiscordClient` | `Type not found : Discord` | 要写 `import pe063.Discord.DiscordClient`（模块.类型） |
+
+`pe063/Discord.hx` 里的类叫 `DiscordClient`（文件名是 Discord），Haxe 的 import 必须写成
+`模块.类型`，写成 `pe063.DiscordClient` 找不到。
+
+### 0.6.3 的资产：library selector
+
+0.6.3 和 1.0.4 的寻路机制不一样 —— 它用 lime 的 `library`：
+
+```haxe
+getLibraryPathForce(file, "shared")  →  "shared:assets/shared/$file"
+```
+
+`shared:` 是库名，后面的 `assets/shared/...` 是**库内路径**，不是磁盘路径。
+所以 `Project.xml` 里磁盘路径写 `assets/0.6.3/shared`、库内路径必须保持 `assets/shared`：
+
+```xml
+<assets path="assets/0.6.3/shared" library="shared" rename="assets/shared" ... />
+```
+
+`rename` 写 `assets/0.6.3/shared` 的话库内路径就对不上了，运行时全部 404。
+
+`preload` 是例外：它走 `getPreloadPath()`，我们改成了 `assets/0.6.3/$file`，
+所以 `rename="assets/0.6.3"`。
+
+### 踩到的两个运行时崩溃
+
+1. **`[file_contents,assets/images/titleEnter.xml]`** — `TitleState` 里有一段兜底硬编码
+   `"assets/images/titleEnter.png"`，改成 `assets/0.6.3/...`。
+2. **`[file_open,mods/1.0.4/modsList.txt]`** — 见上面那节，`Mods.updateModList()` 写列表前
+   要确保 `mods/<版本>/` 目录存在。
+
 ## 七、下一步（优先级）
 
 1. **验证第五节三处改动**：跑 childplayV2 看偏移还在不在；看启动日志只剩一条

@@ -18,6 +18,7 @@ class Engine
 	public static inline var FILE_NAME:String = 'engine.txt';
 	public static inline var BODY:String = 'body';
 	public static inline var VANILLA:String = 'vanilla';
+	public static inline var PE063:String = 'pe063';
 
 	public static function current():String
 	{
@@ -25,11 +26,19 @@ class Engine
 		if (raw == null) return BODY;
 
 		raw = raw.trim().toLowerCase();
-		return raw == VANILLA ? VANILLA : BODY;
+		return switch (raw)
+		{
+			case VANILLA: VANILLA;
+			case PE063: PE063;
+			default: BODY;
+		};
 	}
 
 	public static function isVanilla():Bool
 		return current() == VANILLA;
+
+	public static function isPe063():Bool
+		return current() == PE063;
 
 	public static function readRaw():String
 	{

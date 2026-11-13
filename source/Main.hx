@@ -64,10 +64,15 @@ class Main extends Sprite
 
 	public static function main():Void
 	{
-		// engine.txt 在 bin 根目录：vanilla 走原版 1.0.4，其他一律走本体
+		// engine.txt 在 bin 根目录：vanilla 走原版 1.0.4，pe063 走 0.6.3，其他一律走本体
 		if (Engine.isVanilla())
 		{
 			Lib.current.addChild(new vanilla.Main());
+			return;
+		}
+		if (Engine.isPe063())
+		{
+			Lib.current.addChild(new pe063.Main());
 			return;
 		}
 

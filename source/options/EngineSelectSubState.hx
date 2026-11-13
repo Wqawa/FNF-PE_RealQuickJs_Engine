@@ -12,9 +12,10 @@ class EngineSelectSubState extends MusicBeatSubstate
 {
 	var options:Array<String> = [
 		'Body (Current Fork)',
-		'Vanilla Psych Engine 1.0.4'
+		'Vanilla Psych Engine 1.0.4',
+		'Psych Engine 0.6.3'
 	];
-	var keys:Array<String> = [Engine.BODY, Engine.VANILLA];
+	var keys:Array<String> = [Engine.BODY, Engine.VANILLA, Engine.PE063];
 
 	var grpOptions:FlxTypedGroup<Alphabet>;
 	var selectorLeft:Alphabet;

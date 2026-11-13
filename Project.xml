@@ -72,6 +72,7 @@
 	<classpath name="source" />
 	<!-- 原版 Psych Engine 1.0.4 源码，整体放在 vanilla.* 命名空间；engine.txt=vanilla 时使用 -->
 	<classpath name="source_vanilla" />
+	<classpath name="source_063" />
 
 	<!-- __________________________ Game Assets & Etc. __________________________ -->
 	
@@ -130,6 +131,35 @@
 		<assets path="assets/1.0.4/translations" rename="assets/1.0.4" exclude="*.mp3"  unless="web"/>
 	</section>
 
+	<!-- ===== 0.6.3（老版本） =====
+	     它用的是 lime 的 library selector：代码里拼的是 'shared:assets/shared/xxx'
+	     这种形式，所以库名和库内路径都得和原仓一致 —— rename 写 assets/<lib> 而不是
+	     assets/0.6.3/<lib>，磁盘位置和库内路径是两回事。 -->
+	<assets path="assets/0.6.3/fonts" />
+	<assets path="assets/0.6.3/preload" rename="assets/0.6.3" exclude="*.ogg" if="web"/>
+	<assets path="assets/0.6.3/preload" rename="assets/0.6.3" exclude="*.mp3" unless="web"/>
+	<section if="TITLE_SCREEN_EASTER_EGG">
+		<assets path="assets/0.6.3/secrets" rename="assets/0.6.3" exclude="*.ogg" if="web"/>
+		<assets path="assets/0.6.3/secrets" rename="assets/0.6.3" exclude="*.mp3"  unless="web"/>
+	</section>
+	<assets path="assets/0.6.3/videos" library="videos" rename="assets/videos" if="VIDEOS_ALLOWED"/>
+	<assets path="assets/0.6.3/songs" library="songs" rename="assets/songs" exclude="*.ogg" if="web"/>
+	<assets path="assets/0.6.3/songs" library="songs" rename="assets/songs" exclude="*.mp3" unless="web"/>
+	<assets path="assets/0.6.3/shared" library="shared" rename="assets/shared" exclude="*.ogg" if="web"/>
+	<assets path="assets/0.6.3/shared" library="shared" rename="assets/shared" exclude="*.mp3" unless="web"/>
+	<assets path="assets/0.6.3/week2" library="week2" rename="assets/week2" exclude="*.ogg" if="web"/>
+	<assets path="assets/0.6.3/week2" library="week2" rename="assets/week2" exclude="*.mp3" unless="web"/>
+	<assets path="assets/0.6.3/week3" library="week3" rename="assets/week3" exclude="*.ogg" if="web"/>
+	<assets path="assets/0.6.3/week3" library="week3" rename="assets/week3" exclude="*.mp3" unless="web"/>
+	<assets path="assets/0.6.3/week4" library="week4" rename="assets/week4" exclude="*.ogg" if="web"/>
+	<assets path="assets/0.6.3/week4" library="week4" rename="assets/week4" exclude="*.mp3" unless="web"/>
+	<assets path="assets/0.6.3/week5" library="week5" rename="assets/week5" exclude="*.ogg" if="web"/>
+	<assets path="assets/0.6.3/week5" library="week5" rename="assets/week5" exclude="*.mp3" unless="web"/>
+	<assets path="assets/0.6.3/week6" library="week6" rename="assets/week6" exclude="*.ogg" if="web"/>
+	<assets path="assets/0.6.3/week6" library="week6" rename="assets/week6" exclude="*.mp3" unless="web"/>
+	<assets path="assets/0.6.3/week7" library="week7" rename="assets/week7" exclude="*.ogg" if="web"/>
+	<assets path="assets/0.6.3/week7" library="week7" rename="assets/week7" exclude="*.mp3" unless="web"/>
+
 	<section if="BASE_GAME_FILES">
 		<assets path="assets/base_game" rename="assets/body" exclude="*.ogg" if="web"/>
 		<assets path="assets/base_game" rename="assets/body" exclude="*.mp3"  unless="web"/>
@@ -156,6 +186,9 @@
 
 	<haxelib name="flixel" version="5.6.1"/>
 	<haxelib name="flixel-addons" version="3.2.2"/>
+	<!-- 0.6.3 那棵树要这两个，本体和原版 1.0.4 不用 -->
+	<haxelib name="flixel-ui" version="2.6.5"/>
+	<haxelib name="hscript" version="2.5.0"/>
 	<haxelib name="tjson" version="1.4.0"/>
 
 	<!--Psych stuff needed-->
