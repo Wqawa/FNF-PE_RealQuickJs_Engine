@@ -80,6 +80,19 @@ import states.TitleState;
 	// false = identical Lua errors are only printed once per script (less console spam);
 	// true = every single occurrence gets printed, useful when debugging
 	public var moreLuaErrors:Bool = false;
+
+	// ------------------------------------------------------------------
+	// 版本差异开关（只影响本仓的 body 树，原版树不受影响）
+	// 全部默认 false = 保持 1.0.4 原本行为；打开才回退成 0.6.3 那套。
+	// ------------------------------------------------------------------
+	/** 0.6.3 式 HUD：把 uiGroup 展开成平铺 members（老脚本按索引排层级要靠它） */
+	public var compatLegacyUI:Bool = false;
+	/** 0.6.3 式时间条：漏一段不会让整条变半透明 */
+	public var compatLegacyTimeBar:Bool = false;
+	/** 0.6.3 式回血：命中音符 +0.023（1.0.4 调低了） */
+	public var compatLegacyHealth:Bool = false;
+	/** 0.6.3 式小图标：换一套裁剪/缩放算法，修 1.0.4 上图标被裁边 */
+	public var compatLegacyIcons:Bool = false;
 }
 
 class ClientPrefs {

@@ -603,7 +603,7 @@ class PlayState extends MusicBeatState
 		// mods measure their own sprites off healthBar.x/y), so flatten the group once it is
 		// fully populated: same objects, same order, just one level up where old code expects
 		// them. The group itself carries no transform, so this is visually a no-op.
-		if(uiGroup != null && uiGroup.members.length > 0)
+		if(ClientPrefs.data.compatLegacyUI && uiGroup != null && uiGroup.members.length > 0)
 		{
 			var uiElements:Array<FlxSprite> = uiGroup.members.copy();
 			for(uiSpr in uiElements)
