@@ -89,6 +89,7 @@ class OptionsState extends MusicBeatState
 		ClientPrefs.saveSettings();
 
 		super.create();
+
 	}
 
 	override function closeSubState() {
@@ -111,7 +112,10 @@ class OptionsState extends MusicBeatState
 			MusicBeatState.switchState(new MainMenuState());
 		}
 
-		if (controls.ACCEPT) {
+		// ACCEPT 是「按住」语义（FlxActionDigital.check()），子界面打开后父状态
+		// 仍在 update（persistentUpdate 默认 true），不判断 subState 就会每帧重建
+		// 一次子界面，表现成「点了进不去」。
+		if (controls.ACCEPT && subState == null) {
 			openSelectedSubstate(options[curSelected]);
 		}
 	}

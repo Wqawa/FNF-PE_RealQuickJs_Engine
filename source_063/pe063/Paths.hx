@@ -119,6 +119,21 @@ class Paths
 		currentLevel = name.toLowerCase();
 	}
 
+	/**
+	 * 文件到底在不在：先看磁盘，再看编译期清单。
+	 *
+	 * 只查 OpenFlAssets 会把 mods/ 下的资源和构建后才铺进 bin 的素材统统判成缺失
+	 * （它们永远不进清单）。lua 的 texture 贴图模式（AtlasFrameMaker）第一步就是
+	 * fileExists，判错就整个贴图建不出来。本体那边早就有这个判断，这里补齐。
+	 */
+	static public function existsOnDiskOrManifest(path:String, ?type:AssetType = null):Bool
+	{
+		#if MODS_ALLOWED
+		if (FileSystem.exists(path)) return true;
+		#end
+		return OpenFlAssets.exists(path, type);
+	}
+
 	public static function getPath(file:String, type:AssetType, ?library:Null<String> = null)
 	{
 		if (library != null)
@@ -129,12 +144,12 @@ class Paths
 			var levelPath:String = '';
 			if(currentLevel != 'shared') {
 				levelPath = getLibraryPathForce(file, currentLevel);
-				if (OpenFlAssets.exists(levelPath, type))
+				if (existsOnDiskOrManifest(levelPath, type))
 					return levelPath;
 			}
 
 			levelPath = getLibraryPathForce(file, "shared");
-			if (OpenFlAssets.exists(levelPath, type))
+			if (existsOnDiskOrManifest(levelPath, type))
 				return levelPath;
 		}
 
@@ -289,10 +304,7 @@ class Paths
 		}
 		#end
 
-		if(OpenFlAssets.exists(getPath(key, type))) {
-			return true;
-		}
-		return false;
+		return existsOnDiskOrManifest(getPath(key, type), type);
 	}
 
 	inline static public function getSparrowAtlas(key:String, ?library:String):FlxAtlasFrames
@@ -353,6 +365,19 @@ class Paths
 
 		var path = getPath('images/$key.png', IMAGE, library);
 		//trace(path);
+		// 磁盘优先：构建后才铺进 bin 的素材不在编译期清单里，只查 OpenFlAssets 会漏
+		#if MODS_ALLOWED
+		if (FileSystem.exists(path)) {
+			if(!currentTrackedAssets.exists(path)) {
+				var newBitmap:BitmapData = BitmapData.fromFile(path);
+				var newGraphic:FlxGraphic = FlxGraphic.fromBitmapData(newBitmap, false, path);
+				newGraphic.persist = true;
+				currentTrackedAssets.set(path, newGraphic);
+			}
+			localTrackedAssets.push(path);
+			return currentTrackedAssets.get(path);
+		}
+		#end
 		if (OpenFlAssets.exists(path, IMAGE)) {
 			if(!currentTrackedAssets.exists(path)) {
 				var newGraphic:FlxGraphic = FlxG.bitmap.add(path, false, path);

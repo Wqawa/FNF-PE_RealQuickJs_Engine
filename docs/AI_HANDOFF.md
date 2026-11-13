@@ -8,6 +8,125 @@
 
 ---
 
+## 0. 2026-11-13 交接：当前状态与未解决的问题
+
+> 这一节是给接手的人看的。**两个问题没修好**，先看这里再动代码。
+
+### 0.0 现在是什么状态
+
+同一个 `PsychEngine.exe` 里跑三棵独立的源码树，靠 `bin/engine.txt` 选：
+
+| engine.txt | 走哪棵 | 源码目录 | 资产目录 |
+|---|---|---|---|
+| `body`（默认） | 本仓 fork | `source/` | `assets/body/` |
+| `vanilla` | 原版 PE 1.0.4 | `source_vanilla/vanilla/` | `assets/1.0.4/` |
+| `pe063` | Psych Engine 0.6.3 | `source_063/pe063/` | `assets/0.6.3/` |
+
+三份 Options 菜单里都有 `Switch Engine`，选完写 `engine.txt` + `Sys.exit(0)`，重启生效。
+mod 同样分组：`mods/body`、`mods/1.0.4`、`mods/0.6.3`、`mods/global`（全局，三版本共用）。
+
+细节看 `docs/HANDOFF_DUAL_ENGINE.md` 第六点五、六点六节。
+
+**编译**（全程纯命令行，不弹窗）：
+
+```bash
+bash building/build.sh                # 增量
+bash building/setup.sh                # 环境体检
+```
+
+如果从没有控制台的环境启动编译，Windows 会给 haxe/cl/link 各分配一个控制台窗口，
+用 `conhost --headless bash building/build.sh` 包一层就没有窗口了。
+
+---
+
+### 0.1 未解决：0.6.3 的 Options → Switch Engine 打不开
+
+**现象**：0.6.3 里选中 Switch Engine，界面不出现（卡住 / 一闪即回）。
+
+**已经查到哪一步**：
+
+诊断日志 `bin/testout/engine_select_063.log` 里 `create start` → `create ok`
+**重复了几十遍**，确认不是崩溃，是每帧都在重建这个 SubState。
+
+判断的根因：`Controls.ACCEPT` 用的是 `FlxActionDigital.check()`（**按住**语义，不是按下），
+而父菜单 `persistentUpdate` 默认 `true`，SubState 打开后 `update` 照跑，
+`controls.ACCEPT` 一直是 true，于是每帧又 `openSubState` 一次，把刚建好的界面关掉重建。
+
+已经改的：`source_063/pe063/options/OptionsState.hx`
+
+```haxe
+if (controls.ACCEPT && subState == null) {
+    openSelectedSubstate(options[curSelected]);
+}
+```
+
+**但用户反馈仍然卡住。所以还有第二个原因没找到。**
+
+**下一步建议**：
+
+1. 先确认那个 `subState == null` 真的生效——在 `openSelectedSubstate` 里加 trace，
+   看日志里还会不会重复出现多条。如果不再重复，说明问题变成「界面建出来了但看不见」。
+2. 若界面建出来看不见，查 `EngineSelectSubState` 的 `alpha`、`camera`、`scrollFactor`，
+   以及 `bg` 是否被 `screenCenter` 推到了屏幕外。
+3. 对照 0.6.3 原仓（`D:/FNF/PsychEngine_0.6.3`）里能正常打开的
+   `options/GraphicsSettingsSubState`，逐行比差异。
+4. 注意：**不要**把 `initialState` 直接设成 `OptionsState` 来测——那会跳过
+   `PlayerSettings` 初始化，`controls` 为 null，得到的是假崩溃。
+
+### 0.2 未解决：0.6.3 里 lua 创建贴图找不到资源
+
+**现象**：0.6.3 里 lua 建的贴图（`makeAnimatedLuaSprite` 的 `texture` 模式等）出不来。
+
+**已经查到哪一步**：
+
+0.6.3 的 `Paths` 有**三处只查 `OpenFlAssets`**（编译期清单）：
+
+| 位置 | 后果 |
+|---|---|
+| `fileExists()` | `mods/` 下的资源判成不存在 |
+| `getPath()` 的两级 fallback | 磁盘有、清单无的关卡资源被跳过 |
+| `returnGraphic()` | 只有清单里有才加载，磁盘图返回 null |
+
+`mods/` 下的文件永远不进编译期清单，构建后才铺进 bin 的素材也一样，
+所以这三处等于「运行时才出现的文件一律当不存在」。
+
+已经改的：`source_063/pe063/Paths.hx` 加了 `existsOnDiskOrManifest()`
+（先 `FileSystem.exists` 再 `OpenFlAssets.exists`），上述三处改走它。
+
+**但用户反馈仍然没修好。**
+
+**下一步建议**：
+
+1. 拿一个**最小 lua 脚本**在 0.6.3 里单独试 `makeLuaSprite('t', 'images/xxx')` 和
+   `makeAnimatedLuaSprite('t', 'xxx', 0, 0, 'texture')`，把 `Paths.image()` 返回的实际
+   路径 trace 出来。
+2. 重点怀疑 `key` 是否重复带了 `images/` 前缀：0.6.3 的 `getPath('images/$key.png')`
+   自己会加一次，如果 lua/上层再传 `images/xxx`，就变成 `images/images/xxx.png`。
+   grep 一下调用方。
+3. 确认 mod 目录名和 `modsList.txt` 里的名字是否一致（`mods/0.6.3/<名字>`），
+   不一致 `currentModDirectory` 就查不到。
+4. `AtlasFrameMaker.construct` 里 `getTextFromFile('images/$key/Animation.json')`
+   同样的前缀问题也查一遍。
+
+### 0.3 已确认不是 bug 的（别再浪费时间）
+
+- **本体跑 childplayV2 血条上的黑色块**：是 mod 自己的 `pahb` 血条皮肤。
+  `mods/body/Gumball cp/scripts/HUD.lua` 里 `setProperty('healthBarBG.visible', false)`
+  把原版血条背景藏了，换成它自己的图集。正常现象。
+- **0.6.3 画面里没有 BOTPLAY 文字**：0.6.3 本来就没有这个元素，不是缺资源。
+- **`StageEditorState` 列出 body/1.0.4/0.6.3 当 stage 名**：已修。
+
+### 0.4 这一轮已经做完的
+
+- 三引擎并进同一个 exe（`1fd1c78`）
+- 资产按版本分组：`assets/{body,1.0.4,0.6.3}`，`Project.xml` 三段对称声明（`6ef5666`）
+- 0.6.3 去掉 lime 的 library selector，三棵树统一走普通路径（`fceb131`）
+- 0.6.3 的 `checkFileExists` 多拼一层 `assets/`（`153ce24`）
+- 构建脚本收口到 `building/`：`setup.sh` + `libs.txt` + `README`（`f766a51`）
+- 清掉 `.workbuddy` 里四十多个一次性日志、`bin` 里的诊断残留
+
+---
+
 ## 1. 项目是什么
 
 Psych Engine 1.0.4 的源码 fork，目标是让 0.6.3 / 0.7.3 时代的老 mod（Lua + HScript）不改一行就能跑，

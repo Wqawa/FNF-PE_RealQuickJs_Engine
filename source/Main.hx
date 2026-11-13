@@ -235,7 +235,16 @@ class Main extends Sprite
 		// 所以 stage 这边也得等到这里再设一遍，不然会被盖回去。
 		Lib.current.stage.align = "";
 		Lib.current.stage.scaleMode = StageScaleMode.SHOW_ALL;
+		// PE_OLD_SCALE=1 走 flixel 原生等比缩放，用来对照排查"某个元素在
+		// NativeScaleMode 下花屏"这类问题；正常游玩不需要这个开关。
+		#if desktop
+		if (Sys.getEnv('PE_OLD_SCALE') == '1')
+			FlxG.scaleMode = new flixel.system.scaleModes.RatioScaleMode();
+		else
+			FlxG.scaleMode = new backend.NativeScaleMode();
+		#else
 		FlxG.scaleMode = new backend.NativeScaleMode();
+		#end
 	}
 
 	static function resetSpriteCache(sprite:Sprite):Void {		@:privateAccess {

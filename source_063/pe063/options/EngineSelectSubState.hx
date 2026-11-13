@@ -32,11 +32,28 @@ class EngineSelectSubState extends MusicBeatSubstate
 	var curSelected:Int = 0;
 	var errorText:FlxText;
 
+	static function diag(msg:String):Void
+	{
+		#if sys
+		try {
+			sys.FileSystem.createDirectory('./testout');
+			var f = sys.io.File.append('./testout/engine_select_063.log', false);
+			f.writeString(msg + '\n');
+			f.close();
+		} catch (e:Dynamic) {}
+		#end
+		trace('[engine-select-063] ' + msg);
+	}
+
 	override function create()
 	{
+		diag('create start');
 		super.create();
+		diag('super.create ok');
 
+		diag('loading menuDesat: ' + Paths.image('menuDesat'));
 		var bg:FlxSprite = new FlxSprite().loadGraphic(Paths.image('menuDesat'));
+		diag('bg ok');
 		bg.antialiasing = ClientPrefs.globalAntialiasing;
 		bg.color = 0xFF71bdfd;
 		bg.updateHitbox();
@@ -53,6 +70,7 @@ class EngineSelectSubState extends MusicBeatSubstate
 		current.scrollFactor.set();
 		add(current);
 
+		diag('font: ' + Paths.font('vcr.ttf'));
 		grpOptions = new FlxTypedGroup<Alphabet>();
 		add(grpOptions);
 
@@ -79,9 +97,12 @@ class EngineSelectSubState extends MusicBeatSubstate
 		errorText.scrollFactor.set();
 		add(errorText);
 
+		diag('alphabet group built: ' + grpOptions.length);
 		curSelected = keys.indexOf(Engine.current());
 		if (curSelected < 0) curSelected = 0;
 		changeSelection();
+
+		diag('create ok, current=' + Engine.current());
 	}
 
 	override function update(elapsed:Float)
@@ -95,7 +116,8 @@ class EngineSelectSubState extends MusicBeatSubstate
 
 		if (controls.BACK)
 		{
-			FlxG.sound.play(Paths.sound('cancelMenu'));
+			var snd = Paths.sound('cancelMenu');
+			if (snd != null) FlxG.sound.play(snd);
 			close();
 		}
 		else if (controls.ACCEPT)
@@ -121,7 +143,8 @@ class EngineSelectSubState extends MusicBeatSubstate
 			}
 		}
 
-		FlxG.sound.play(Paths.sound('scrollMenu'));
+		var snd = Paths.sound('scrollMenu');
+		if (snd != null) FlxG.sound.play(snd);
 	}
 
 	function confirmSelection()
@@ -130,7 +153,8 @@ class EngineSelectSubState extends MusicBeatSubstate
 
 		if (chosen == Engine.current())
 		{
-			FlxG.sound.play(Paths.sound('cancelMenu'));
+			var snd = Paths.sound('cancelMenu');
+			if (snd != null) FlxG.sound.play(snd);
 			close();
 			return;
 		}
@@ -142,7 +166,8 @@ class EngineSelectSubState extends MusicBeatSubstate
 			return;
 		}
 
-		FlxG.sound.play(Paths.sound('confirmMenu'));
+		var snd = Paths.sound('confirmMenu');
+		if (snd != null) FlxG.sound.play(snd);
 		Sys.exit(0);
 	}
 }
