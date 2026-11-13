@@ -78,25 +78,11 @@ say "haxelib 仓库: $HAXELIB_PATH"
 # ---------------------------------------------------------------- 2/6 依赖库
 step "2/6 haxelib 依赖"
 
-# project.xml 里带 version 的那几个是硬依赖；linc_luajit/flxanimate 走 git 安装，同样必须存在。
-REQUIRED=(lime openfl flixel flixel-addons flxanimate hscript-iris tjson hxdiscord_rpc linc_luajit)
-if [ "$MODE" = debug ]; then REQUIRED+=(hxcpp-debug-server); fi
-# 视频是人肉开关，只在 Project.xml 打开时才要求
-if grep -q '<define name="VIDEOS_ALLOWED"' "$ROOT/Project.xml"; then REQUIRED+=(hxvlc); fi
-
-INSTALLED="$(haxelib list 2>/dev/null || true)"
-MISSING=()
-for lib in "${REQUIRED[@]}"; do
-	printf '%s\n' "$INSTALLED" | grep -qiE "^${lib//./\\.}[: ]" || MISSING+=("$lib")
-done
-
-if [ ${#MISSING[@]} -gt 0 ]; then
-	say "缺库: ${MISSING[*]}"
-	say "补库命令（在仓库根执行）："
-	say "  haxe -cp commandline --run Main setup    # 或直接跑 setup/windows.bat"
-	fail "依赖不齐，先补库。"
+# 清单在 building/libs.txt，版本判断在 setup.sh，这里不再维护第二份
+if ! bash "$ROOT/building/setup.sh" --libs-only --check; then
+	fail "依赖不齐，跑 bash building/setup.sh 看完整报告。"
 fi
-say "依赖齐全（${#REQUIRED[@]} 个）"
+say "依赖齐全（清单见 building/libs.txt）"
 
 # ---------------------------------------------------------------- 3/6 MSVC
 step "3/6 MSVC / Windows SDK"

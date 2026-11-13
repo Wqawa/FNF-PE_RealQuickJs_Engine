@@ -1,40 +1,64 @@
 # 编译入口
 
-双击 `Build.bat`，或者：
+这个文件夹放编译相关的全部东西：环境校验、依赖清单、编译脚本、日志。
+
+```
+building/
+  setup.sh      环境体检（Haxe / 库版本 / MSVC / SDK / rc.exe）
+  build.sh      编译
+  libs.txt      依赖清单，版本号只在这里维护一份
+  Build.bat     Windows 双击入口，转发到 build.sh
+  logs/         编译日志，一次一份
+```
+
+## 日常用法
 
 ```bash
+bash building/setup.sh            # 环境体检，缺什么报什么，不改机器
+bash building/setup.sh --fix      # 缺库时尝试 haxelib install（要网络）
 bash building/build.sh            # 增量 release
 bash building/build.sh -debug     # debug
 bash building/build.sh -clean     # 清中间产物全量重编
 bash building/build.sh -dry       # 只打印计划，不动文件
+bash building/build.sh -no-cache  # 关 hxcpp 编译缓存（怀疑缓存里是旧 obj）
 ```
 
 产物 `export/<release|debug>/windows/bin/PsychEngine.exe`，日志在 `logs/`。
 
-## 它依次做六件事
+**全部是纯命令行脚本，不弹窗、不抢焦点、不出声。** 需要自动化的场合一律调 `.sh`；
+`Build.bat` 只给你手动双击用，它会开一个 cmd 窗口并在结束时 `pause`（不然报错一闪就没了）。
+
+## build.sh 依次做六件事
 
 | 步骤 | 做什么 | 缺东西时 |
 |---|---|---|
 | 1/6 工具链 | 找 `haxe`，把 `.haxelib` 指到仓库本地 | 提示装 Haxe 4.3.x |
-| 2/6 依赖 | 用 `haxelib list` 核对 `Project.xml` 要求的库 | 列出缺的库 + 补库命令，直接停 |
+| 2/6 依赖 | 调 `setup.sh --libs-only`，按 `libs.txt` 核对版本 | 列出差异，直接停 |
 | 3/6 MSVC | 扫 `D:/VS2019/BuildTools`、VS2022 等位置，取最新版本和 SDK | 提示装 Build Tools 的 C++ 工作负载 |
-| 4/6 预处理 | 关掉运行中的游戏；`-clean` 时清 obj/src；打开 hxcpp 编译缓存（`-no-cache` 关） | — |
+| 4/6 预处理 | 关掉运行中的游戏；`-clean` 时清 obj/src；打开 hxcpp 编译缓存 | — |
 | 5/6 编译 | `haxelib run lime build windows` | 失败时摘出前 10 条 error |
-| 6/6 验收 | exe 是否存在 / 时间戳 / 大小 / warning 数，铺 `assets/base_game` | 时间戳没变会提醒用 `-clean` |
+| 6/6 验收 | exe 是否存在 / 时间戳 / 大小 / warning 数 | 时间戳没变会提醒用 `-clean` |
 
-## 和上游脚本的关系
+素材铺放在第 6 步之后，调 `.workbuddy/prep_assets.sh`（只有那一份实现，没在这里重复写）。
 
-`setup/` 里是上游原来的装库脚本（`windows.bat` 等），只在**第一次配环境**时用一次。
-之后日常编译都走 `building/build.sh`，它不会下载任何东西，也不会改系统 PATH / 注册表。
+## 环境版本
 
-`.workbuddy/build.sh` 现在只是转发到这里，`run_test.sh` 仍然能用。
+`libs.txt` 里那套版本是 2026-11-13 验证过的组合，`setup.sh` 按它逐条比对。
+版本对不上会标「注意」但不中断编译 —— 真正会咬人的是 stdlib 语义变化
+（比如 Haxe 4.3 的 `Std.parseInt` 在 cpp 上溢出会饱和到 IntMax，而不是环绕，
+代码一个字没改，颜色全变白）。所以别随手升级。
+
+## 和上游 setup/ 的关系
+
+根目录的 `setup/` 是上游 Psych Engine 原来的装库脚本（`windows.bat` 等），
+只在**这台机器从零配环境**时用一次，装 Haxe 和基础库。
+配好之后日常都走这里的 `setup.sh`（只校验，不下载）和 `build.sh`。
 
 ## 注意
 
-- `assets/base_game` 是编译**之后**才拷进 `bin/assets` 的（`Project.xml` 的 `BASE_GAME_FILES` 故意留在 officialBuild 段）。
-  脚本第 6 步会做这件事，用 `.assets_ready` 标记避免重复拷。
-- 改了 `Project.xml` 的 define、增删 `.hx` 文件、换 Haxe/hxcpp 版本之后，hxcpp 会判定全量重编（本机约 30 分钟）；
+- `assets/base_game` 是编译**之后**才铺进 `bin/assets/body` 和 `bin/assets/1.0.4` 的
+  （`Project.xml` 的 `BASE_GAME_FILES` 故意留在 officialBuild 段）。
+- 改了 `Project.xml` 的 define、增删 `.hx` 文件、换 Haxe/hxcpp 版本之后会全量重编（本机约 3~4 分钟）；
   平时改代码是增量，一分钟左右。
-- hxcpp 编译缓存在 `.cache/hxcpp`（已 gitignore，可以随便删）。默认开着，命中时直接拷 `.obj` 不跑 `cl.exe`；
-  第一次填充会慢一点（152s），之后稳态增量 73s 左右。怀疑缓存里是旧 obj 了加 `-no-cache`。
+- hxcpp 编译缓存在 `.cache/hxcpp`（已 gitignore，可以随便删）。怀疑缓存里是旧 obj 了加 `-no-cache`。
 - 游戏开着的时候链接器写不进 exe，脚本会先关掉它。
