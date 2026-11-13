@@ -46,9 +46,8 @@
 
 	<!--These window settings apply to all targets-->
 	<!-- allow-high-dpi 不能删。进程不 DPI aware 的话，Windows 会把 1280x720 的逻辑窗口
-	     整张位图拉伸到物理分辨率，模糊；而 aware 之后窗口按物理像素走，150% 屏上
-	     会算出 1.275 这种非整数缩放。当前方案是「aware + camera 全部 1:1 + 整体交给
-	     openfl stage 缩放」，细节见 docs/HANDOFF_DUAL_ENGINE.md 和 backend.NativeScaleMode。 -->
+	     整张位图拉伸到物理分辨率，模糊。aware 之后窗口按物理像素走，缩放由
+	     backend.Native.fixScaling() 按 display.dpi/96 放大，和原版 1.0.4 一致。 -->
 	<window width="1280" height="720" fps="60" background="#000000" hardware="true" vsync="false" allow-high-dpi="true" />
 
 	<!--HTML5-specific-->

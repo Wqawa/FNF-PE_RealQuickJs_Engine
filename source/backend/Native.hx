@@ -93,32 +93,12 @@ class Native
 		final display:Null<Display> = System.getDisplay(0);
 		if (display != null)
 		{
-			// 窗口按 DPI 放大，再卡在屏幕 85% 以内，免得全屏启动。
-			// 这里允许非整数倍：缩放本身不归 flixel 管了，camera 一律 1:1 布局，
-			// 窗口比画布大的那部分由 openfl 的 stage 统一缩放（见 NativeScaleMode）。
 			final dpiScale:Float = display.dpi / 96;
-			var winW:Int = Std.int(Main.game.width * dpiScale);
-			var winH:Int = Std.int(Main.game.height * dpiScale);
+			@:privateAccess Application.current.window.width = Std.int(Main.game.width * dpiScale);
+			@:privateAccess Application.current.window.height = Std.int(Main.game.height * dpiScale);
 
-			final maxW:Int = Std.int(display.bounds.width * 0.85);
-			final maxH:Int = Std.int(display.bounds.height * 0.85);
-
-			if (winW > maxW)
-			{
-				winH = Std.int(winH * maxW / winW);
-				winW = maxW;
-			}
-			if (winH > maxH)
-			{
-				winW = Std.int(winW * maxH / winH);
-				winH = maxH;
-			}
-
-			@:privateAccess Application.current.window.width = winW;
-			@:privateAccess Application.current.window.height = winH;
-
-			Application.current.window.x = Std.int((Application.current.window.display.bounds.width - winW) / 2);
-			Application.current.window.y = Std.int((Application.current.window.display.bounds.height - winH) / 2);
+			Application.current.window.x = Std.int((Application.current.window.display.bounds.width - Application.current.window.width) / 2);
+			Application.current.window.y = Std.int((Application.current.window.display.bounds.height - Application.current.window.height) / 2);
 		}
 
 		untyped __cpp__('

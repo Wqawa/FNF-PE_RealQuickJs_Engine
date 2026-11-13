@@ -235,8 +235,10 @@ stage / notetype / event 三类脚本都正常
 
 ## 6. 已知未修
 
-- **`weeb/` / `pauseAlt/` / `ui/` / `philly/` 素材在 bin 里不存在** —— `assets/base_game` 没拷全，
-  pixel 舞台（Week 6）会缺图。这是素材分发问题，不是代码问题。
+- ~~`weeb/` / `pauseAlt/` / `ui/` / `philly/` 素材在 bin 里不存在~~ —— 2026-11-13 晚修好：
+  根因是 `assets/base_game`（官方素材单一源，713 个文件）没被铺进 `bin/assets/<版本>/`，
+  连带两棵 1.0.4 树的 `shared/weeks/*.json`、`week*`、`songs`、`characters` 全都缺。
+  现在由 `building/prep_assets.sh`（build.sh 第 6 步）用硬链接补齐，已核对两棵树 0 缺。
 - `noteSplashes` 的老式扁平图集如果**和 1.0 内置皮肤同名**，仍会被解析到内置皮肤（优先能加载的那个）。
 - `FlxUIDropDownMenuCustom` 这类依赖 flixel-ui 的类，1.0 已经没有对应库，接不了。
 - 画面层面的兼容（贴图位置、动画观感、UI 层级）这套测试看不出来，只能人眼验。

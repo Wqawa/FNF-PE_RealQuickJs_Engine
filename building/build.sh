@@ -225,8 +225,8 @@ WARN_COUNT=$(grep -ci "warning:" "$LOG" || true)
 say "编译 warning: $WARN_COUNT 条（上游代码的 deprecated 噪声属正常）"
 
 if [ "$ASSETS" = 1 ]; then
-	# 素材铺放只有一份实现，在 .workbuddy/prep_assets.sh，别在这儿再抄一遍
-	bash "$ROOT/.workbuddy/prep_assets.sh" "$MODE"
+	# 官方素材（base_game）铺进 bin/assets/<版本>/，见 building/prep_assets.sh
+	bash "$ROOT/building/prep_assets.sh" "$MODE"
 else
 	say "按参数跳过素材拷贝"
 fi

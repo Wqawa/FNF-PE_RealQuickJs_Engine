@@ -114,7 +114,11 @@ public static var updateVersion:String = CoolUtil.checkForUpdates();
 vanilla 模式下遍历整张别名表，用 `Type.getClassName()` 取本体全名、拼 `vanilla.` 解析，
 成功就替换表项，并把原全名也注册进 proxyImports。`resolve()` 里同款优先逻辑。
 
-### 3. 缩放偏移 → 改整数倍窗口
+### 3. 缩放偏移 → ~~改整数倍窗口~~（2026-11-13 晚已还原）
+
+> **这一节的改动已经撤掉了，本体现在和原版 1.0.4 一样**：`Native.fixScaling()` 只按
+> `display.dpi/96` 放大窗口，`Main.create()` 里回到 `align="tl"` + `NO_SCALE`，
+> `backend/NativeScaleMode.hx` 整个删除。下面留着当记录，别照着改回去。
 
 实测几何（150% DPI 屏）：
 
@@ -128,20 +132,8 @@ RatioScaleMode → scale=1.275,1.275
 1.275 是非整数缩放。平时不明显，但 Gumball cp 的 childplayV2 给 `camGame` 和 `camHUD`
 都挂了 `ShaderFilter`（色差），滤镜按画布尺寸采样，非整数缩放就让画面和 HUD 整体错开一点。
 
-`backend/Native.hx` 改成只按**整数倍**放大：
-
-```haxe
-var factor = floor(min(displayW*0.85/1280, displayH*0.85/720));
-if (factor < 1) factor = 1;
-winW = 1280 * factor; winH = 720 * factor;
-```
-
-1920x1080 上 factor=1 → 窗口 1280x720，复测 `scale=1,1 offset=0,0`。
-
-**代价**：150% DPI 屏上窗口变物理 1280x720，看着偏小。要舒服就得加"窗口倍率"选项，
-但选 1.5x 偏移会回来。
-
-vanilla 那侧没改，保持原版 `1280*dpi` 行为。
+当时的做法是只按**整数倍**放大（150% 屏 → 1280x720），代价是窗口看着偏小 —— 用户嫌小，
+已整体还原成原版行为。
 
 ## 六、构建与调试手册（这几天踩的坑）
 
