@@ -17,6 +17,8 @@ class Bar extends FlxSpriteGroup
 	public var barWidth(default, set):Int = 1;
 	public var barHeight(default, set):Int = 1;
 	public var barOffset:FlxPoint = new FlxPoint(3, 3);
+	/** 0.6.3 式：只画填充条 + 背景，不叠一层黑色 rightBar（新版漏一段会整条发暗） */
+	public var legacyMode:Bool = false;
 
 	public function new(x:Float, y:Float, image:String = 'healthBar', valueFunction:Void->Float = null, boundX:Float = 0, boundY:Float = 1)
 	{
@@ -96,6 +98,13 @@ class Bar extends FlxSpriteGroup
 		rightBar.clipRect.y = barOffset.y;
 
 		barCenter = leftBar.x + leftSize + barOffset.x;
+
+		if(legacyMode)
+		{
+			rightBar.visible = false;
+			leftBar.alpha = 1;
+			rightBar.alpha = 1;
+		}
 
 		// flixel is retarded
 		leftBar.clipRect = leftBar.clipRect;

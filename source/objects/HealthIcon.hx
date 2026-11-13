@@ -90,7 +90,9 @@ class HealthIcon extends FlxSprite
 		if(hp == null) return;
 		var health:Float = cast hp;
 		// health 是 0~2，1 是中间；对手图标在血高时才是「被打」
-		var losing:Bool = isPlayer ? (health < 1.0) : (health > 1.0);
+		// 0.6.3 的判据：血条 percent < 20 玩家图标变脸，> 80 对手图标变脸
+		// （percent = health / 2 * 100，所以 <20% 等于 health < 0.4，>80% 等于 health > 1.6）
+		var losing:Bool = isPlayer ? (health < 0.4) : (health > 1.6);
 		animation.curAnim.curFrame = losing ? 1 : 0;
 	}
 
