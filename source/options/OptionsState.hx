@@ -12,6 +12,7 @@ class OptionsState extends MusicBeatState
 		'Graphics',
 		'Visuals',
 		'Gameplay',
+		'Compat',
 		'Switch Engine'
 		#if TRANSLATIONS_ALLOWED , 'Language' #end
 	];
