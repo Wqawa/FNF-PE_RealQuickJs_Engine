@@ -1,6 +1,7 @@
 package jsruntime;
 
 import haxe.Log;
+import psychlua.LuaUtils;
 
 /**
  * QuickJS-NG 的运行时封装（单上下文，够 PE 用）。
@@ -36,6 +37,22 @@ static JSValue qjs_getProperty(JSContext *ctx, JSValueConst this_val, int argc, 
 	return JS_NewString(ctx, r.utf8_str());
 }
 
+// 通用桥：函数名走 opaque，参数最多三个，全部按字符串过，结果也是字符串
+typedef ::String (*qjs_host4_fn)(::String, ::String, ::String, ::String);
+static qjs_host4_fn g_host4 = nullptr;
+
+static JSValue qjs_call4(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv) {
+	const char *fn = (const char *)JS_GetOpaque(this_val, 1);
+	char a[1024] = "", b[1024] = "", c[1024] = "";
+	char *dst[3] = { a, b, c };
+	for (int i = 0; i < 3 && i < argc; i++) {
+		const char *s = JS_ToCString(ctx, argv[i]);
+		if (s != nullptr) { snprintf(dst[i], 1024, "%s", s); JS_FreeCString(ctx, s); }
+	}
+	::String r = g_host4 ? g_host4(::String(fn ? fn : ""), ::String(a), ::String(b), ::String(c)) : ::String("");
+	return JS_NewString(ctx, r.utf8_str());
+}
+
 // JS 侧的 trace()：把字符串交给 Haxe 的 Log.trace
 static JSValue qjs_trace(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv) {
 	const char *s = (argc > 0) ? JS_ToCString(ctx, argv[0]) : nullptr;
@@ -68,6 +85,69 @@ class QuickJSHandler
 			ok = (g_js_ctx != nullptr);
 		');
 		return ok;
+	}
+
+	/** 字符串 → 合适的 Haxe 值（数字 / 布尔 / null / 字符串） */
+	@:keep static function coerce(v:String):Dynamic
+	{
+		if (v == null) return null;
+		var t:String = v.trim();
+		if (t == 'true') return true;
+		if (t == 'false') return false;
+		if (t == 'null') return null;
+		if (t.length > 0 && t.length < 20)
+		{
+			var f:Float = Std.parseFloat(t);
+			if (!Math.isNaN(f) && Std.string(f) == t) return f;
+		}
+		return v;
+	}
+
+	/**
+	 * JS 函数的宿主分发。名字和语义都对齐 FunkinLua 那一套，
+	 * 反射直接走 LuaUtils —— Lua 和 JS 查到的是同一个属性、同一套层级规则。
+	 */
+	@:keep static function hostCall(name:String, a:String, b:String, c:String):String
+	{
+		switch (name)
+		{
+			case 'getProperty':
+				var split:Array<String> = a.split('.');
+				var v:Dynamic = (split.length > 1)
+					? LuaUtils.getVarInArray(LuaUtils.getPropertyLoop(split, true), split[split.length - 1])
+					: LuaUtils.getVarInArray(LuaUtils.getTargetInstance(), a);
+				return Std.string(v);
+
+			case 'setProperty':
+				var split:Array<String> = a.split('.');
+				if (split.length > 1)
+					LuaUtils.setVarInArray(LuaUtils.getPropertyLoop(split, true), split[split.length - 1], coerce(b));
+				else
+					LuaUtils.setVarInArray(LuaUtils.getTargetInstance(), a, coerce(b));
+				return b;
+
+			default:
+				Log.trace('[js] hostCall: 未实现 $name', null);
+				return '';
+		}
+	}
+
+	/** 注册 getProperty / setProperty，走 hostCall */
+	public static function installHostFunctions():Void
+	{
+		if (!isReady() && !init()) return;
+		untyped __cpp__('g_host4 = (qjs_host4_fn)::jsruntime::QuickJSHandler_obj::hostCall;');
+		// 名字直接写在 C 字面量里：Haxe 的 String 传给 C 会变成 String 对象，不是 const char*
+		untyped __cpp__('
+			JSValue g = JS_GetGlobalObject(g_js_ctx);
+			JSValue f1 = JS_NewCFunction(g_js_ctx, qjs_call4, "getProperty", 3);
+			JS_SetOpaque(f1, strdup("getProperty"));
+			JS_SetPropertyStr(g_js_ctx, g, "getProperty", f1);
+			JSValue f2 = JS_NewCFunction(g_js_ctx, qjs_call4, "setProperty", 3);
+			JS_SetOpaque(f2, strdup("setProperty"));
+			JS_SetPropertyStr(g_js_ctx, g, "setProperty", f2);
+			JS_FreeValue(g_js_ctx, g);
+		');
 	}
 
 	/** A1 探针：只回显参数，用来验证 C→Haxe 的返回值通道 */
