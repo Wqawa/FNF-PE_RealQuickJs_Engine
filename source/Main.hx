@@ -175,11 +175,13 @@ class Main extends Sprite
 		trace('[quickjs-ng] smoke: ' + jsruntime.QuickJS.smokeTest());
 		if (jsruntime.QuickJSHandler.init()) {
 			jsruntime.QuickJSHandler.registerBasics();
-			jsruntime.QuickJSHandler.eval("trace('hello from js'); globalThis.__bridge = 'js-ok';", "<bridge-test>");
+			jsruntime.QuickJSHandler.installProbe();
+			jsruntime.QuickJSHandler.eval("trace('hello from js'); globalThis.__bridge = 'js-ok'; globalThis.__p = getProperty('health');", "<bridge-test>");
 			try {
 				sys.FileSystem.createDirectory('./testout');
 				var bf = sys.io.File.write('./testout/js_bridge.txt', false);
-				bf.writeString('trace=' + jsruntime.QuickJSHandler.globalString('__bridge') + '\n');
+				bf.writeString('trace=' + jsruntime.QuickJSHandler.globalString('__bridge')
+					+ ' getProperty=' + jsruntime.QuickJSHandler.globalString('__p') + '\n');
 				bf.close();
 			} catch (e:Dynamic) {}
 		}

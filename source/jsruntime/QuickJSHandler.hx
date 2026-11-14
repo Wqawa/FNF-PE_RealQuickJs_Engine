@@ -24,6 +24,18 @@ import haxe.Log;
 #include <cstdlib>
 #include <haxe/Log.h>
 
+// A1：Haxe 静态函数指针（签名用 ::String，由 Haxe 方法体里取地址塞进来）
+typedef ::String (*qjs_host_probe_fn)(::String);
+static qjs_host_probe_fn g_host_probe = nullptr;
+
+static JSValue qjs_getProperty(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv) {
+	const char *s = (argc > 0) ? JS_ToCString(ctx, argv[0]) : nullptr;
+	::String key(s ? s : "");
+	if (s != nullptr) JS_FreeCString(ctx, s);
+	::String r = g_host_probe ? g_host_probe(key) : ::String("null");
+	return JS_NewString(ctx, r.utf8_str());
+}
+
 // JS 侧的 trace()：把字符串交给 Haxe 的 Log.trace
 static JSValue qjs_trace(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv) {
 	const char *s = (argc > 0) ? JS_ToCString(ctx, argv[0]) : nullptr;
@@ -56,6 +68,25 @@ class QuickJSHandler
 			ok = (g_js_ctx != nullptr);
 		');
 		return ok;
+	}
+
+	/** A1 探针：只回显参数，用来验证 C→Haxe 的返回值通道 */
+	@:keep static function probe(k:String):String
+	{
+		return 'got:' + k;
+	}
+
+	/** 把 probe 的地址交给 C，并注册成 JS 的 getProperty */
+	public static function installProbe():Void
+	{
+		if (!isReady() && !init()) return;
+		// 在方法体里取地址：此处 QuickJSHandler_obj 已经定义完，不像 @:cppFileCode 那样在前面
+		untyped __cpp__('g_host_probe = (qjs_host_probe_fn)::jsruntime::QuickJSHandler_obj::probe;');
+		untyped __cpp__('
+			JSValue g = JS_GetGlobalObject(g_js_ctx);
+			JS_SetPropertyStr(g_js_ctx, g, "getProperty", JS_NewCFunction(g_js_ctx, qjs_getProperty, "getProperty", 1));
+			JS_FreeValue(g_js_ctx, g);
+		');
 	}
 
 	/** 注册 JS 侧的基础函数。现在只有 trace，用来验证 JS→C→Haxe 这条链路。 */
