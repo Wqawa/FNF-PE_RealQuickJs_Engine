@@ -485,6 +485,37 @@ EOF
 	return 0
 }
 
+
+# ---------------------------------------------------------------- QuickJS-NG
+# JS 运行时。源码在 third_party/quickjs-ng（自己 clone 进来的，不自动下载）。
+# 只需要三个 .c：这个 fork 把 cutils.c 并进 quickjs.c 了，没有独立的 cutils.c。
+cmd_quickjs() {
+	local src="$ROOT/third_party/quickjs-ng"
+	head_ "QuickJS-NG 静态库"
+	[ -f "$src/quickjs.c" ] || { bad "没有 third_party/quickjs-ng/quickjs.c（先 clone 源码）"; return 1; }
+
+	setup_msvc >/dev/null || return 1
+
+	local M
+	M="$(cygpath -u "$MSVC_PATH" 2>/dev/null || printf '%s' "$MSVC_PATH")"
+	local cl="$M/bin/Hostx64/x64/cl.exe"
+	local libtool="$M/bin/Hostx64/x64/lib.exe"
+	[ -f "$cl" ] || { bad "找不到 cl.exe：$cl"; return 1; }
+
+	mkdir -p "$src/build"
+	echo "  编译 quickjs.c / libregexp.c / libunicode.c …"
+	# MSYS 会把 /nologo 这类参数当成路径改写掉，必须关掉参数转换 + 用 - 前缀
+	if ! (cd "$src" && MSYS2_ARG_CONV_EXCL='*' "$cl" -nologo -c -O2 -std:c11 -utf-8 -Fo:build\\ quickjs.c libregexp.c libunicode.c >/dev/null 2>&1); then
+		bad "编译失败（看上面 MSVC 输出）"
+		return 1
+	fi
+	(cd "$src" && MSYS2_ARG_CONV_EXCL='*' "$libtool" -nologo -OUT:build/quickjs-ng.lib build/quickjs.obj build/libregexp.obj build/libunicode.obj >/dev/null 2>&1) \
+		|| { bad "打包 .lib 失败"; return 1; }
+
+	ok "third_party/quickjs-ng/build/quickjs-ng.lib（$(du -h "$src/build/quickjs-ng.lib" | cut -f1)）"
+	return 0
+}
+
 # ---------------------------------------------------------------- 兼容审计
 # 只比函数名（add_callback 注册的那些），够看出「上游有、我们没有」
 collect_lua_funcs() {
@@ -560,6 +591,7 @@ print_menu() {
 		printf '  7)  Repair libraries     haxelib install/set whatever is missing\n'
 		printf '  8)  Lua compat audit     function-name diff against an upstream tree\n'
 		printf '  9)  Rebuild import table regenerate the vanilla HScript import map\n'
+		printf ' 10)  Build QuickJS-NG     compile the JS runtime static library\n'
 		printf '  0)  Quit\n'
 	else
 		printf '  1)  环境体检       Haxe / 库 / MSVC / SDK / rc.exe，只读不改\n'
@@ -571,6 +603,7 @@ print_menu() {
 		printf '  7)  补/修依赖库    缺哪个 haxelib 库就装/切哪个（要网络）\n'
 		printf '  8)  Lua 兼容审计   拿上游源码树当基准，比 add_callback 注册的函数名\n'
 		printf '  9)  重建 import 表 扫 source_vanilla 重生成 HScript 的 import 隔离表\n'
+		printf ' 10)  构建 QuickJS-NG 把 JS 运行时编成静态库（third_party/quickjs-ng）\n'
 		printf '  0)  退出\n'
 	fi
 	printf '\n  > '
@@ -587,6 +620,7 @@ run_action() {
 		7|libs)     fix_libs ;;
 		8|audit)    cmd_audit ;;
 		9|imports)  cmd_imports ;;
+		10|quickjs) cmd_quickjs ;;
 		0|q|Q)      return 99 ;;
 		*)          say "  没有这个编号" "  no such item"; return 2 ;;
 	esac

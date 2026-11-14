@@ -31,3 +31,6 @@ art/build_html-debug.bat
 
 # building/build.sh -cache 用的 hxcpp 编译缓存
 .cache/
+
+# QuickJS-NG 编译产物
+third_party/quickjs-ng/build/
