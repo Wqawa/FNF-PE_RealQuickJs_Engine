@@ -550,15 +550,18 @@ class HScript extends Iris implements IScriptHost
 	/**
 	 * 脚本该看到的「当前这一局」。
 	 *
-	 * FlxG.state 是 PlayState 就用它；否则退回 PlayState.instance。
-	 * 事件在 create 阶段触发、或者正卡在切 state 的瞬间，FlxG.state 可能还挂在
-	 * LoadingState 上，hscript 去它身上找 boyfriend 就是 null，报
-	 * "Invalid access to field"。0.6.3 那边 state 结构简单，碰不到这个。
+	 * 0.6.3 的写法是 `interp.variables.set('game', PlayState.instance)`，无条件。
+	 * 1.0 这边原来取 FlxG.state —— 事件在 create 阶段触发、或者正卡在切 state
+	 * 的瞬间，那玩意儿可能还挂在 LoadingState 上，hscript 去它身上找 boyfriend
+	 * 就是 null，报 "Invalid access to field"。
+	 *
+	 * 所以优先 PlayState.instance；只有在 instance 还没建出来（菜单脚本之类）
+	 * 的时候才退回 FlxG.state。
 	 */
 	public static function currentGame():Dynamic
 	{
-		if (Std.isOfType(FlxG.state, PlayState)) return FlxG.state;
-		return PlayState.instance;
+		if (PlayState.instance != null) return PlayState.instance;
+		return FlxG.state;
 	}
 
 	public function emit(func:String, args:Array<Dynamic>):Dynamic
