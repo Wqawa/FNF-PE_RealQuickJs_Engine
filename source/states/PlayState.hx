@@ -2606,6 +2606,9 @@ class PlayState extends MusicBeatState
 		if(exclusions == null) exclusions = [];
 		setOnLuas(variable, arg, exclusions);
 		setOnHScript(variable, arg, exclusions);
+		#if LUA_ALLOWED
+		jsruntime.JSPlayer.setGlobal(variable, arg);
+		#end
 	}
 
 	public function setOnLuas(variable:String, arg:Dynamic, exclusions:Array<String> = null) {

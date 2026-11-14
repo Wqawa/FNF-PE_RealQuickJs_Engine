@@ -1,6 +1,7 @@
 package jsruntime;
 
 import haxe.Log;
+import backend.Conductor;
 
 /**
  * .js 脚本的运行期状态：每首歌一个干净的 QuickJS context。
@@ -35,6 +36,27 @@ class JSPlayer
 		// 128MB 上限：mod 脚本正常用不到，跑飞的分配会在这里被掐掉
 		if (!QuickJSHandler.init(128)) return;
 		QuickJSHandler.installHostFunctions();
+
+		// Lua 脚本创建时就能读这些（FunkinLua 在 create 里塞了一份），
+		// JS 侧不预置的话，onCreatePost / onSongStart 里读 curBeat 会直接 ReferenceError
+		QuickJSHandler.setGlobal('curBeat', 0);
+		QuickJSHandler.setGlobal('curStep', 0);
+		QuickJSHandler.setGlobal('curSection', 0);
+		QuickJSHandler.setGlobal('curBpm', Conductor.bpm);
+		QuickJSHandler.setGlobal('bpm', Conductor.bpm);
+		QuickJSHandler.setGlobal('crochet', Conductor.crochet);
+		QuickJSHandler.setGlobal('stepCrochet', Conductor.stepCrochet);
+		QuickJSHandler.setGlobal('songLength', (FlxG.sound.music != null) ? FlxG.sound.music.length : 0);
+		QuickJSHandler.setGlobal('score', 0);
+		QuickJSHandler.setGlobal('misses', 0);
+		QuickJSHandler.setGlobal('hits', 0);
+		QuickJSHandler.setGlobal('rating', 0);
+		QuickJSHandler.setGlobal('ratingName', '');
+		QuickJSHandler.setGlobal('ratingFC', '');
+		QuickJSHandler.setGlobal('mustHitSection', false);
+		QuickJSHandler.setGlobal('altAnim', false);
+		QuickJSHandler.setGlobal('gfSection', false);
+
 		active = true;
 	}
 
@@ -89,11 +111,18 @@ class JSPlayer
 			QuickJSHandler.callGlobalStr(name, Std.string(a));
 	}
 
-	/** runTimer 的回调：onTimerCompleted(tag, loopsLeft) */
+	/** runTimer 的回调：onTimerCompleted(tag, loops, loopsLeft)，参数跟 Lua 一致 */
 	public static function onTimerCompleted(tag:String, loops:Int, loopsLeft:Int):Void
 	{
 		if (!active) return;
-		QuickJSHandler.callGlobalStrNum('onTimerCompleted', tag, loopsLeft);
+		QuickJSHandler.callGlobalStrNumNum('onTimerCompleted', tag, loops, loopsLeft);
+	}
+
+	/** setOnScripts 同步：Lua 脚本能直接读 curBeat / score 这些，JS 也得有 */
+	public static function setGlobal(name:String, v:Dynamic):Void
+	{
+		if (!active) return;
+		QuickJSHandler.setGlobal(name, v);
 	}
 
 	/** doTween* 的回调：onTweenCompleted(tag, vars) */

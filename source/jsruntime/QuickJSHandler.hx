@@ -45,6 +45,27 @@ static JSRuntime *g_js_rt = nullptr;
 static JSContext *g_js_ctx = nullptr;
 static char g_js_err[1024];
 
+// setOnScripts 同步到 JS 全局：Lua 脚本一直能直接读 curBeat / curStep 这些，
+// JS 侧没有这一步就完全对不上。
+static void js_set_num(const char *name, double v) {
+	if (g_js_ctx == nullptr) return;
+	JSValue g = JS_GetGlobalObject(g_js_ctx);
+	JS_SetPropertyStr(g_js_ctx, g, name, JS_NewFloat64(g_js_ctx, v));
+	JS_FreeValue(g_js_ctx, g);
+}
+static void js_set_str(const char *name, const char *v) {
+	if (g_js_ctx == nullptr) return;
+	JSValue g = JS_GetGlobalObject(g_js_ctx);
+	JS_SetPropertyStr(g_js_ctx, g, name, JS_NewString(g_js_ctx, v ? v : ""));
+	JS_FreeValue(g_js_ctx, g);
+}
+static void js_set_bool(const char *name, bool v) {
+	if (g_js_ctx == nullptr) return;
+	JSValue g = JS_GetGlobalObject(g_js_ctx);
+	JS_SetPropertyStr(g_js_ctx, g, name, JS_NewBool(g_js_ctx, v));
+	JS_FreeValue(g_js_ctx, g);
+}
+
 typedef ::String (*qjs_host_fn)(int, ::String, ::String, ::String, ::String, ::String, ::String);
 static qjs_host_fn g_host = nullptr;
 
@@ -68,8 +89,8 @@ static JSValue qjs_host(JSContext *ctx, JSValueConst this_val, int argc, JSValue
 
 // 调用 JS 全局函数（回调用）：
 //   mode 0 = 无参，1 = (number)，2 = (string)，
-//   mode 3 = (string, number)，4 = (string, string)
-static bool js_invoke(const char *name, int mode, double num, const char *str, const char *str2) {
+//   mode 3 = (string, number)，4 = (string, string)，5 = (string, number, number)
+static bool js_invoke(const char *name, int mode, double num, const char *str, const char *str2, double extra) {
 	bool ok = false;
 	g_js_err[0] = 0; // 清掉上一次的残留，否则「函数不存在」会被误报成异常
 	if (g_js_ctx == nullptr) return false;
@@ -89,6 +110,12 @@ static bool js_invoke(const char *name, int mode, double num, const char *str, c
 			a[0] = JS_NewString(g_js_ctx, str ? str : "");
 			a[1] = JS_NewString(g_js_ctx, str2 ? str2 : "");
 			n = 2;
+		}
+		else if (mode == 5) {
+			a[0] = JS_NewString(g_js_ctx, str ? str : "");
+			a[1] = JS_NewFloat64(g_js_ctx, num);
+			a[2] = JS_NewFloat64(g_js_ctx, extra);
+			n = 3;
 		}
 		JSValue r = JS_Call(g_js_ctx, f, g, n, n > 0 ? a : nullptr);
 		ok = !JS_IsException(r);
@@ -248,7 +275,7 @@ class QuickJSHandler
 	{
 		if (!isReady()) return false;
 		var ok:Bool = false;
-		untyped __cpp__('ok = js_invoke(name.utf8_str(), 0, 0, nullptr, nullptr);');
+		untyped __cpp__('ok = js_invoke(name.utf8_str(), 0, 0, nullptr, nullptr, 0);');
 		if (!ok && lastError().length > 0) log('[error] ' + name + '(): ' + lastError());
 		return ok;
 	}
@@ -258,7 +285,7 @@ class QuickJSHandler
 	{
 		if (!isReady()) return false;
 		var ok:Bool = false;
-		untyped __cpp__('ok = js_invoke(name.utf8_str(), 1, (double)v, nullptr, nullptr);');
+		untyped __cpp__('ok = js_invoke(name.utf8_str(), 1, (double)v, nullptr, nullptr, 0);');
 		if (!ok && lastError().length > 0) log('[error] ' + name + '(num): ' + lastError());
 		return ok;
 	}
@@ -268,7 +295,7 @@ class QuickJSHandler
 	{
 		if (!isReady()) return false;
 		var ok:Bool = false;
-		untyped __cpp__('ok = js_invoke(name.utf8_str(), 2, 0, s.utf8_str(), nullptr);');
+		untyped __cpp__('ok = js_invoke(name.utf8_str(), 2, 0, s.utf8_str(), nullptr, 0);');
 		if (!ok && lastError().length > 0) log('[error] ' + name + '(str): ' + lastError());
 		return ok;
 	}
@@ -278,8 +305,18 @@ class QuickJSHandler
 	{
 		if (!isReady()) return false;
 		var ok:Bool = false;
-		untyped __cpp__('ok = js_invoke(name.utf8_str(), 3, (double)n1, s1.utf8_str(), nullptr);');
+		untyped __cpp__('ok = js_invoke(name.utf8_str(), 3, (double)n1, s1.utf8_str(), nullptr, 0);');
 		if (!ok && lastError().length > 0) log('[error] ' + name + '(s,n): ' + lastError());
+		return ok;
+	}
+
+	/** (字符串, 数字, 数字) 回调：onTimerCompleted(tag, loops, loopsLeft) */
+	public static function callGlobalStrNumNum(name:String, s1:String, n1:Float, n2:Float):Bool
+	{
+		if (!isReady()) return false;
+		var ok:Bool = false;
+		untyped __cpp__('ok = js_invoke(name.utf8_str(), 5, (double)n1, s1.utf8_str(), nullptr, (double)n2);');
+		if (!ok && lastError().length > 0) log('[error] ' + name + '(s,n,n): ' + lastError());
 		return ok;
 	}
 
@@ -288,9 +325,29 @@ class QuickJSHandler
 	{
 		if (!isReady()) return false;
 		var ok:Bool = false;
-		untyped __cpp__('ok = js_invoke(name.utf8_str(), 4, 0, s1.utf8_str(), s2.utf8_str());');
+		untyped __cpp__('ok = js_invoke(name.utf8_str(), 4, 0, s1.utf8_str(), s2.utf8_str(), 0);');
 		if (!ok && lastError().length > 0) log('[error] ' + name + '(s,s): ' + lastError());
 		return ok;
+	}
+
+	/** setOnScripts 的 JS 侧同步：数字 / 布尔 / 字符串 都能落进全局 */
+	public static function setGlobal(name:String, v:Dynamic):Void
+	{
+		if (!isReady()) return;
+		if (v == null) return;
+		if (Std.isOfType(v, Bool))
+		{
+			untyped __cpp__('js_set_bool(name.utf8_str(), v);');
+		}
+		else if (Std.isOfType(v, Int) || Std.isOfType(v, Float))
+		{
+			untyped __cpp__('js_set_num(name.utf8_str(), (double)v);');
+		}
+		else
+		{
+			var sv:String = Std.string(v);
+			untyped __cpp__('js_set_str(name.utf8_str(), sv.utf8_str());');
+		}
 	}
 
 	// ---------------------------------------------------------------- 宿主函数表
@@ -345,7 +402,7 @@ class QuickJSHandler
 		globalThis.setProperty = (v, val) => __h(1, v, val);
 		globalThis.getPropertyFromClass = (c, v) => __h(2, c, v);
 		globalThis.setPropertyFromClass = (c, v, val) => __h(3, c, v, val);
-		globalThis.playSound = (name, vol) => __h(4, name, vol);
+		globalThis.playSound = (name, vol, tag, loop) => __h(4, name, vol, tag, loop);
 		globalThis.makeLuaSprite = (tag, img, x, y) => __h(5, tag, img, x, y);
 		globalThis.makeAnimatedLuaSprite = (tag, img, x, y) => __h(6, tag, img, x, y);
 		globalThis.addLuaSprite = (tag, front) => __h(7, tag, front);
@@ -385,6 +442,102 @@ class QuickJSHandler
 		globalThis.precacheImage = (tag) => __h(41, tag);
 		globalThis.screenCenter = (tag, pos) => __h(42, tag, pos);
 		globalThis.playMusic = (name, vol, loop) => __h(43, name, vol, loop);
+		globalThis.getRandomInt = (a, b) => Number(__h(44, a, b));
+		globalThis.getRandomFloat = (a, b) => Number(__h(45, a, b));
+		globalThis.getRandomBool = (chance) => __h(46, chance) === "1";
+		globalThis.stringSplit = (s, sep) => __h(47, s, sep).split(String.fromCharCode(1));
+		globalThis.stringTrim = (s) => __h(48, s);
+		globalThis.stringStartsWith = (s, p) => __h(49, s, p) === "1";
+		globalThis.stringEndsWith = (s, p) => __h(50, s, p) === "1";
+		globalThis.FlxColor = (c) => Number(__h(51, c));
+		globalThis.getColorFromHex = (c) => Number(__h(51, c));
+		globalThis.getColorFromName = (c) => Number(__h(52, c));
+		globalThis.getColorFromString = (c) => Number(__h(53, c));
+		globalThis.getScore = () => Number(__h(54));
+		globalThis.setScore = (v) => __h(55, v);
+		globalThis.addScore = (v) => __h(56, v);
+		globalThis.getMisses = () => Number(__h(57));
+		globalThis.setMisses = (v) => __h(58, v);
+		globalThis.addMisses = (v) => __h(59, v);
+		globalThis.getHits = () => Number(__h(60));
+		globalThis.setHits = (v) => __h(61, v);
+		globalThis.addHits = (v) => __h(62, v);
+		globalThis.updateScoreText = () => __h(63);
+		globalThis.setRatingPercent = (v) => __h(64, v);
+		globalThis.setRatingName = (v) => __h(65, v);
+		globalThis.setRatingFC = (v) => __h(66, v);
+		globalThis.getCharacterX = (c) => Number(__h(67, c));
+		globalThis.setCharacterX = (c, v) => __h(68, c, v);
+		globalThis.getCharacterY = (c) => Number(__h(69, c));
+		globalThis.setCharacterY = (c, v) => __h(70, c, v);
+		globalThis.characterPlayAnim = (c, a, f) => __h(71, c, a, f);
+		globalThis.getCameraScrollX = (c) => Number(__h(72, c));
+		globalThis.getCameraScrollY = (c) => Number(__h(73, c));
+		globalThis.setCameraScroll = (c, x, y) => __h(74, c, x, y);
+		globalThis.addCameraScroll = (c, x, y) => __h(75, c, x, y);
+		globalThis.getCameraFollowX = (c) => Number(__h(76, c));
+		globalThis.getCameraFollowY = (c) => Number(__h(77, c));
+		globalThis.setCameraFollowPoint = (c, x, y) => __h(78, c, x, y);
+		globalThis.addCameraFollowPoint = (c, x, y) => __h(79, c, x, y);
+		globalThis.cameraSetTarget = (c, t) => __h(80, c, t);
+		globalThis.luaSpriteExists = (t) => __h(81, t) === "1";
+		globalThis.luaTextExists = (t) => __h(82, t) === "1";
+		globalThis.luaSoundExists = (t) => __h(83, t) === "1";
+		globalThis.objectsOverlap = (a, b) => __h(84, a, b) === "1";
+		globalThis.scaleObject = (t, x, y, u) => __h(85, t, x, y, u);
+		globalThis.scaleLuaSprite = (t, x, y) => __h(85, t, x, y, "true");
+		globalThis.playAnim = (t, a, f) => __h(86, t, a, f);
+		globalThis.noteTweenX = (t, n, v, d, e) => __h(87, t, n, v, d, e);
+		globalThis.noteTweenY = (t, n, v, d, e) => __h(88, t, n, v, d, e);
+		globalThis.noteTweenAngle = (t, n, v, d, e) => __h(89, t, n, v, d, e);
+		globalThis.noteTweenAlpha = (t, n, v, d, e) => __h(90, t, n, v, d, e);
+		globalThis.noteTweenDirection = (t, n, v, d, e) => __h(91, t, n, v, d, e);
+		globalThis.noteTweenScale = (t, n, v, d, e) => __h(92, t, n, v, d, e);
+		globalThis.getSoundVolume = (t) => Number(__h(93, t));
+		globalThis.setSoundVolume = (t, v) => __h(94, t, v);
+		globalThis.getSoundTime = (t) => Number(__h(95, t));
+		globalThis.setSoundTime = (t, v) => __h(96, t, v);
+		globalThis.getSoundPitch = (t) => Number(__h(97, t));
+		globalThis.setSoundPitch = (t, v) => __h(98, t, v);
+		globalThis.pauseSound = (t) => __h(99, t);
+		globalThis.resumeSound = (t) => __h(100, t);
+		globalThis.stopSound = (t) => __h(101, t);
+		globalThis.soundFadeIn = (t, d, f, to) => __h(102, t, d, f, to);
+		globalThis.soundFadeOut = (t, d, to) => __h(103, t, d, to);
+		globalThis.soundFadeCancel = (t) => __h(104, t);
+		globalThis.musicFadeIn = (d, f, to) => __h(105, d, f, to);
+		globalThis.musicFadeOut = (d, to) => __h(106, d, to);
+		globalThis.precacheSound = (t) => __h(107, t);
+		globalThis.precacheMusic = (t) => __h(108, t);
+		globalThis.addToGroup = (g, t, i) => __h(109, g, t, i);
+		globalThis.removeFromGroup = (g, i) => __h(110, g, i);
+		globalThis.updateHitboxFromGroup = (g, i) => __h(111, g, i);
+		globalThis.getMidpointX = (t) => Number(__h(112, t));
+		globalThis.getMidpointY = (t) => Number(__h(113, t));
+		globalThis.getGraphicMidpointX = (t) => Number(__h(114, t));
+		globalThis.getGraphicMidpointY = (t) => Number(__h(115, t));
+		globalThis.getScreenPositionX = (t, c) => Number(__h(116, t, c));
+		globalThis.getScreenPositionY = (t, c) => Number(__h(117, t, c));
+		globalThis.getMouseX = (c) => Number(__h(118, c));
+		globalThis.getMouseY = (c) => Number(__h(119, c));
+		globalThis.mouseClicked = (b) => __h(120, b) === "1";
+		globalThis.mousePressed = (b) => __h(121, b) === "1";
+		globalThis.mouseReleased = (b) => __h(122, b) === "1";
+		globalThis.keyJustPressed = (k) => __h(123, k) === "1";
+		globalThis.keyPressed = (k) => __h(124, k) === "1";
+		globalThis.keyReleased = (k) => __h(125, k) === "1";
+		globalThis.debugPrint = (t, c) => __h(126, t, c);
+		globalThis.checkFileExists = (p) => __h(127, p) === "1";
+		globalThis.getTextFromFile = (p) => __h(128, p);
+		globalThis.readJson = (p) => __h(129, p);
+		globalThis.startCountdown = () => __h(130);
+		globalThis.endSong = () => __h(131);
+		globalThis.restartSong = () => __h(132);
+		globalThis.exitSong = () => __h(133);
+		globalThis.addCharacterToList = (n, t) => __h(134, n, t);
+		globalThis.setHealthBarColors = (l, r) => __h(135, l, r);
+		globalThis.setTimeBarColors = (l, r) => __h(136, l, r);
+		globalThis.getPixelColor = (t, x, y) => Number(__h(137, t, x, y));
 	';
 
 	/** 编号 → 实现。加函数只在这张表里加一行。 */
@@ -435,14 +588,30 @@ class QuickJSHandler
 				LuaUtils.setVarInArray(cls3, b, coerce(c));
 				return c;
 
-			case 4: // playSound
+			case 4: // playSound(sound, volume, tag, loop)
 				var snd = Paths.sound(a);
-				if (snd != null)
+				if (snd == null) return '0';
+				var vol4:Float = fnum(b, 1);
+				var loop4:Bool = truthy(d);
+				if (c != null && c.length > 0)
 				{
-					FlxG.sound.play(snd, fnum(b, 1));
-					return '1';
+					var key4:String = LuaUtils.formatVariable('sound_' + c);
+					var old4:Dynamic = MusicBeatState.getVariables().get(key4);
+					if (old4 != null)
+					{
+						old4.stop();
+						old4.destroy();
+					}
+					var orig4:String = c;
+					MusicBeatState.getVariables().set(key4,
+						FlxG.sound.play(snd, vol4, loop4, null, true, function() {
+							if (!loop4) MusicBeatState.getVariables().remove(key4);
+							JSPlayer.forward('onSoundFinished', [orig4]);
+						}));
+					return key4;
 				}
-				return '0';
+				FlxG.sound.play(snd, vol4);
+				return '1';
 
 			case 5, 6: // makeLuaSprite / makeAnimatedLuaSprite
 				var spr = new psychlua.ModchartSprite(fnum(c, 0), fnum(d, 0));
@@ -589,32 +758,27 @@ class QuickJSHandler
 				return '1';
 
 			case 26: // cancelTween
-				if (PlayState.instance == null) return '0';
-				var tw26:Dynamic = PlayState.instance.modchartTweens.get('tween_' + a);
-				if (tw26 == null) return '0';
-				tw26.cancel();
-				PlayState.instance.modchartTweens.remove('tween_' + a);
+				LuaUtils.cancelTween(a);
 				return '1';
 
 			case 27: // runTimer
 				if (PlayState.instance == null) return '0';
+				LuaUtils.cancelTimer(a);
 				var time27:Float = fnum(b, 1);
 				if (time27 <= 0) time27 = 1;
 				var loops27:Int = inum(c, 1);
 				if (loops27 <= 0) loops27 = 1;
-				var tag27:String = a;
+				var orig27:String = a;
+				var key27:String = LuaUtils.formatVariable('timer_' + a);
 				var tmr27:FlxTimer = new FlxTimer().start(time27, function(t) {
-					JSPlayer.onTimerCompleted(tag27, loops27, Std.int(t.loopsLeft));
+					if (t.finished) vars().remove(key27);
+					JSPlayer.onTimerCompleted(orig27, t.loops, Std.int(t.loopsLeft));
 				}, loops27);
-				PlayState.instance.modchartTimers.set('timer_' + tag27, tmr27);
-				return '1';
+				vars().set(key27, tmr27);
+				return key27;
 
 			case 28: // cancelTimer
-				if (PlayState.instance == null) return '0';
-				var tmr28:Dynamic = PlayState.instance.modchartTimers.get('timer_' + a);
-				if (tmr28 == null) return '0';
-				tmr28.cancel();
-				PlayState.instance.modchartTimers.remove('timer_' + a);
+				LuaUtils.cancelTimer(a);
 				return '1';
 
 			case 29: // addAnimationByIndices
@@ -677,12 +841,12 @@ class QuickJSHandler
 
 			case 33: // addHealth
 				if (PlayState.instance == null) return '0';
-				PlayState.instance.health = Math.max(0, Math.min(2, PlayState.instance.health + fnum(a, 0)));
+				PlayState.instance.health += fnum(a, 0);
 				return Std.string(PlayState.instance.health);
 
 			case 34: // setHealth
 				if (PlayState.instance == null) return '0';
-				PlayState.instance.health = Math.max(0, Math.min(2, fnum(a, 1)));
+				PlayState.instance.health = fnum(a, 1);
 				return Std.string(PlayState.instance.health);
 
 			case 35: // getHealth
@@ -735,6 +899,392 @@ class QuickJSHandler
 				FlxG.sound.playMusic(mus, fnum(b, 1), truthy(c));
 				return '1';
 
+
+			// ---- 44..50 随机 / 字符串
+			case 44: return Std.string(FlxG.random.int(inum(a, 0), inum(b, 10)));
+			case 45: return Std.string(FlxG.random.float(fnum(a, 0), fnum(b, 1)));
+			case 46: return FlxG.random.bool(inum(a, 50)) ? '1' : '0';
+			case 47: return a.split(b.length > 0 ? b : ',').join(String.fromCharCode(1));
+			case 48: return StringTools.trim(a);
+			case 49: return StringTools.startsWith(a, b) ? '1' : '0';
+			case 50: return StringTools.endsWith(a, b) ? '1' : '0';
+
+			// ---- 51..53 颜色（Lua 侧也是 FlxColor.fromString）
+			case 51: return Std.string(FlxColor.fromString('#' + a));
+			case 52, 53: return Std.string(FlxColor.fromString(a));
+
+			// ---- 54..66 分数 / 评价
+			case 54: return Std.string(PlayState.instance != null ? PlayState.instance.songScore : 0);
+			case 55:
+				if (PlayState.instance == null) return '0';
+				PlayState.instance.songScore = inum(a, 0);
+				PlayState.instance.RecalculateRating();
+				return '1';
+			case 56:
+				if (PlayState.instance == null) return '0';
+				PlayState.instance.songScore += inum(a, 0);
+				PlayState.instance.RecalculateRating();
+				return '1';
+			case 57: return Std.string(PlayState.instance != null ? PlayState.instance.songMisses : 0);
+			case 58:
+				if (PlayState.instance == null) return '0';
+				PlayState.instance.songMisses = inum(a, 0);
+				PlayState.instance.RecalculateRating();
+				return '1';
+			case 59:
+				if (PlayState.instance == null) return '0';
+				PlayState.instance.songMisses += inum(a, 0);
+				PlayState.instance.RecalculateRating();
+				return '1';
+			case 60: return Std.string(PlayState.instance != null ? PlayState.instance.songHits : 0);
+			case 61:
+				if (PlayState.instance == null) return '0';
+				PlayState.instance.songHits = inum(a, 0);
+				PlayState.instance.RecalculateRating();
+				return '1';
+			case 62:
+				if (PlayState.instance == null) return '0';
+				PlayState.instance.songHits += inum(a, 0);
+				PlayState.instance.RecalculateRating();
+				return '1';
+			case 63:
+				if (PlayState.instance == null) return '0';
+				PlayState.instance.updateScoreText();
+				return '1';
+			case 64:
+				if (PlayState.instance == null) return '0';
+				PlayState.instance.ratingPercent = fnum(a, 1);
+				return '1';
+			case 65:
+				if (PlayState.instance == null) return '0';
+				PlayState.instance.ratingName = a;
+				return '1';
+			case 66:
+				if (PlayState.instance == null) return '0';
+				PlayState.instance.ratingFC = a;
+				return '1';
+
+			// ---- 67..71 角色
+			case 67, 69:
+				var ch67:Dynamic = charOf(a);
+				if (ch67 == null) return '0';
+				return Std.string(idx == 67 ? ch67.x : ch67.y);
+			case 68:
+				var ch68:Dynamic = charOf(a);
+				if (ch68 == null) return '0';
+				ch68.x = fnum(b, 0);
+				return '1';
+			case 70:
+				var ch70:Dynamic = charOf(a);
+				if (ch70 == null) return '0';
+				ch70.y = fnum(b, 0);
+				return '1';
+			case 71:
+				var ch71:Dynamic = charOf(a);
+				if (ch71 == null) return '0';
+				ch71.playAnim(b, truthy(c));
+				return '1';
+
+			// ---- 72..80 相机
+			case 72, 73:
+				var cam72:FlxCamera = LuaUtils.cameraFromString(a);
+				if (cam72 == null) return '0';
+				return Std.string(idx == 72 ? cam72.scroll.x : cam72.scroll.y);
+			case 74:
+				var cam74:FlxCamera = LuaUtils.cameraFromString(a);
+				if (cam74 == null) return '0';
+				cam74.scroll.set(fnum(b, 0), fnum(c, 0));
+				return '1';
+			case 75:
+				var cam75:FlxCamera = LuaUtils.cameraFromString(a);
+				if (cam75 == null) return '0';
+				cam75.scroll.x += fnum(b, 0);
+				cam75.scroll.y += fnum(c, 0);
+				return '1';
+			case 76, 77:
+				if (PlayState.instance == null) return '0';
+				return Std.string(idx == 76 ? PlayState.instance.camFollow.x : PlayState.instance.camFollow.y);
+			case 78:
+				if (PlayState.instance == null) return '0';
+				PlayState.instance.camFollow.setPosition(fnum(b, 0), fnum(c, 0));
+				return '1';
+			case 79:
+				if (PlayState.instance == null) return '0';
+				PlayState.instance.camFollow.x += fnum(b, 0);
+				PlayState.instance.camFollow.y += fnum(c, 0);
+				return '1';
+			case 80:
+				var cam80:FlxCamera = LuaUtils.cameraFromString(a);
+				var tgt80:Dynamic = charOf(b);
+				if (cam80 == null || tgt80 == null) return '0';
+				cam80.follow(tgt80);
+				return '1';
+
+			// ---- 81..83 存在性（跟 Lua 一样按类型判定，不是看键在不在）
+			case 81:
+				var o81:Dynamic = vars().get(a);
+				return (o81 != null && Std.isOfType(o81, psychlua.ModchartSprite)) ? '1' : '0';
+			case 82:
+				var o82:Dynamic = vars().get(a);
+				return (o82 != null && Std.isOfType(o82, flixel.text.FlxText)) ? '1' : '0';
+			case 83:
+				var o83:Dynamic = vars().get('sound_' + a);
+				return (o83 != null && Std.isOfType(o83, flixel.sound.FlxSound)) ? '1' : '0';
+
+			// ---- 84..86 物体杂项
+			case 84:
+				var o1:Dynamic = LuaUtils.getObjectDirectly(a);
+				var o2:Dynamic = LuaUtils.getObjectDirectly(b);
+				if (o1 == null || o2 == null) return '0';
+				return FlxG.overlap(o1, o2) ? '1' : '0';
+			case 85:
+				var o85:Dynamic = LuaUtils.getObjectDirectly(a);
+				if (o85 == null) return '0';
+				o85.scale.set(fnum(b, 1), fnum(c, 1));
+				if (d.length == 0 || truthy(d)) o85.updateHitbox();
+				return '1';
+			case 86:
+				var o86:Dynamic = LuaUtils.getObjectDirectly(a);
+				if (o86 == null) return '0';
+				o86.animation.play(b, truthy(c));
+				return '1';
+
+			// ---- 87..92 noteTween（和 Lua 一样打 StrumNote，存同一个键名）
+			case 87, 88, 89, 90, 91, 92:
+				if (PlayState.instance == null) return '0';
+				var strums = PlayState.instance.strumLineNotes;
+				if (strums == null || strums.length == 0) return '0';
+				var note87:Int = inum(b, 0);
+				var strum87:Dynamic = strums.members[note87 % strums.length];
+				if (strum87 == null) return '0';
+				var val87:Float = fnum(c, 0);
+				var dur87:Float = fnum(d, 1);
+				if (dur87 <= 0) dur87 = 1;
+				var tgt87:Dynamic = strum87;
+				var data87:Dynamic = switch (idx)
+				{
+					case 87: {x: val87};
+					case 88: {y: val87};
+					case 89: {angle: val87};
+					case 90: {alpha: val87};
+					case 91: {direction: val87};
+					default: {x: val87, y: val87};
+				}
+				if (idx == 92) tgt87 = strum87.scale;
+				tweenStore(a, FlxTween.tween(tgt87, data87, dur87, {
+					ease: LuaUtils.getTweenEaseByString(e),
+					onComplete: function(_) onTweenDone(a, Std.string(note87))
+				}));
+				return '1';
+
+			// ---- 93..108 声音
+			case 93:
+				var s93:Dynamic = soundOf(a);
+				if (s93 == null) return '0';
+				var fs93:flixel.sound.FlxSound = cast s93;
+				return Std.string(fs93.volume);
+			case 94:
+				var s94:Dynamic = soundOf(a);
+				if (s94 == null) return '0';
+				s94.volume = fnum(b, 1);
+				return '1';
+			case 95:
+				var s95:Dynamic = soundOf(a);
+				if (s95 == null) return '0';
+				var fs95:flixel.sound.FlxSound = cast s95;
+				return Std.string(fs95.time);
+			case 96:
+				var s96:Dynamic = soundOf(a);
+				if (s96 == null) return '0';
+				s96.time = fnum(b, 0);
+				return '1';
+			case 97:
+				var s97:Dynamic = soundOf(a);
+				if (s97 == null) return '1';
+				var fs97:flixel.sound.FlxSound = cast s97;
+				return Std.string(fs97.pitch);
+			case 98:
+				var s98:Dynamic = soundOf(a);
+				if (s98 == null) return '0';
+				s98.pitch = fnum(b, 1);
+				return '1';
+			case 99:
+				var s99:Dynamic = soundOf(a);
+				if (s99 == null) return '0';
+				s99.pause();
+				return '1';
+			case 100:
+				var s100:Dynamic = soundOf(a);
+				if (s100 == null) return '0';
+				s100.resume();
+				return '1';
+			case 101:
+				var s101:Dynamic = soundOf(a);
+				if (s101 == null) return '0';
+				s101.stop();
+				if (a != null && a.length > 0) vars().remove(LuaUtils.formatVariable('sound_' + a));
+				return '1';
+			case 102:
+				var s102:Dynamic = soundOf(a);
+				if (s102 == null) return '0';
+				s102.fadeIn(fnum(b, 1), fnum(c, 0), fnum(d, 1));
+				return '1';
+			case 103:
+				var s103:Dynamic = soundOf(a);
+				if (s103 == null) return '0';
+				s103.fadeOut(fnum(b, 1), fnum(c, 0));
+				return '1';
+			case 104:
+				var s104:Dynamic = soundOf(a);
+				if (s104 != null && s104.fadeTween != null) s104.fadeTween.cancel();
+				return '1';
+			case 105:
+				if (FlxG.sound.music == null) return '0';
+				FlxG.sound.music.fadeIn(fnum(a, 1), fnum(b, 0), fnum(c, 1));
+				return '1';
+			case 106:
+				if (FlxG.sound.music == null) return '0';
+				FlxG.sound.music.fadeOut(fnum(a, 1), fnum(b, 0));
+				return '1';
+			case 107:
+				Paths.sound(a);
+				return '1';
+			case 108:
+				Paths.music(a);
+				return '1';
+
+			// ---- 109..111 组
+			case 109:
+				var g109:Dynamic = Reflect.getProperty(LuaUtils.getTargetInstance(), a);
+				var o109:Dynamic = LuaUtils.getObjectDirectly(b);
+				if (g109 == null || o109 == null) return '0';
+				var pos109:Int = inum(c, -1);
+				if (pos109 < 0) g109.add(o109);
+				else g109.insert(pos109, o109);
+				return '1';
+			case 110:
+				var g110:Dynamic = Reflect.getProperty(LuaUtils.getTargetInstance(), a);
+				if (g110 == null) return '0';
+				var item110:Dynamic = (g110.members != null) ? g110.members[inum(b, 0)] : g110[inum(b, 0)];
+				if (item110 == null) return '0';
+				if (g110.members != null) g110.remove(item110, true);
+				else g110.remove(item110);
+				return '1';
+			case 111:
+				var g111:Dynamic = Reflect.getProperty(LuaUtils.getTargetInstance(), a);
+				if (g111 == null) return '0';
+				var item111:Dynamic = (g111.members != null) ? g111.members[inum(b, 0)] : g111[inum(b, 0)];
+				if (item111 == null) return '0';
+				item111.updateHitbox();
+				return '1';
+
+			// ---- 112..119 中点 / 屏幕位置 / 鼠标
+			case 112, 113:
+				var o112:Dynamic = LuaUtils.getObjectDirectly(a);
+				if (o112 == null) return '0';
+				return Std.string(idx == 112 ? o112.getMidpoint().x : o112.getMidpoint().y);
+			case 114, 115:
+				var o114:Dynamic = LuaUtils.getObjectDirectly(a);
+				if (o114 == null) return '0';
+				return Std.string(idx == 114 ? o114.getGraphicMidpoint().x : o114.getGraphicMidpoint().y);
+			case 116, 117:
+				var o116:Dynamic = LuaUtils.getObjectDirectly(a);
+				if (o116 == null) return '0';
+				var cam116:FlxCamera = LuaUtils.cameraFromString(b.length > 0 ? b : 'game');
+				var pos116:Dynamic = o116.getScreenPosition(cam116);
+				return Std.string(idx == 116 ? pos116.x : pos116.y);
+			case 118, 119:
+				var cam118:FlxCamera = LuaUtils.cameraFromString(a.length > 0 ? a : 'game');
+				var pos118:Dynamic = FlxG.mouse.getScreenPosition(cam118);
+				return Std.string(idx == 118 ? pos118.x : pos118.y);
+
+			// ---- 120..125 鼠标 / 键盘
+			case 120:
+				return switch (a.toLowerCase())
+				{
+					case 'middle': FlxG.mouse.justPressedMiddle ? '1' : '0';
+					case 'right': FlxG.mouse.justPressedRight ? '1' : '0';
+					default: FlxG.mouse.justPressed ? '1' : '0';
+				};
+			case 121:
+				return switch (a.toLowerCase())
+				{
+					case 'middle': FlxG.mouse.pressedMiddle ? '1' : '0';
+					case 'right': FlxG.mouse.pressedRight ? '1' : '0';
+					default: FlxG.mouse.pressed ? '1' : '0';
+				};
+			case 122:
+				return switch (a.toLowerCase())
+				{
+					case 'middle': FlxG.mouse.justReleasedMiddle ? '1' : '0';
+					case 'right': FlxG.mouse.justReleasedRight ? '1' : '0';
+					default: FlxG.mouse.justReleased ? '1' : '0';
+				};
+			case 123, 124, 125:
+				var ks:Dynamic = switch (idx)
+				{
+					case 123: FlxG.keys.justPressed;
+					case 124: FlxG.keys.pressed;
+					default: FlxG.keys.justReleased;
+				};
+				var k123:Dynamic = Reflect.getProperty(ks, a.toUpperCase());
+				return (k123 == true) ? '1' : '0';
+
+			// ---- 126..129 文件
+			case 126:
+				if (PlayState.instance == null) return '0';
+				var col126:FlxColor = (b.length > 0) ? CoolUtil.colorFromString(b) : FlxColor.WHITE;
+				PlayState.instance.addTextToDebug(a, col126);
+				return '1';
+			case 127: return sys.FileSystem.exists(a) ? '1' : '0';
+			case 128: return sys.FileSystem.exists(a) ? sys.io.File.getContent(a) : '';
+			case 129: return sys.FileSystem.exists(a) ? sys.io.File.getContent(a) : '';
+
+			// ---- 130..132 歌曲控制
+			case 130:
+				if (PlayState.instance == null) return '0';
+				PlayState.instance.startCountdown();
+				return '1';
+			case 131:
+				if (PlayState.instance == null) return '0';
+				PlayState.instance.KillNotes();
+				PlayState.instance.endSong();
+				return '1';
+			case 132:
+				if (PlayState.instance == null) return '0';
+				PlayState.instance.persistentUpdate = false;
+				FlxG.camera.followLerp = 0;
+				substates.PauseSubState.restartSong(false);
+				return '1';
+
+			// ---- 134..137 其它
+			case 134:
+				if (PlayState.instance == null) return '0';
+				var type134:Int = switch (b.toLowerCase())
+				{
+					case 'dad': 1;
+					case 'gf' | 'girlfriend': 2;
+					default: 0;
+				}
+				PlayState.instance.addCharacterToList(a, type134);
+				return '1';
+			case 135:
+				if (PlayState.instance == null || PlayState.instance.healthBar == null) return '0';
+				PlayState.instance.healthBar.setColors(
+					a.length > 0 ? CoolUtil.colorFromString(a) : null,
+					b.length > 0 ? CoolUtil.colorFromString(b) : null);
+				return '1';
+			case 136:
+				if (PlayState.instance == null || PlayState.instance.timeBar == null) return '0';
+				PlayState.instance.timeBar.setColors(
+					a.length > 0 ? CoolUtil.colorFromString(a) : null,
+					b.length > 0 ? CoolUtil.colorFromString(b) : null);
+				return '1';
+			case 137:
+				var o137:Dynamic = LuaUtils.getObjectDirectly(a);
+				if (o137 == null || o137.pixels == null) return '0';
+				return Std.string(o137.pixels.getPixel32(inum(b, 0), inum(c, 0)));
+
 			default:
 				var m2:String = '[warn] 未实现的宿主函数编号 $idx (a=$a)';
 				Log.trace('[js] ' + m2, null);
@@ -743,18 +1293,43 @@ class QuickJSHandler
 		}
 	}
 
-	// ---------------------------------------------------------------- tween 辅助
+	// ---------------------------------------------------------------- 小工具
+	static inline function vars():Map<String, Dynamic>
+		return MusicBeatState.getVariables();
+
+	static function tweenKey(tag:String):String
+		return 'tween_' + LuaUtils.formatVariable(tag);
+
+	// tween 存在 MusicBeatState 的 variables 里、键名跟 Lua 一致，
+	// 这样 JS 的 cancelTween 能取消 Lua 建的 tween，反过来也一样
 	static function tweenStore(tag:String, tw:FlxTween):Void
 	{
-		if (PlayState.instance == null || tw == null) return;
-		PlayState.instance.modchartTweens.set('tween_' + tag, tw);
+		if (tw == null) return;
+		vars().set(tweenKey(tag), tw);
 	}
 
-	/** tween 结束：清表 + 回调 onTweenCompleted(tag, vars)，和 Lua 那边一致 */
-	static function onTweenDone(tag:String, vars:String):Void
+	static function onTweenDone(tag:String, varsStr:String):Void
 	{
-		if (PlayState.instance != null) PlayState.instance.modchartTweens.remove('tween_' + tag);
-		JSPlayer.onTweenCompleted(tag, vars);
+		vars().remove(tweenKey(tag));
+		JSPlayer.onTweenCompleted(tag, varsStr);
+	}
+
+	static function charOf(n:String):Dynamic
+	{
+		if (PlayState.instance == null || n == null) return null;
+		return switch (n.toLowerCase())
+		{
+			case 'boyfriend' | 'bf': PlayState.instance.boyfriend;
+			case 'dad' | 'opponent': PlayState.instance.dad;
+			case 'gf' | 'girlfriend': PlayState.instance.gf;
+			default: null;
+		};
+	}
+
+	static function soundOf(tag:String):Dynamic
+	{
+		if (tag == null || tag.length == 0) return FlxG.sound.music;
+		return vars().get(LuaUtils.formatVariable('sound_' + tag));
 	}
 
 	// ---------------------------------------------------------------- 注册
