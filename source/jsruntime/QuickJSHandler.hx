@@ -43,29 +43,94 @@ import backend.MusicBeatState;
 #include <cstring>
 #include <haxe/Log.h>
 
+#define QJS_MAX_CTX 32
 static JSRuntime *g_js_rt = nullptr;
-static JSContext *g_js_ctx = nullptr;
+static JSContext *g_ctxs[QJS_MAX_CTX];
+static int g_cur = -1;			// trampoline 用：当前正在跑哪个 context
 static char g_js_err[1024];
+static char g_js_out[8192];
 
-// setOnScripts 同步到 JS 全局：Lua 脚本一直能直接读 curBeat / curStep 这些，
-// JS 侧没有这一步就完全对不上。
-static void js_set_num(const char *name, double v) {
-	if (g_js_ctx == nullptr) return;
-	JSValue g = JS_GetGlobalObject(g_js_ctx);
-	JS_SetPropertyStr(g_js_ctx, g, name, JS_NewFloat64(g_js_ctx, v));
-	JS_FreeValue(g_js_ctx, g);
+// 每个 .js 文件一个 context（对齐 Lua「一个文件一个解释器」），
+// 这样同名回调不会互相覆盖。runtime 只有一个，context 用整数句柄表示。
+static JSContext *js_ctx(int h) {
+	if (h < 0 || h >= QJS_MAX_CTX) return nullptr;
+	return g_ctxs[h];
 }
-static void js_set_str(const char *name, const char *v) {
-	if (g_js_ctx == nullptr) return;
-	JSValue g = JS_GetGlobalObject(g_js_ctx);
-	JS_SetPropertyStr(g_js_ctx, g, name, JS_NewString(g_js_ctx, v ? v : ""));
-	JS_FreeValue(g_js_ctx, g);
+
+static int js_new_ctx(int memLimitMB) {
+	if (g_js_rt == nullptr) {
+		g_js_rt = JS_NewRuntime();
+		if (g_js_rt == nullptr) return -1;
+		// 上限是整个 runtime 的，所有 context 共用
+		if (memLimitMB > 0) JS_SetMemoryLimit(g_js_rt, (size_t)memLimitMB * 1024 * 1024);
+	}
+	for (int i = 0; i < QJS_MAX_CTX; i++) {
+		if (g_ctxs[i] == nullptr) {
+			g_ctxs[i] = JS_NewContext(g_js_rt);
+			return (g_ctxs[i] != nullptr) ? i : -1;
+		}
+	}
+	return -1;
 }
-static void js_set_bool(const char *name, bool v) {
-	if (g_js_ctx == nullptr) return;
-	JSValue g = JS_GetGlobalObject(g_js_ctx);
-	JS_SetPropertyStr(g_js_ctx, g, name, JS_NewBool(g_js_ctx, v));
-	JS_FreeValue(g_js_ctx, g);
+
+static void js_free_ctx(int h) {
+	if (h < 0 || h >= QJS_MAX_CTX) return;
+	if (g_ctxs[h] != nullptr) { JS_FreeContext(g_ctxs[h]); g_ctxs[h] = nullptr; }
+}
+
+static void js_take_err(JSContext *c) {
+	JSValue e = JS_GetException(c);
+	const char *m = JS_ToCString(c, e);
+	snprintf(g_js_err, sizeof(g_js_err), "%s", m ? m : "(unknown)");
+	if (m) JS_FreeCString(c, m);
+	JS_FreeValue(c, e);
+}
+
+static void js_set_num_h(int h, const char *name, double v) {
+	JSContext *c = js_ctx(h); if (c == nullptr) return;
+	JSValue g = JS_GetGlobalObject(c);
+	JS_SetPropertyStr(c, g, name, JS_NewFloat64(c, v));
+	JS_FreeValue(c, g);
+}
+static void js_set_str_h(int h, const char *name, const char *v) {
+	JSContext *c = js_ctx(h); if (c == nullptr) return;
+	JSValue g = JS_GetGlobalObject(c);
+	JS_SetPropertyStr(c, g, name, JS_NewString(c, v ? v : ""));
+	JS_FreeValue(c, g);
+}
+static void js_set_bool_h(int h, const char *name, bool v) {
+	JSContext *c = js_ctx(h); if (c == nullptr) return;
+	JSValue g = JS_GetGlobalObject(c);
+	JS_SetPropertyStr(c, g, name, JS_NewBool(c, v));
+	JS_FreeValue(c, g);
+}
+
+static bool js_eval_h(int h, const char *code, const char *name) {
+	JSContext *c = js_ctx(h);
+	if (c == nullptr || code == nullptr) return false;
+	g_cur = h;
+	// 长度用 strlen：Haxe String 的 length 是字符数，中文注释会让 UTF-8 字节数更大
+	JSValue r = JS_Eval(c, code, strlen(code), name, JS_EVAL_TYPE_GLOBAL);
+	bool ok = !JS_IsException(r);
+	if (!ok) js_take_err(c);
+	JS_FreeValue(c, r);
+	g_cur = -1;
+	return ok;
+}
+
+static const char *js_get_str_h(int h, const char *name) {
+	JSContext *c = js_ctx(h);
+	g_js_out[0] = 0;
+	if (c == nullptr) return g_js_out;
+	JSValue g = JS_GetGlobalObject(c);
+	JSValue v = JS_GetPropertyStr(c, g, name);
+	if (!JS_IsUndefined(v)) {
+		const char *cs = JS_ToCString(c, v);
+		if (cs != nullptr) { snprintf(g_js_out, sizeof(g_js_out), "%s", cs); JS_FreeCString(c, cs); }
+	}
+	JS_FreeValue(c, v);
+	JS_FreeValue(c, g);
+	return g_js_out;
 }
 
 typedef ::String (*qjs_host_fn)(int, ::String, ::String, ::String, ::String, ::String, ::String);
@@ -92,47 +157,45 @@ static JSValue qjs_host(JSContext *ctx, JSValueConst this_val, int argc, JSValue
 // 调用 JS 全局函数（回调用）：
 //   mode 0 = 无参，1 = (number)，2 = (string)，
 //   mode 3 = (string, number)，4 = (string, string)，5 = (string, number, number)
-static bool js_invoke(const char *name, int mode, double num, const char *str, const char *str2, double extra) {
-	bool ok = false;
+static bool js_invoke(int h, const char *name, int mode, double num, const char *str, const char *str2, double extra) {
+	JSContext *c = js_ctx(h);
+	if (c == nullptr) return false;
 	g_js_err[0] = 0; // 清掉上一次的残留，否则「函数不存在」会被误报成异常
-	if (g_js_ctx == nullptr) return false;
-	JSValue g = JS_GetGlobalObject(g_js_ctx);
-	JSValue f = JS_GetPropertyStr(g_js_ctx, g, name);
-	if (JS_IsFunction(g_js_ctx, f)) {
-		JSValue a[2];
+	g_cur = h;
+
+	bool ok = false;
+	JSValue g = JS_GetGlobalObject(c);
+	JSValue f = JS_GetPropertyStr(c, g, name);
+	if (JS_IsFunction(c, f)) {
+		JSValue a[3];
 		int n = 0;
-		if (mode == 1) { a[0] = JS_NewFloat64(g_js_ctx, num); n = 1; }
-		else if (mode == 2) { a[0] = JS_NewString(g_js_ctx, str ? str : ""); n = 1; }
+		if (mode == 1) { a[0] = JS_NewFloat64(c, num); n = 1; }
+		else if (mode == 2) { a[0] = JS_NewString(c, str ? str : ""); n = 1; }
 		else if (mode == 3) {
-			a[0] = JS_NewString(g_js_ctx, str ? str : "");
-			a[1] = JS_NewFloat64(g_js_ctx, num);
+			a[0] = JS_NewString(c, str ? str : "");
+			a[1] = JS_NewFloat64(c, num);
 			n = 2;
 		}
 		else if (mode == 4) {
-			a[0] = JS_NewString(g_js_ctx, str ? str : "");
-			a[1] = JS_NewString(g_js_ctx, str2 ? str2 : "");
+			a[0] = JS_NewString(c, str ? str : "");
+			a[1] = JS_NewString(c, str2 ? str2 : "");
 			n = 2;
 		}
 		else if (mode == 5) {
-			a[0] = JS_NewString(g_js_ctx, str ? str : "");
-			a[1] = JS_NewFloat64(g_js_ctx, num);
-			a[2] = JS_NewFloat64(g_js_ctx, extra);
+			a[0] = JS_NewString(c, str ? str : "");
+			a[1] = JS_NewFloat64(c, num);
+			a[2] = JS_NewFloat64(c, extra);
 			n = 3;
 		}
-		JSValue r = JS_Call(g_js_ctx, f, g, n, n > 0 ? a : nullptr);
+		JSValue r = JS_Call(c, f, g, n, n > 0 ? a : nullptr);
 		ok = !JS_IsException(r);
-		if (!ok) {
-			JSValue e = JS_GetException(g_js_ctx);
-			const char *m = JS_ToCString(g_js_ctx, e);
-			snprintf(g_js_err, sizeof(g_js_err), "%s", m ? m : "(unknown)");
-			if (m) JS_FreeCString(g_js_ctx, m);
-			JS_FreeValue(g_js_ctx, e);
-		}
-		JS_FreeValue(g_js_ctx, r);
-		for (int i = 0; i < n; i++) JS_FreeValue(g_js_ctx, a[i]);
+		if (!ok) js_take_err(c);
+		JS_FreeValue(c, r);
+		for (int i = 0; i < n; i++) JS_FreeValue(c, a[i]);
 	}
-	JS_FreeValue(g_js_ctx, f);
-	JS_FreeValue(g_js_ctx, g);
+	JS_FreeValue(c, f);
+	JS_FreeValue(c, g);
+	g_cur = -1;
 	return ok;
 }
 ')
@@ -171,67 +234,50 @@ class QuickJSHandler
 	}
 
 	// ---------------------------------------------------------------- 生命周期
-	public static function init(memLimitMB:Int = 0):Bool
+	/** 新建一个 context，返回整数句柄（<0 表示失败）。每个 .js 文件一个。 */
+	public static function newContext(memLimitMB:Int = 256):Int
+	{
+		var h:Int = -1;
+		untyped __cpp__('h = js_new_ctx((int)memLimitMB);');
+		return h;
+	}
+
+	public static function isReady(h:Int):Bool
 	{
 		var ok:Bool = false;
-		untyped __cpp__('
-			if (g_js_ctx == nullptr) {
-				g_js_rt = JS_NewRuntime();
-				if (g_js_rt != nullptr) {
-					if ((int)memLimitMB > 0) JS_SetMemoryLimit(g_js_rt, (size_t)memLimitMB * 1024 * 1024);
-					g_js_ctx = JS_NewContext(g_js_rt);
-				}
-			}
-			ok = (g_js_ctx != nullptr);
-		');
+		untyped __cpp__('ok = (js_ctx(h) != nullptr);');
 		return ok;
 	}
 
-	public static function isReady():Bool
+	public static function dispose(h:Int):Void
 	{
-		var ok:Bool = false;
-		untyped __cpp__('ok = (g_js_ctx != nullptr);');
-		return ok;
+		untyped __cpp__('js_free_ctx(h);');
 	}
 
-	public static function dispose():Void
+	/** 当前正在执行回调的是哪个 context（宿主函数里往回调用时用） */
+	public static function current():Int
 	{
-		untyped __cpp__('
-			if (g_js_ctx != nullptr) { JS_FreeContext(g_js_ctx); g_js_ctx = nullptr; }
-			if (g_js_rt != nullptr) { JS_FreeRuntime(g_js_rt); g_js_rt = nullptr; }
-		');
+		var h:Int = -1;
+		untyped __cpp__('h = g_cur;');
+		return h;
 	}
 
+	/** 推进整个 runtime 的 microtask（所有 context 一起） */
 	public static function pump():Void
 	{
-		if (!isReady()) return;
 		untyped __cpp__('
-			JSContext *c = nullptr;
-			while (JS_ExecutePendingJob(g_js_rt, &c) > 0) { }
+			if (g_js_rt != nullptr) {
+				JSContext *c = nullptr;
+				while (JS_ExecutePendingJob(g_js_rt, &c) > 0) { }
+			}
 		');
 	}
 
 	// ---------------------------------------------------------------- 执行
-	public static function eval(code:String, ?chunkName:String = '<js>'):Bool
+	public static function eval(h:Int, code:String, ?chunkName:String = '<js>'):Bool
 	{
-		if (!isReady() && !init()) return false;
-
 		var out:Bool = false;
-		untyped __cpp__('
-			// 长度必须用 strlen：code.length 是字符数，中文注释会让 UTF-8 字节数更大，
-			// 按字符数传就被截断，报 "SyntaxError: unexpected end of string"
-			const char *src = code.utf8_str();
-			JSValue r = JS_Eval(g_js_ctx, src, strlen(src), chunkName.utf8_str(), JS_EVAL_TYPE_GLOBAL);
-			if (JS_IsException(r)) {
-				JSValue e = JS_GetException(g_js_ctx);
-				const char *msg = JS_ToCString(g_js_ctx, e);
-				snprintf(g_js_err, sizeof(g_js_err), "%s", msg ? msg : "(unknown)");
-				if (msg) JS_FreeCString(g_js_ctx, msg);
-				JS_FreeValue(g_js_ctx, e);
-				out = false;
-			} else out = true;
-			JS_FreeValue(g_js_ctx, r);
-		');
+		untyped __cpp__('out = js_eval_h(h, code.utf8_str(), chunkName.utf8_str());');
 		if (!out)
 		{
 			var m:String = '[error] ' + chunkName + ': ' + lastError();
@@ -241,10 +287,10 @@ class QuickJSHandler
 		return out;
 	}
 
-	public static function evalFile(path:String):Bool
+	public static function evalFile(h:Int, path:String):Bool
 	{
 		if (!sys.FileSystem.exists(path)) return false;
-		return eval(sys.io.File.getContent(path), path);
+		return eval(h, sys.io.File.getContent(path), path);
 	}
 
 	public static function lastError():String
@@ -254,101 +300,90 @@ class QuickJSHandler
 		return msg;
 	}
 
-	public static function globalString(name:String):String
+	public static function globalString(h:Int, name:String):String
 	{
-		if (!isReady()) return '';
 		var out:String = '';
-		untyped __cpp__('
-			JSValue g = JS_GetGlobalObject(g_js_ctx);
-			JSValue v = JS_GetPropertyStr(g_js_ctx, g, name.utf8_str());
-			if (!JS_IsUndefined(v)) {
-				const char *cs = JS_ToCString(g_js_ctx, v);
-				if (cs != nullptr) { out = ::String(cs); JS_FreeCString(g_js_ctx, cs); }
-			}
-			JS_FreeValue(g_js_ctx, v);
-			JS_FreeValue(g_js_ctx, g);
-		');
+		untyped __cpp__('out = ::String(js_get_str_h(h, name.utf8_str()));');
 		return out;
 	}
 
 	// ---------------------------------------------------------------- 回调调用
 	/** 无参回调。函数不存在时静默返回 false。 */
-	public static function callGlobal(name:String):Bool
+	public static function callGlobal(h:Int, name:String):Bool
 	{
-		if (!isReady()) return false;
+		if (!isReady(h)) return false;
 		var ok:Bool = false;
-		untyped __cpp__('ok = js_invoke(name.utf8_str(), 0, 0, nullptr, nullptr, 0);');
+		untyped __cpp__('ok = js_invoke(h, name.utf8_str(), 0, 0, nullptr, nullptr, 0);');
 		if (!ok && lastError().length > 0) log('[error] ' + name + '(): ' + lastError());
 		return ok;
 	}
 
 	/** 一个数字参数的回调（onUpdate / onBeatHit / onStepHit …） */
-	public static function callGlobalNum(name:String, v:Float):Bool
+	public static function callGlobalNum(h:Int, name:String, v:Float):Bool
 	{
-		if (!isReady()) return false;
+		if (!isReady(h)) return false;
 		var ok:Bool = false;
-		untyped __cpp__('ok = js_invoke(name.utf8_str(), 1, (double)v, nullptr, nullptr, 0);');
+		untyped __cpp__('ok = js_invoke(h, name.utf8_str(), 1, (double)v, nullptr, nullptr, 0);');
 		if (!ok && lastError().length > 0) log('[error] ' + name + '(num): ' + lastError());
 		return ok;
 	}
 
 	/** 一个字符串参数的回调 */
-	public static function callGlobalStr(name:String, s:String):Bool
+	public static function callGlobalStr(h:Int, name:String, s:String):Bool
 	{
-		if (!isReady()) return false;
+		if (!isReady(h)) return false;
 		var ok:Bool = false;
-		untyped __cpp__('ok = js_invoke(name.utf8_str(), 2, 0, s.utf8_str(), nullptr, 0);');
+		untyped __cpp__('ok = js_invoke(h, name.utf8_str(), 2, 0, s.utf8_str(), nullptr, 0);');
 		if (!ok && lastError().length > 0) log('[error] ' + name + '(str): ' + lastError());
 		return ok;
 	}
 
-	/** (字符串, 数字) 回调：onTimerCompleted(tag, loopsLeft) */
-	public static function callGlobalStrNum(name:String, s1:String, n1:Float):Bool
+	/** (字符串, 数字) 回调 */
+	public static function callGlobalStrNum(h:Int, name:String, s1:String, n1:Float):Bool
 	{
-		if (!isReady()) return false;
+		if (!isReady(h)) return false;
 		var ok:Bool = false;
-		untyped __cpp__('ok = js_invoke(name.utf8_str(), 3, (double)n1, s1.utf8_str(), nullptr, 0);');
+		untyped __cpp__('ok = js_invoke(h, name.utf8_str(), 3, (double)n1, s1.utf8_str(), nullptr, 0);');
 		if (!ok && lastError().length > 0) log('[error] ' + name + '(s,n): ' + lastError());
 		return ok;
 	}
 
 	/** (字符串, 数字, 数字) 回调：onTimerCompleted(tag, loops, loopsLeft) */
-	public static function callGlobalStrNumNum(name:String, s1:String, n1:Float, n2:Float):Bool
+	public static function callGlobalStrNumNum(h:Int, name:String, s1:String, n1:Float, n2:Float):Bool
 	{
-		if (!isReady()) return false;
+		if (!isReady(h)) return false;
 		var ok:Bool = false;
-		untyped __cpp__('ok = js_invoke(name.utf8_str(), 5, (double)n1, s1.utf8_str(), nullptr, (double)n2);');
+		untyped __cpp__('ok = js_invoke(h, name.utf8_str(), 5, (double)n1, s1.utf8_str(), nullptr, (double)n2);');
 		if (!ok && lastError().length > 0) log('[error] ' + name + '(s,n,n): ' + lastError());
 		return ok;
 	}
 
 	/** (字符串, 字符串) 回调：onTweenCompleted(tag, vars) 之类 */
-	public static function callGlobalStrStr(name:String, s1:String, s2:String):Bool
+	public static function callGlobalStrStr(h:Int, name:String, s1:String, s2:String):Bool
 	{
-		if (!isReady()) return false;
+		if (!isReady(h)) return false;
 		var ok:Bool = false;
-		untyped __cpp__('ok = js_invoke(name.utf8_str(), 4, 0, s1.utf8_str(), s2.utf8_str(), 0);');
+		untyped __cpp__('ok = js_invoke(h, name.utf8_str(), 4, 0, s1.utf8_str(), s2.utf8_str(), 0);');
 		if (!ok && lastError().length > 0) log('[error] ' + name + '(s,s): ' + lastError());
 		return ok;
 	}
 
 	/** setOnScripts 的 JS 侧同步：数字 / 布尔 / 字符串 都能落进全局 */
-	public static function setGlobal(name:String, v:Dynamic):Void
+	public static function setGlobal(h:Int, name:String, v:Dynamic):Void
 	{
-		if (!isReady()) return;
-		if (v == null) return;
+		if (!isReady(h) || v == null) return;
 		if (Std.isOfType(v, Bool))
 		{
-			untyped __cpp__('js_set_bool(name.utf8_str(), v);');
+			untyped __cpp__('js_set_bool_h(h, name.utf8_str(), v);');
 		}
 		else if (Std.isOfType(v, Int) || Std.isOfType(v, Float))
 		{
-			untyped __cpp__('js_set_num(name.utf8_str(), (double)v);');
+			untyped __cpp__('js_set_num_h(h, name.utf8_str(), (double)v);');
 		}
 		else
 		{
 			var sv:String = Std.string(v);
-			untyped __cpp__('js_set_str(name.utf8_str(), sv.utf8_str());');
+			untyped __cpp__('js_set_str_h(h, name.utf8_str(), sv.utf8_str());');
 		}
 	}
 
@@ -873,6 +908,7 @@ class QuickJSHandler
 					JSPlayer.onTimerCompleted(orig27, t.loops, Std.int(t.loopsLeft));
 				}, loops27);
 				vars().set(key27, tmr27);
+				JSPlayer.registerOwner('timer_' + orig27, current());
 				return key27;
 
 			case 28: // cancelTimer
@@ -1727,11 +1763,13 @@ class QuickJSHandler
 			case 190: // getRunningScripts
 				return JSPlayer.getLoadedFiles().join(String.fromCharCode(1));
 
-			case 191: // callScript(script, func, arg)
-				return QuickJSHandler.callGlobalStr(b, c) ? '1' : '0';
+			case 191: // callScript(script, func, arg) —— 调那个脚本自己的 context
+				var h191:Int = JSPlayer.handleOf(a);
+				if (h191 < 0) h191 = QuickJSHandler.current();
+				return QuickJSHandler.callGlobalStr(h191, b, c) ? '1' : '0';
 
 			case 192: // callMethod(func, arg)
-				return QuickJSHandler.callGlobalStr(a, b) ? '1' : '0';
+				return QuickJSHandler.callGlobalStr(QuickJSHandler.current(), a, b) ? '1' : '0';
 
 			case 193: // callMethodFromClass(class, method)
 				var cls193:Dynamic = ScriptClassAliases.resolve(a);
@@ -1756,11 +1794,15 @@ class QuickJSHandler
 				vars().set(a, coerce(b));
 				return b;
 
-			case 197: // getGlobalFromScript（单 context，就是读全局）
-				return QuickJSHandler.globalString(b);
+			case 197: // getGlobalFromScript → 读对应脚本上下文里的全局
+				var h197:Int = JSPlayer.handleOf(a);
+				if (h197 < 0) h197 = QuickJSHandler.current();
+				return QuickJSHandler.globalString(h197, b);
 
-			case 198: // setGlobalFromScript
-				QuickJSHandler.setGlobal(b, coerce(c));
+			case 198: // setGlobalFromScript → 写对应脚本上下文
+				var h198:Int = JSPlayer.handleOf(a);
+				if (h198 < 0) h198 = QuickJSHandler.current();
+				QuickJSHandler.setGlobal(h198, b, coerce(c));
 				return c;
 
 			case 199: // addInstance(class, tag)
@@ -1957,6 +1999,8 @@ class QuickJSHandler
 	{
 		if (tw == null) return;
 		vars().set(tweenKey(tag), tw);
+		// 记住是哪个脚本建的，onTweenCompleted 只回给它
+		JSPlayer.registerOwner(tweenKey(tag), current());
 	}
 
 	static function onTweenDone(tag:String, varsStr:String):Void
@@ -2043,17 +2087,20 @@ class QuickJSHandler
 
 	// ---------------------------------------------------------------- 注册
 	/** 注册 trace + 所有包装函数（一次 eval 搞定） */
-	public static function installHostFunctions():Void
+	public static function installHostFunctions(h:Int):Void
 	{
-		if (!isReady() && !init()) return;
+		if (!isReady(h)) return;
 		// 取地址必须在方法体里：此处 QuickJSHandler_obj 已经定义
 		untyped __cpp__('g_host = (qjs_host_fn)::jsruntime::QuickJSHandler_obj::hostDispatch;');
 		untyped __cpp__('
-			JSValue g = JS_GetGlobalObject(g_js_ctx);
-			JS_SetPropertyStr(g_js_ctx, g, "__host", JS_NewCFunction(g_js_ctx, qjs_host, "__host", 7));
-			JS_SetPropertyStr(g_js_ctx, g, "console", JS_NewObject(g_js_ctx));
-			JS_FreeValue(g_js_ctx, g);
+			JSContext *c = js_ctx(h);
+			if (c != nullptr) {
+				JSValue g = JS_GetGlobalObject(c);
+				JS_SetPropertyStr(c, g, "__host", JS_NewCFunction(c, qjs_host, "__host", 7));
+				JS_SetPropertyStr(c, g, "console", JS_NewObject(c));
+				JS_FreeValue(c, g);
+			}
 		');
-		eval(WRAPPERS + '\nconsole.log = trace; console.error = trace; console.warn = trace;', '<wrappers>');
+		eval(h, WRAPPERS + '\nconsole.log = trace; console.error = trace; console.warn = trace;', '<wrappers>');
 	}
 }

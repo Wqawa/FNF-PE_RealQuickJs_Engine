@@ -189,9 +189,11 @@ class Main extends Sprite
 			// 还会把 camZooming 设成 false，混在业务脚本里只会让人以为脚本有毛病。
 			if (jsruntime.JSPlayer.active) return;
 
-			if (!jsruntime.QuickJSHandler.init()) return;
-			jsruntime.QuickJSHandler.installHostFunctions();
-			jsruntime.QuickJSHandler.eval(
+			// 桥接自检：用一次性的临时 context，跑完就扔，不碰业务脚本
+			var hProbe:Int = jsruntime.QuickJSHandler.newContext(64);
+			if (hProbe < 0) return;
+			jsruntime.QuickJSHandler.installHostFunctions(hProbe);
+			jsruntime.QuickJSHandler.eval(hProbe,
 				"globalThis.__a = getProperty('health');"
 				+ "setProperty('camZooming', 'false');"
 				+ "globalThis.__b = getProperty('camZooming');"
@@ -203,15 +205,16 @@ class Main extends Sprite
 			try {
 				sys.FileSystem.createDirectory('./testout');
 				var bf = sys.io.File.write('./testout/js_bridge.txt', false);
-				bf.writeString('health=' + jsruntime.QuickJSHandler.globalString('__a')
-					+ ' camZooming=' + jsruntime.QuickJSHandler.globalString('__b')
-					+ ' downScroll=' + jsruntime.QuickJSHandler.globalString('__c')
-					+ ' playSound=' + jsruntime.QuickJSHandler.globalString('__d')
-					+ ' makeSprite=' + jsruntime.QuickJSHandler.globalString('__e')
-					+ ' addSprite=' + jsruntime.QuickJSHandler.globalString('__f')
-					+ ' setCam=' + jsruntime.QuickJSHandler.globalString('__g') + '\n');
+				bf.writeString('health=' + jsruntime.QuickJSHandler.globalString(hProbe, '__a')
+					+ ' camZooming=' + jsruntime.QuickJSHandler.globalString(hProbe, '__b')
+					+ ' downScroll=' + jsruntime.QuickJSHandler.globalString(hProbe, '__c')
+					+ ' playSound=' + jsruntime.QuickJSHandler.globalString(hProbe, '__d')
+					+ ' makeSprite=' + jsruntime.QuickJSHandler.globalString(hProbe, '__e')
+					+ ' addSprite=' + jsruntime.QuickJSHandler.globalString(hProbe, '__f')
+					+ ' setCam=' + jsruntime.QuickJSHandler.globalString(hProbe, '__g') + '\n');
 				bf.close();
 			} catch (e:Dynamic) {}
+			jsruntime.QuickJSHandler.dispose(hProbe);
 
 		});
 		addChild(new FlxGame(game.width, game.height, game.initialState, game.framerate, game.framerate, game.skipSplash, game.startFullscreen));
