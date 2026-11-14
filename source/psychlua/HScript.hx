@@ -65,7 +65,13 @@ class HScript extends Iris implements IScriptHost
 		try {
 			sys.FileSystem.createDirectory('./testout');
 			var f = sys.io.File.append('./testout/js_log.txt', false);
-			f.writeString('[hscript] ' + key + '\n');
+			// 顺手记一下 game 当时到底是什么、角色在不在，下次再出 "Invalid access"
+			// 就不用猜了
+			var diag:String = '';
+			var g:Dynamic = PlayState.instance;
+			if(g != null)
+				diag = '  [game=' + Type.getClassName(Type.getClass(g)) + ' bf=' + (g.boyfriend != null) + ' dad=' + (g.dad != null) + ']';
+			f.writeString('[hscript] ' + key + diag + '\n');
 			f.close();
 		} catch(e:Dynamic) {}
 		#end
@@ -157,7 +163,7 @@ class HScript extends Iris implements IScriptHost
 		#end
 		super(scriptThing, new IrisConfig(scriptName, false, false));
 		var customInterp:CustomInterp = new CustomInterp();
-		customInterp.parentInstance = FlxG.state;
+		customInterp.parentInstance = currentGame();
 		customInterp.showPosOnLog = false;
 		this.interp = customInterp;
 		#if LUA_ALLOWED
@@ -400,7 +406,10 @@ class HScript extends Iris implements IScriptHost
 		set('parentLua', null);
 		#end
 		set('this', this);
-		set('game', FlxG.state != null ? FlxG.state : PlayState.instance);
+		// 脚本嘴里的 `game` 就是这一局。以前优先取 FlxG.state，但事件在 create
+		// 阶段触发、或者切 state 的瞬间，那玩意儿可能是 LoadingState 之类的 ——
+		// hscript 到它上面找 boyfriend 就是 null，报 "Invalid access to field"。
+		set('game', currentGame());
 		set('controls', Controls.instance);
 
 		set('buildTarget', LuaUtils.getBuildTarget());
@@ -537,6 +546,20 @@ class HScript extends Iris implements IScriptHost
 	public function scriptId():String return origin;
 	public function scriptMod():String return modFolder;
 	public function isClosed():Bool return closed;
+
+	/**
+	 * 脚本该看到的「当前这一局」。
+	 *
+	 * FlxG.state 是 PlayState 就用它；否则退回 PlayState.instance。
+	 * 事件在 create 阶段触发、或者正卡在切 state 的瞬间，FlxG.state 可能还挂在
+	 * LoadingState 上，hscript 去它身上找 boyfriend 就是 null，报
+	 * "Invalid access to field"。0.6.3 那边 state 结构简单，碰不到这个。
+	 */
+	public static function currentGame():Dynamic
+	{
+		if (Std.isOfType(FlxG.state, PlayState)) return FlxG.state;
+		return PlayState.instance;
+	}
 
 	public function emit(func:String, args:Array<Dynamic>):Dynamic
 	{
