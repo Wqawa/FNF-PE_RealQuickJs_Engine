@@ -6,6 +6,8 @@ import backend.Paths;
 import backend.CoolUtil;
 import backend.ScriptClassAliases;
 import flixel.FlxG;
+import flixel.util.FlxSave;
+import flixel.util.FlxColor;
 import flixel.tweens.FlxTween;
 import flixel.util.FlxTimer;
 import states.PlayState;
@@ -538,6 +540,38 @@ class QuickJSHandler
 		globalThis.setHealthBarColors = (l, r) => __h(135, l, r);
 		globalThis.setTimeBarColors = (l, r) => __h(136, l, r);
 		globalThis.getPixelColor = (t, x, y) => Number(__h(137, t, x, y));
+		globalThis.makeLuaText = (t, s, w, x, y) => __h(138, t, s, w, x, y);
+		globalThis.setTextString = (t, s) => __h(139, t, s) === "1";
+		globalThis.setTextSize = (t, v) => __h(140, t, v) === "1";
+		globalThis.setTextWidth = (t, v) => __h(141, t, v) === "1";
+		globalThis.setTextFont = (t, f) => __h(142, t, f) === "1";
+		globalThis.setTextColor = (t, c) => __h(143, t, c) === "1";
+		globalThis.setTextBorder = (t, s, c, st) => __h(144, t, s, c, st) === "1";
+		globalThis.setTextAlignment = (t, a) => __h(145, t, a) === "1";
+		globalThis.setTextAutoSize = (t, v) => __h(146, t, v) === "1";
+		globalThis.setTextItalic = (t, v) => __h(147, t, v) === "1";
+		globalThis.setTextHeight = (t, v) => __h(148, t, v) === "1";
+		globalThis.getTextString = (t) => __h(149, t);
+		globalThis.getTextWidth = (t) => Number(__h(150, t));
+		globalThis.getTextSize = (t) => Number(__h(151, t));
+		globalThis.getTextFont = (t) => __h(152, t);
+		globalThis.removeLuaText = (t, d) => __h(153, t, d);
+		globalThis.keyboardJustPressed = (k) => __h(154, k) === "1";
+		globalThis.keyboardPressed = (k) => __h(155, k) === "1";
+		globalThis.keyboardReleased = (k) => __h(156, k) === "1";
+		globalThis.gamepadAnalogX = (id, left) => Number(__h(157, id, left));
+		globalThis.gamepadAnalogY = (id, left) => Number(__h(158, id, left));
+		globalThis.gamepadJustPressed = (id, n) => __h(159, id, n) === "1";
+		globalThis.gamepadPressed = (id, n) => __h(160, id, n) === "1";
+		globalThis.gamepadReleased = (id, n) => __h(161, id, n) === "1";
+		globalThis.initSaveData = (n) => __h(162, n) === "1";
+		globalThis.getDataFromSave = (n, f) => __h(163, n, f);
+		globalThis.setDataFromSave = (n, f, v) => __h(164, n, f, v);
+		globalThis.flushSaveData = (n) => __h(165, n) === "1";
+		globalThis.eraseSaveData = (n) => __h(166, n) === "1";
+		globalThis.loadGraphic = (t, img, gx, gy) => __h(167, t, img, gx, gy) === "1";
+		globalThis.addAnimationByIndicesLoop = (t, n, p, i, f) => __h(168, t, n, p, i, f);
+		globalThis.addLuaText = (t) => __h(169, t) === "1";
 	';
 
 	/** 编号 → 实现。加函数只在这张表里加一行。 */
@@ -1285,6 +1319,223 @@ class QuickJSHandler
 				if (o137 == null || o137.pixels == null) return '0';
 				return Std.string(o137.pixels.getPixel32(inum(b, 0), inum(c, 0)));
 
+
+			// ---- 138..153 文本（跟 TextFunctions.hx 同一套语义）
+			case 138: // makeLuaText
+				var t138:String = a.replace('.', '');
+				LuaUtils.destroyObject(t138);
+				var t:flixel.text.FlxText = new flixel.text.FlxText(fnum(d, 0), fnum(e, 0), inum(c, 0), b, 16);
+				t.setFormat(Paths.font('vcr.ttf'), 16, FlxColor.WHITE,
+					flixel.text.FlxText.FlxTextAlign.CENTER,
+					flixel.text.FlxText.FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
+				if (PlayState.instance != null) t.cameras = [PlayState.instance.camHUD];
+				t.scrollFactor.set();
+				t.borderSize = 2;
+				vars().set(t138, t);
+				return '1';
+
+			case 139:
+				var o139:flixel.text.FlxText = textObj(a);
+				if (o139 == null) return '0';
+				o139.text = b;
+				return '1';
+
+			case 140:
+				var o140:flixel.text.FlxText = textObj(a);
+				if (o140 == null) return '0';
+				o140.size = inum(b, 16);
+				return '1';
+
+			case 141:
+				var o141:flixel.text.FlxText = textObj(a);
+				if (o141 == null) return '0';
+				o141.fieldWidth = fnum(b, 0);
+				return '1';
+
+			case 142:
+				var o142:flixel.text.FlxText = textObj(a);
+				if (o142 == null) return '0';
+				o142.font = Paths.font(b);
+				return '1';
+
+			case 143:
+				var o143:flixel.text.FlxText = textObj(a);
+				if (o143 == null) return '0';
+				o143.color = CoolUtil.colorFromString(b);
+				return '1';
+
+			case 144:
+				var o144:flixel.text.FlxText = textObj(a);
+				if (o144 == null) return '0';
+				var st144:String = (d.length > 0) ? d.toLowerCase() : 'outline';
+				o144.borderStyle = switch (st144)
+				{
+					case 'shadow': flixel.text.FlxText.FlxTextBorderStyle.SHADOW;
+					case 'outline_fast' | 'fast': flixel.text.FlxText.FlxTextBorderStyle.OUTLINE_FAST;
+					case 'none': flixel.text.FlxText.FlxTextBorderStyle.NONE;
+					default: flixel.text.FlxText.FlxTextBorderStyle.OUTLINE;
+				}
+				if (st144 != 'none') o144.borderSize = fnum(b, 2);
+				o144.borderColor = CoolUtil.colorFromString(c);
+				return '1';
+
+			case 145:
+				var o145:flixel.text.FlxText = textObj(a);
+				if (o145 == null) return '0';
+				o145.alignment = switch (b.toLowerCase())
+				{
+					case 'right': flixel.text.FlxText.FlxTextAlign.RIGHT;
+					case 'center': flixel.text.FlxText.FlxTextAlign.CENTER;
+					case 'justify': flixel.text.FlxText.FlxTextAlign.JUSTIFY;
+					default: flixel.text.FlxText.FlxTextAlign.LEFT;
+				}
+				return '1';
+
+			case 146:
+				var o146:flixel.text.FlxText = textObj(a);
+				if (o146 == null) return '0';
+				o146.autoSize = truthy(b);
+				return '1';
+
+			case 147:
+				var o147:flixel.text.FlxText = textObj(a);
+				if (o147 == null) return '0';
+				o147.italic = truthy(b);
+				return '1';
+
+			case 148:
+				var o148:flixel.text.FlxText = textObj(a);
+				if (o148 == null) return '0';
+				o148.fieldHeight = fnum(b, 0);
+				return '1';
+
+			case 149:
+				var o149:flixel.text.FlxText = textObj(a);
+				return (o149 != null) ? Std.string(o149.text) : '';
+
+			case 150:
+				var o150:flixel.text.FlxText = textObj(a);
+				return (o150 != null) ? Std.string(o150.width) : '0';
+
+			case 151:
+				var o151:flixel.text.FlxText = textObj(a);
+				return (o151 != null) ? Std.string(o151.size) : '-1';
+
+			case 152:
+				var o152:flixel.text.FlxText = textObj(a);
+				return (o152 != null) ? Std.string(o152.font) : '';
+
+			case 153: // removeLuaText
+				var o153:flixel.text.FlxText = textObj(a);
+				if (o153 == null) return '0';
+				if (PlayState.instance != null) PlayState.instance.remove(o153, true);
+				if (truthy(b) && o153.destroy != null) o153.destroy();
+				vars().remove(a.replace('.', ''));
+				return '1';
+
+			// ---- 154..156 键盘别名（Lua 里 keyboard* 跟 key* 是同一套）
+			case 154, 155, 156:
+				var ks2:Dynamic = switch (idx)
+				{
+					case 154: FlxG.keys.justPressed;
+					case 155: FlxG.keys.pressed;
+					default: FlxG.keys.justReleased;
+				}
+				return (Reflect.getProperty(ks2, a.toUpperCase()) == true) ? '1' : '0';
+
+			// ---- 157..161 手柄
+			case 157, 158:
+				var pad:Dynamic = FlxG.gamepads.getByID(inum(a, 0));
+				if (pad == null) return '0';
+				var stick:Dynamic = truthy(b) ? pad.getXAxis(flixel.input.gamepad.FlxGamepadInputID.LEFT_ANALOG_STICK)
+					: pad.getXAxis(flixel.input.gamepad.FlxGamepadInputID.RIGHT_ANALOG_STICK);
+				if (idx == 158)
+					stick = truthy(b) ? pad.getYAxis(flixel.input.gamepad.FlxGamepadInputID.LEFT_ANALOG_STICK)
+						: pad.getYAxis(flixel.input.gamepad.FlxGamepadInputID.RIGHT_ANALOG_STICK);
+				return Std.string(stick);
+
+			case 159, 160, 161:
+				var pad2:Dynamic = FlxG.gamepads.getByID(inum(a, 0));
+				if (pad2 == null) return '0';
+				var btnState:Dynamic = switch (idx)
+				{
+					case 159: pad2.justPressed;
+					case 160: pad2.pressed;
+					default: pad2.justReleased;
+				}
+				return (Reflect.getProperty(btnState, b) == true) ? '1' : '0';
+
+			// ---- 162..166 存档（键名跟 Lua 一致：save_<name>）
+			case 162:
+				var skey:String = 'save_' + a;
+				if (!vars().exists(skey))
+				{
+					var sv:FlxSave = new FlxSave();
+					sv.bind(a, CoolUtil.getSavePath() + '/psychenginemods');
+					vars().set(skey, sv);
+				}
+				return '1';
+
+			case 163:
+				var sv163:Dynamic = vars().get('save_' + a);
+				if (sv163 == null || sv163.data == null) return '';
+				return Reflect.hasField(sv163.data, b) ? Std.string(Reflect.field(sv163.data, b)) : '';
+
+			case 164:
+				var sv164:Dynamic = vars().get('save_' + a);
+				if (sv164 == null || sv164.data == null) return '0';
+				Reflect.setField(sv164.data, b, coerce(c));
+				return '1';
+
+			case 165:
+				var sv165:Dynamic = vars().get('save_' + a);
+				if (sv165 == null) return '0';
+				sv165.flush();
+				return '1';
+
+			case 166:
+				var sv166:Dynamic = vars().get('save_' + a);
+				if (sv166 == null) return '0';
+				sv166.erase();
+				vars().remove('save_' + a);
+				return '1';
+
+			// ---- 167..168 图集
+			case 167: // loadGraphic(tag, image, gridX, gridY)
+				var o167:Dynamic = LuaUtils.getObjectDirectly(a);
+				if (o167 == null || !Std.isOfType(o167, flixel.FlxSprite)) return '0';
+				var sp167:flixel.FlxSprite = cast o167;
+				var gx167:Int = inum(c, 0);
+				var gy167:Int = inum(d, 0);
+				var img167 = Paths.image(b);
+				if (gx167 > 0 && gy167 > 1) sp167.loadGraphic(img167, true, gx167, gy167);
+				else sp167.loadGraphic(img167);
+				return '1';
+
+			case 168: // addAnimationByIndicesLoop
+				var o168:Dynamic = LuaUtils.getObjectDirectly(a);
+				if (o168 == null) return '0';
+				var idxs168:Array<Int> = [];
+				for (part in d.split(','))
+				{
+					var n168:Null<Int> = Std.parseInt(part.trim());
+					if (n168 != null) idxs168.push(n168);
+				}
+				if (idxs168.length == 0) return '0';
+				var fps168:Int = inum(e, 24);
+				if (fps168 <= 0) fps168 = 24;
+				o168.animation.addByIndices(b, c, idxs168, '', fps168, true);
+				return '1';
+
+			case 169: // addLuaText
+				var o169:Dynamic = vars().get(a);
+				if (o169 == null) return '0';
+				var inst169:Dynamic = (psychlua.CustomSubstate.instance != null)
+					? psychlua.CustomSubstate.instance : LuaUtils.getTargetInstance();
+				if (inst169 == null) return '0';
+				inst169.add(o169);
+				return '1';
+
 			default:
 				var m2:String = '[warn] 未实现的宿主函数编号 $idx (a=$a)';
 				Log.trace('[js] ' + m2, null);
@@ -1324,6 +1575,18 @@ class QuickJSHandler
 			case 'gf' | 'girlfriend': PlayState.instance.gf;
 			default: null;
 		};
+	}
+
+	// 返回强类型：用 Dynamic 访问 size / alignment 这类字段时，hxcpp 反射拿不到值
+	// （表现为 NaN 或 Invalid field），文本那批函数全得靠它
+	static function textObj(tag:String):flixel.text.FlxText
+	{
+		if (tag == null) return null;
+		var split:Array<String> = tag.split('.');
+		var o:Dynamic = (split.length > 1)
+			? LuaUtils.getVarInArray(LuaUtils.getPropertyLoop(split), split[split.length - 1])
+			: LuaUtils.getObjectDirectly(tag);
+		return (o != null && Std.isOfType(o, flixel.text.FlxText)) ? cast o : null;
 	}
 
 	static function soundOf(tag:String):Dynamic
