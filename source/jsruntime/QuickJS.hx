@@ -21,6 +21,19 @@ package jsruntime;
 ')
 class QuickJS
 {
+	/** 顺便把结果落到 testout/quickjs_smoke.txt —— 双击启动看不到控制台，写文件才查得到 */
+	static function note(text:String):Void
+	{
+		#if sys
+		try {
+			sys.FileSystem.createDirectory('./testout');
+			var f = sys.io.File.write('./testout/quickjs_smoke.txt', false);
+			f.writeString(text + '\n');
+			f.close();
+		} catch (e:Dynamic) {}
+		#end
+	}
+
 	/** 跑一次 1+1，返回结果字符串；失败返回错误描述。只用来验证 ABI 通不通。 */
 	public static function smokeTest():String
 	{
@@ -45,6 +58,7 @@ class QuickJS
 				JS_FreeRuntime(rt);
 			}
 		');
+		note(out);
 		return out;
 	}
 }
