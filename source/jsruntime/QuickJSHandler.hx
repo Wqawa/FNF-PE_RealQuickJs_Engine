@@ -205,6 +205,16 @@ class QuickJSHandler
 	/** 编号 → 实现。加函数只在这张表里加一行。 */
 	@:keep static function hostDispatch(idx:Int, a:String, b:String, c:String, d:String):String
 	{
+		try {
+			return dispatchInner(idx, a, b, c, d);
+		} catch (e:Dynamic) {
+			Log.trace('[js] 宿主函数异常 idx=$idx a=$a b=$b : ' + Std.string(e), null);
+			return '';
+		}
+	}
+
+	@:keep static function dispatchInner(idx:Int, a:String, b:String, c:String, d:String):String
+	{
 		switch (idx)
 		{
 			case 0: // getProperty
@@ -279,7 +289,9 @@ class QuickJSHandler
 			case 10: // setObjectCamera
 				var o10:Dynamic = LuaUtils.getObjectDirectly(a);
 				if (o10 == null) return '0';
-				o10.cameras = [b == 'hud' ? PlayState.instance.camHUD : PlayState.instance.camGame];
+				if (!Std.isOfType(o10, flixel.FlxSprite)) return '0'; // 组/Bar 这类没有 cameras 字段
+				var sp:flixel.FlxSprite = cast o10;
+				sp.cameras = [b == 'hud' ? PlayState.instance.camHUD : PlayState.instance.camGame];
 				return '1';
 
 			default:
