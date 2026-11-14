@@ -170,6 +170,9 @@ class Main extends Sprite
 		Controls.instance = new Controls();
 		ClientPrefs.loadDefaultKeys();
 		#if ACHIEVEMENTS_ALLOWED Achievements.load(); #end
+
+		// QuickJS-NG 链接自检（先只打印一次，确认静态库能链上）
+		trace('[quickjs-ng] smoke: ' + jsruntime.QuickJS.smokeTest());
 		addChild(new FlxGame(game.width, game.height, game.initialState, game.framerate, game.framerate, game.skipSplash, game.startFullscreen));
 
 		#if !mobile
