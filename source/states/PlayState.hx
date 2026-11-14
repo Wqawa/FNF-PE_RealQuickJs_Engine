@@ -2294,27 +2294,24 @@ class PlayState extends MusicBeatState
 			resetSubState();
 		}
 
-		#if LUA_ALLOWED
+		#if (LUA_ALLOWED || HSCRIPT_ALLOWED)
 		// JS 脚本共用一个 context，onDestroy 发一次就行；放在 stop 之前，
-		// 让脚本还能调 setProperty 之类的收尾函数
-		jsruntime.JSPlayer.forward('onDestroy', []);
-		for (lua in luaArray)
+		// 让脚本还能调 setProperty 之类的收尾函数。
+		// 三条通道现在都走 IScriptHost，顺序和以前一致（JS → Lua → HScript）。
+		for (host in allScripts())
 		{
-			lua.call('onDestroy', []);
-			lua.stop();
+			if (host.isClosed()) continue;
+			host.emit('onDestroy', []);
+			host.shutdown();
 		}
+		#end
+
+		#if LUA_ALLOWED
 		luaArray = null;
 		FunkinLua.customFunctions.clear();
 		#end
 
 		#if HSCRIPT_ALLOWED
-		for (script in hscriptArray)
-			if(script != null)
-			{
-				if(script.exists('onDestroy')) script.call('onDestroy');
-				script.destroy();
-			}
-
 		hscriptArray = null;
 		#end
 
@@ -2517,6 +2514,34 @@ class PlayState extends MusicBeatState
 	}
 	#end
 
+	/**
+	 * 当前 state 里所有活着的脚本，顺序就是分发顺序：JS → Lua → HScript，
+	 * 和原来 callOnScripts 里三段调用的先后一致。
+	 *
+	 * 以后再加一条脚本通道，只要实现 IScriptHost 并从这里出去，
+	 * PlayState 其余地方都不用跟着改。
+	 */
+	public function allScripts():Array<IScriptHost>
+	{
+		var out:Array<IScriptHost> = [];
+
+		#if LUA_ALLOWED
+		for (s in jsruntime.JSPlayer.hosts())
+			if (s != null) out.push(s);
+		if (luaArray != null)
+			for (s in luaArray)
+				if (s != null) out.push(s);
+		#end
+
+		#if HSCRIPT_ALLOWED
+		if (hscriptArray != null)
+			for (s in hscriptArray)
+				if (s != null) out.push(s);
+		#end
+
+		return out;
+	}
+
 	public function callOnScripts(funcToCall:String, args:Array<Dynamic> = null, ignoreStops = false, exclusions:Array<String> = null, excludeValues:Array<Dynamic> = null):Dynamic {
 		var returnVal:Dynamic = LuaUtils.Function_Continue;
 		if(args == null) args = [];
@@ -2615,10 +2640,24 @@ class PlayState extends MusicBeatState
 
 	public function setOnScripts(variable:String, arg:Dynamic, exclusions:Array<String> = null) {
 		if(exclusions == null) exclusions = [];
-		setOnLuas(variable, arg, exclusions);
-		setOnHScript(variable, arg, exclusions);
+
+		// 走 IScriptHost 统一写入。这里不建 allScripts() 数组，因为
+		// RecalculateRating 每次命中都要调好几遍，没必要每秒分配几百个小数组。
+		// 顺带修了一个老问题：JS 那边原来不认 exclusions，是全量广播的。
 		#if LUA_ALLOWED
-		jsruntime.JSPlayer.setGlobal(variable, arg);
+		if (jsruntime.JSPlayer.active)
+			for (s in jsruntime.JSPlayer.hosts())
+				if (!s.isClosed() && !exclusions.contains(s.scriptId())) s.setVar(variable, arg);
+
+		if (luaArray != null)
+			for (s in luaArray)
+				if (s != null && !s.isClosed() && !exclusions.contains(s.scriptId())) s.setVar(variable, arg);
+		#end
+
+		#if HSCRIPT_ALLOWED
+		if (hscriptArray != null)
+			for (s in hscriptArray)
+				if (s != null && !s.isClosed() && !exclusions.contains(s.scriptId())) s.setVar(variable, arg);
 		#end
 	}
 

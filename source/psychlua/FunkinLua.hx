@@ -43,7 +43,7 @@ import flixel.input.gamepad.FlxGamepadInputID;
 
 import haxe.Json;
 
-class FunkinLua {
+class FunkinLua implements IScriptHost {
 	public var lua:State = null;
 	public var camTarget:FlxCamera;
 	public var scriptName:String = '';
@@ -1798,6 +1798,24 @@ class FunkinLua {
 		}
 		#end
 	}
+
+	// ------------------------------------------------------------- IScriptHost
+	// PlayState 分发只认这套方法，不再直接摸 lua_State。
+	public function scriptId():String return scriptName;
+	public function scriptMod():String return modFolder;
+	public function isClosed():Bool return closed;
+
+	public function emit(func:String, args:Array<Dynamic>):Dynamic
+		return call(func, args);
+
+	public function setVar(name:String, value:Dynamic):Void
+		set(name, value);
+
+	public function getVar(name:String):Dynamic
+		return get(name);
+
+	public function shutdown():Void
+		stop();
 
 	function oldTweenFunction(tag:String, vars:String, tweenValue:Any, duration:Float, ease:String, funcName:String)
 	{

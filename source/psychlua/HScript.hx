@@ -26,11 +26,12 @@ typedef HScriptInfos = {
 	#end
 }
 
-class HScript extends Iris
+class HScript extends Iris implements IScriptHost
 {
 	public var filePath:String;
 	public var modFolder:String;
 	public var returnValue:Dynamic;
+	public var closed:Bool = false;
 
 	#if LUA_ALLOWED
 	public var parentLua:FunkinLua;
@@ -485,10 +486,33 @@ class HScript extends Iris
 
 	override public function destroy()
 	{
+		closed = true;
 		origin = null;
 		#if LUA_ALLOWED parentLua = null; #end
 		super.destroy();
 	}
+
+	// ------------------------------------------------------------- IScriptHost
+	// PlayState 分发只认这套方法，不再区分 Iris 的 call 和 Lua 的 call。
+	public function scriptId():String return origin;
+	public function scriptMod():String return modFolder;
+	public function isClosed():Bool return closed;
+
+	public function emit(func:String, args:Array<Dynamic>):Dynamic
+	{
+		if (interp == null || !exists(func)) return null;
+		var r:IrisCall = call(func, args);
+		return r == null ? null : r.returnValue;
+	}
+
+	public function setVar(name:String, value:Dynamic):Void
+		set(name, value);
+
+	public function getVar(name:String):Dynamic
+		return get(name);
+
+	public function shutdown():Void
+		destroy();
 
 	function set_varsToBring(values:Any) {
 		if (varsToBring != null)

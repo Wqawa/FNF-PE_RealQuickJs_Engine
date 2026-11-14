@@ -17,18 +17,20 @@ import flixel.FlxG;
  * 每个 context 独立：A 脚本定义 onCreatePost 不会顶掉 B 脚本的同名函数，
  * 全局变量也各是各的（`getGlobalFromScript` / `setGlobalFromScript` 靠 handleOf 定位）。
  * 整首歌结束（beginSong）时全部 dispose，下一次重新建。
+ *
+ * 2026-11 改造：handle / path 原来是两个平行数组，现在收成 Array<JSScriptHost>，
+ * 每个脚本自带归属 mod，PlayState 那边通过 IScriptHost 统一发事件。
  */
 class JSPlayer
 {
 	public static var active:Bool = false;
 	public static var loadedAny:Bool = false;
 
-	/** 句柄 + 文件路径 */
-	static var handles:Array<Int> = [];
-	static var paths:Array<String> = [];
+	/** 每个 .js 文件一个，顺序就是加载顺序 */
+	static var scripts:Array<JSScriptHost> = [];
 
-	/** timer_xxx / tween_xxx → 创建它的 context，回调用它只发给本人 */
-	static var owners:Map<String, Int> = [];
+	/** timer_xxx / tween_xxx → 创建它的脚本，回调用它只发给本人 */
+	static var owners:Map<String, JSScriptHost> = [];
 
 	public static function beginSong():Void
 	{
@@ -39,9 +41,8 @@ class JSPlayer
 
 	static function disposeAll():Void
 	{
-		for (h in handles) QuickJSHandler.dispose(h);
-		handles = [];
-		paths = [];
+		for (s in scripts) s.shutdown();
+		scripts = [];
 		owners = [];
 		loadedAny = false;
 	}
@@ -50,8 +51,9 @@ class JSPlayer
 	public static function loadFile(path:String):Bool
 	{
 		if (!active) return false;
-		for (i in 0...paths.length)
-			if (paths[i] == path) return true;
+		// 精确路径判重（handleOf 是模糊匹配，这里不能拿来用）
+		for (s in scripts)
+			if (s.path == path) return true;
 
 		// 256MB 是整个 runtime 的上限，所有 context 共用；单个 context 不会吃这么多
 		var h:Int = QuickJSHandler.newContext(256);
@@ -70,12 +72,11 @@ class JSPlayer
 			return false;
 		}
 
-		handles.push(h);
-		paths.push(path);
+		var modName:String = backend.Paths.modFromScriptPath(path);
+		scripts.push(new JSScriptHost(h, path, modName));
 		loadedAny = true;
 		Log.trace('[js] loaded $path (ctx=$h)', null);
-		var owner:String = backend.Paths.modFromScriptPath(path);
-		QuickJSHandler.log('[script] js/qjs  mod=' + (owner == null ? '<global>' : owner) + '  ' + path + ' (ctx=' + h + ')');
+		QuickJSHandler.log('[script] js/qjs  mod=' + (modName == null ? '<global>' : modName) + '  ' + path + ' (ctx=' + h + ')');
 		return true;
 	}
 
@@ -113,69 +114,82 @@ class JSPlayer
 	public static function forward(name:String, args:Array<Dynamic>):Void
 	{
 		if (!active) return;
+		for (s in scripts) emitTo(s, name, args);
+	}
+
+	/**
+	 * 发给单个脚本。参数分派逻辑和改造前一样：零参 / 数字 / 字符串三种。
+	 * 返回 null 是因为 QuickJS 的宿主调用目前不取返回值 —— 要拿返回值得走
+	 * QuickJSHandler 里那几条 eval 通道。
+	 */
+	public static function emitTo(host:JSScriptHost, name:String, args:Array<Dynamic>):Dynamic
+	{
+		if (!active || host == null || host.closed || !QuickJSHandler.isReady(host.handle)) return null;
+
 		var hasArg:Bool = (args != null && args.length > 0 && args[0] != null);
 		var a:Dynamic = hasArg ? args[0] : null;
 		var isNum:Bool = hasArg && (Std.isOfType(a, Int) || Std.isOfType(a, Float));
 
-		for (h in handles)
-		{
-			if (!hasArg) QuickJSHandler.callGlobal(h, name);
-			else if (isNum) QuickJSHandler.callGlobalNum(h, name, cast a);
-			else QuickJSHandler.callGlobalStr(h, name, Std.string(a));
-		}
-	}
-
-	/** setOnScripts 同步：每个脚本的上下文都写一份 */
-	public static function setGlobal(name:String, v:Dynamic):Void
-	{
-		if (!active) return;
-		for (h in handles) QuickJSHandler.setGlobal(h, name, v);
+		if (!hasArg) QuickJSHandler.callGlobal(host.handle, name);
+		else if (isNum) QuickJSHandler.callGlobalNum(host.handle, name, cast a);
+		else QuickJSHandler.callGlobalStr(host.handle, name, Std.string(a));
+		return null;
 	}
 
 	/** runTimer 的回调：只发给创建这个 timer 的脚本；找不到就全发 */
 	public static function onTimerCompleted(tag:String, loops:Int, loopsLeft:Int):Void
 	{
 		if (!active) return;
-		var key:String = 'timer_' + tag;
-		var h:Int = owners.exists(key) ? owners.get(key) : -1;
-		if (h >= 0 && QuickJSHandler.isReady(h))
+		var host:JSScriptHost = owners.exists('timer_' + tag) ? owners.get('timer_' + tag) : null;
+		if (host != null && !host.closed && QuickJSHandler.isReady(host.handle))
 		{
-			QuickJSHandler.callGlobalStrNumNum(h, 'onTimerCompleted', tag, loops, loopsLeft);
+			QuickJSHandler.callGlobalStrNumNum(host.handle, 'onTimerCompleted', tag, loops, loopsLeft);
 			return;
 		}
-		for (hh in handles) QuickJSHandler.callGlobalStrNumNum(hh, 'onTimerCompleted', tag, loops, loopsLeft);
+		for (s in scripts)
+			if (!s.closed && QuickJSHandler.isReady(s.handle))
+				QuickJSHandler.callGlobalStrNumNum(s.handle, 'onTimerCompleted', tag, loops, loopsLeft);
 	}
 
 	/** tween 完成回调：同样的规则 */
 	public static function onTweenCompleted(tag:String, vars:String):Void
 	{
 		if (!active) return;
-		var h:Int = owners.exists('tween_' + tag) ? owners.get('tween_' + tag) : -1;
-		if (h >= 0 && QuickJSHandler.isReady(h))
+		var host:JSScriptHost = owners.exists('tween_' + tag) ? owners.get('tween_' + tag) : null;
+		if (host != null && !host.closed && QuickJSHandler.isReady(host.handle))
 		{
-			QuickJSHandler.callGlobalStrStr(h, 'onTweenCompleted', tag, vars);
+			QuickJSHandler.callGlobalStrStr(host.handle, 'onTweenCompleted', tag, vars);
 			return;
 		}
-		for (hh in handles) QuickJSHandler.callGlobalStrStr(hh, 'onTweenCompleted', tag, vars);
+		for (s in scripts)
+			if (!s.closed && QuickJSHandler.isReady(s.handle))
+				QuickJSHandler.callGlobalStrStr(s.handle, 'onTweenCompleted', tag, vars);
 	}
 
 	/** 记录某个 timer/tween 是哪个脚本建的 */
 	public static function registerOwner(key:String, h:Int):Void
 	{
-		if (h >= 0) owners.set(key, h);
+		var host:JSScriptHost = hostOf(h);
+		if (host != null) owners.set(key, host);
 	}
 
 	// ---------------------------------------------------------------- 查询
+	static function hostOf(h:Int):JSScriptHost
+	{
+		for (s in scripts)
+			if (s.handle == h) return s;
+		return null;
+	}
+
 	/** 脚本路径/文件名 → context 句柄（-1 表示没在跑） */
 	public static function handleOf(name:String):Int
 	{
 		if (name == null || name.length == 0) return -1;
 		var lower:String = name.toLowerCase();
-		for (i in 0...paths.length)
+		for (s in scripts)
 		{
-			var p:String = paths[i];
-			var pl:String = p.toLowerCase();
-			if (pl == lower || pl.endsWith('/' + lower) || pl.endsWith('\\' + lower)) return handles[i];
+			var pl:String = s.path.toLowerCase();
+			if (pl == lower || pl.endsWith('/' + lower) || pl.endsWith('\\' + lower)) return s.handle;
 		}
 		return -1;
 	}
@@ -183,12 +197,19 @@ class JSPlayer
 	public static function isLoaded(path:String):Bool
 	{
 		if (path == null) return false;
-		if (handleOf(path) >= 0) return true;
-		for (p in paths)
-			if (p.toLowerCase() == path.toLowerCase()) return true;
+		for (s in scripts)
+			if (s.path.toLowerCase() == path.toLowerCase()) return true;
 		return false;
 	}
 
 	public static function getLoadedFiles():Array<String>
-		return paths.copy();
+	{
+		var out:Array<String> = [];
+		for (s in scripts) out.push(s.path);
+		return out;
+	}
+
+	/** 给 PlayState 拼统一脚本列表用。直接返回内部数组，调用方只读，不要改。 */
+	public static function hosts():Array<JSScriptHost>
+		return scripts;
 }
