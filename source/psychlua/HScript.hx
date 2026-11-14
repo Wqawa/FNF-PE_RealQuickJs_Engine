@@ -65,12 +65,33 @@ class HScript extends Iris implements IScriptHost
 		try {
 			sys.FileSystem.createDirectory('./testout');
 			var f = sys.io.File.append('./testout/js_log.txt', false);
-			// 顺手记一下 game 当时到底是什么、角色在不在，下次再出 "Invalid access"
-			// 就不用猜了
+			// 顺手记一下现场的几样东西，下次再出 "Invalid access" 不用猜：
+			//   game / bf / dad —— PlayState.instance 上到底有没有这些
+			//   hsGame          —— HScript 变量表里那个 game 到底指向谁
+			//   same            —— 它和 PlayState.instance 是不是同一个对象
 			var diag:String = '';
 			var g:Dynamic = PlayState.instance;
 			if(g != null)
 				diag = '  [game=' + Type.getClassName(Type.getClass(g)) + ' bf=' + (g.boyfriend != null) + ' dad=' + (g.dad != null) + ']';
+
+			var hsGame:Dynamic = null;
+			if(parent != null && parent.hscript != null)
+			{
+				try { hsGame = parent.hscript.getVar('game'); } catch(e:Dynamic) {}
+			}
+
+			if(hsGame == null)
+				diag += ' [hsGame=null]';
+			else
+			{
+				var bf:Dynamic = Reflect.field(hsGame, 'boyfriend');
+				diag += ' [hsGame=' + Type.getClassName(Type.getClass(hsGame))
+					+ ' same=' + (hsGame == g)
+					+ ' bf=' + (bf != null)
+					// 如果 bf 在、但这里拿不到 setColorTransform，就是 DCE 把方法裁了
+					+ ' bfHasSCT=' + (bf != null && Reflect.field(bf, 'setColorTransform') != null) + ']';
+			}
+
 			f.writeString('[hscript] ' + key + diag + '\n');
 			f.close();
 		} catch(e:Dynamic) {}
