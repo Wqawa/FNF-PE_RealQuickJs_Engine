@@ -463,6 +463,12 @@ class PlayState extends MusicBeatState
 		// jsEngine 不是 QuickJS 时这一步什么都不做。
 		jsruntime.JSPlayer.beginSong();
 
+		// 上一首歌的错误去重记录和类名解析缓存都别带过来
+		#if HSCRIPT_ALLOWED
+		HScript.resetErrorLog();
+		backend.ScriptClassAliases.resetMissCache();
+		#end
+
 		// "SCRIPTS FOLDER" SCRIPTS
 		for (folder in Mods.directoriesWithFile(Paths.getSharedPath(), 'scripts/'))
 			for (file in FileSystem.readDirectory(folder))

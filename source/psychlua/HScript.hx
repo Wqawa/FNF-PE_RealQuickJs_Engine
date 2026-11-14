@@ -35,6 +35,46 @@ class HScript extends Iris implements IScriptHost
 
 	#if LUA_ALLOWED
 	public var parentLua:FunkinLua;
+
+	/** 同一个脚本的同一个错误只报一次，见 reportHaxeError() */
+	static var reportedHaxeErrors:Map<String, Bool> = new Map<String, Bool>();
+
+	public static function resetErrorLog():Void
+		reportedHaxeErrors = new Map<String, Bool>();
+
+	/**
+	 * 报一条 HScript 错误。
+	 *
+	 * 0.6.3 的 executeAuto 每帧跑挂也就是每帧报一句，没人管；放到 1.0 上，
+	 * 像 ECR 那种在 onUpdatePost 里引用未定义变量的脚本会每秒刷 60 条，
+	 * 调试文本直接废掉。默认按「脚本 + 错误内容」去重，和 luaTrace 共用
+	 * ClientPrefs.data.moreLuaErrors 这个开关（关掉合并 = 每条都打）。
+	 */
+	public static function reportHaxeError(parent:FunkinLua, message:String, ?funcName:String):Void
+	{
+		var key:String = (parent != null ? parent.scriptName : '?') + '|' + message;
+		if(!ClientPrefs.data.moreLuaErrors)
+		{
+			if(reportedHaxeErrors.exists(key)) return;
+			reportedHaxeErrors.set(key, true);
+		}
+
+		// 除了屏幕上那行，也往 testout/js_log.txt 落一份 —— 跑完直接看文件，
+		// 不用翻控制台。每首歌开头 JSPlayer.beginSong() 会把它清空。
+		#if sys
+		try {
+			sys.FileSystem.createDirectory('./testout');
+			var f = sys.io.File.append('./testout/js_log.txt', false);
+			f.writeString('[hscript] ' + key + '\n');
+			f.close();
+		} catch(e:Dynamic) {}
+		#end
+
+		var pos:HScriptInfos = cast {fileName: parent != null ? parent.scriptName : 'HScript', isLua: true, showLine: false};
+		if(funcName != null && funcName != '') pos.funcName = funcName;
+		Iris.error(message, pos);
+	}
+
 	public static function initHaxeModule(parent:FunkinLua)
 	{
 		if(parent.hscript == null)
@@ -50,34 +90,34 @@ class HScript extends Iris implements IScriptHost
 		if(hs == null)
 		{
 			trace('initializing haxe interp for: ${parent.scriptName}');
+
+			// manualRun=true：只建解释器，执行交给下面统一处理。
+			// 这样第一段代码就跑挂时实例仍然挂得住 —— 0.6.3 的 executeAuto 也是
+			// 报了错但不丢 hscript。以前这里 catch 完把 parent.hscript 置 null，
+			// 调用方下一帧又 new 一个、又报一遍，变成每帧重建解释器。
 			try {
-				parent.hscript = new HScript(parent, code, varsToBring);
+				hs = new HScript(parent, code, varsToBring, true);
+				parent.hscript = hs;
 			}
 			catch(e:IrisError) {
-				var pos:HScriptInfos = cast {fileName: parent.scriptName, isLua: true};
-				if(parent.lastCalledFunction != '') pos.funcName = parent.lastCalledFunction;
-				Iris.error(Printer.errorToString(e, false), pos);
+				// 连解释器本身都建不出来（preset 阶段就炸），这种才是真没救
+				reportHaxeError(parent, Printer.errorToString(e, false), parent.lastCalledFunction);
 				parent.hscript = null;
+				return;
 			}
 		}
-		else
+
+		try
 		{
-			try
-			{
-				hs.scriptCode = code;
-				hs.varsToBring = varsToBring;
-				hs.parse(true);
-				var ret:Dynamic = hs.execute();
-				hs.returnValue = ret;
-			}
-			catch(e:IrisError)
-			{
-				var pos:HScriptInfos = cast hs.interp.posInfos();
-				pos.isLua = true;
-				if(parent.lastCalledFunction != '') pos.funcName = parent.lastCalledFunction;
-				Iris.error(Printer.errorToString(e, false), pos);
-				hs.returnValue = null;
-			}
+			hs.scriptCode = code;
+			hs.varsToBring = varsToBring;
+			hs.parse(true);
+			hs.returnValue = hs.execute();
+		}
+		catch(e:IrisError)
+		{
+			reportHaxeError(parent, Printer.errorToString(e, false), parent.lastCalledFunction);
+			hs.returnValue = null;
 		}
 	}
 	#end
@@ -630,6 +670,15 @@ class CustomInterp extends crowplexus.hscript.Interp
 		if(parentInstance != null && _instanceFields.contains(id)) {
 			var v = Reflect.getProperty(parentInstance, id);
 			return v;
+		}
+
+		// 未知标识符。0.6.3 的 executeAuto 会把它甩给 resolveClass 动态解析，
+		// 1.0 这边只剩一张静态别名表，表外的裸类名（比如 `new Spooky()`）直接炸。
+		// 补上同样的一层：按包列表猜一遍，命中就缓存进 variables，下次直接取。
+		var cls:Dynamic = backend.ScriptClassAliases.resolveDeep(id);
+		if(cls != null) {
+			variables.set(id, cls);
+			return cls;
 		}
 
 		error(EUnknownVariable(id));

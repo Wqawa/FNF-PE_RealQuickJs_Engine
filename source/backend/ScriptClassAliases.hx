@@ -310,4 +310,59 @@ class ScriptClassAliases
 
 	public static function exists(className:String):Bool
 		return resolve(className) != null;
+
+	/**
+	 * 0.6.3 的 runHaxeCode 走的是 `executeAuto(code, resolveClass)`，碰到没定义的
+	 * 标识符就交给 resolveClass 去猜：先 `Type.resolveClass(name)`，再
+	 * `Type.resolveClass('pe063.' + name)` —— 因为那时候源码树是扁平的，只有一个
+	 * 前缀可猜。1.0 的类是分包的，没有唯一前缀，这里改成按包列表挨个试。
+	 *
+	 * 只给「未知标识符」兜底用（HScript 的 CustomInterp.resolve 里调），不要拿它
+	 * 替代上面那张显式表 —— 表里有一部分是改过名的（Boyfriend → Character、
+	 * GitarooPause → PauseSubState），靠猜是猜不出来的。
+	 */
+	static final SEARCH_PACKAGES:Array<String> = [
+		'',
+		'backend.',
+		'objects.',
+		'states.',
+		'states.stages.',
+		'states.stages.objects.',
+		'states.editors.',
+		'substates.',
+		'options.',
+		'psychlua.',
+		'shaders.',
+		'cutscenes.',
+		'flxanimate.',
+		'hxcodec.',
+		'vlc.'
+	];
+
+	/** 已经确认不存在的名字，避免每帧重复扫一遍包 */
+	static var misses:Map<String, Bool> = new Map<String, Bool>();
+
+	public static function resolveDeep(className:String):Dynamic
+	{
+		if(className == null || className.length == 0) return null;
+		init();
+
+		// 显式表优先：改过名的那批只在这里能拿到
+		if(table.exists(className)) return table.get(className);
+
+		if(misses.exists(className)) return null;
+
+		for(pkg in SEARCH_PACKAGES)
+		{
+			var cl:Dynamic = Type.resolveClass(pkg + className);
+			if(cl != null) return cl;
+		}
+
+		misses.set(className, true);
+		return null;
+	}
+
+	/** 换歌时清一次，别让上一首歌的解析结果漏过来 */
+	public static function resetMissCache():Void
+		misses = new Map<String, Bool>();
 }
