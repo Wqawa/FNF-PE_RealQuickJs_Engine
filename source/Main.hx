@@ -177,6 +177,8 @@ class Main extends Sprite
 		// 主菜单阶段 health 根本不存在（拿到的会是 null）。
 		var jsProbed:Bool = false;
 		flixel.FlxG.signals.postUpdate.add(function() {
+			// 每帧驱动真实脚本（jsEngine=QuickJS 时才有内容）
+			jsruntime.JSPlayer.update();
 			if (jsProbed) return;
 			var st:Dynamic = flixel.FlxG.state;
 			if (st == null) return;
@@ -207,6 +209,11 @@ class Main extends Sprite
 					+ ' setCam=' + jsruntime.QuickJSHandler.globalString('__g') + '\n');
 				bf.close();
 			} catch (e:Dynamic) {}
+
+			// 真正装载这首歌的 .js（只有设置里选了 QuickJS 才会执行）
+			var songField:Dynamic = Reflect.getProperty(st, 'SONG');
+			var songName:String = (songField != null) ? Std.string(Reflect.getProperty(songField, 'song')) : '';
+			jsruntime.JSPlayer.load(songName);
 		});
 		addChild(new FlxGame(game.width, game.height, game.initialState, game.framerate, game.framerate, game.skipSplash, game.startFullscreen));
 

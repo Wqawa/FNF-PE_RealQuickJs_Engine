@@ -165,6 +165,32 @@ class QuickJSHandler
 		return out;
 	}
 
+	/** 调用一个无参数的 JS 全局函数（回调用）。不存在或不是函数返回 false。 */
+	public static function callGlobal(name:String):Bool
+	{
+		if (!isReady()) return false;
+		var ok:Bool = false;
+		untyped __cpp__('
+			JSValue g = JS_GetGlobalObject(g_js_ctx);
+			JSValue f = JS_GetPropertyStr(g_js_ctx, g, name.utf8_str());
+			if (JS_IsFunction(g_js_ctx, f)) {
+				JSValue r = JS_Call(g_js_ctx, f, g, 0, nullptr);
+				if (JS_IsException(r)) {
+					JSValue e = JS_GetException(g_js_ctx);
+					const char *msg = JS_ToCString(g_js_ctx, e);
+					snprintf(g_js_err, sizeof(g_js_err), "%s", msg ? msg : "(unknown)");
+					if (msg) JS_FreeCString(g_js_ctx, msg);
+					JS_FreeValue(g_js_ctx, e);
+					ok = false;
+				} else ok = true;
+				JS_FreeValue(g_js_ctx, r);
+			}
+			JS_FreeValue(g_js_ctx, f);
+			JS_FreeValue(g_js_ctx, g);
+		');
+		return ok;
+	}
+
 	// ---------------------------------------------------------------- 宿主函数表
 	/** 字符串 → 数字 / 布尔 / null / 原字符串 */
 	@:keep static function coerce(v:String):Dynamic
