@@ -5,6 +5,27 @@
 
 ---
 
+# 本仓库额外要求（JS 运行时 / QuickJS-NG）
+
+引擎里带一个 JS 脚本运行时（mod 的 `.js` 走它，Gameplay → JS Engine 里切）。它**不需要你另外下载**：
+
+- 源码已经随仓库提交在 `third_party/quickjs-ng/`（约 12.8 万行，MIT）。
+  仓库里这个目录必须存在，否则编译会在链接阶段失败。
+- 编译产物 `third_party/quickjs-ng/build/quickjs-ng.lib` **不进版本库**（在 `.gitignore` 里），
+  由本机 MSVC 现场编译。
+- `bash manage.sh` 的第 2/3/4 项（编译）会**自动检查**：静态库不存在、或
+  `quickjs.c` / `libregexp.c` / `libunicode.c` / `dtoa.c` 比它新，就先编译静态库再编引擎。
+  想强制重编用第 10 项。
+- 编译命令固定为 MSVC `cl /c /O2 /std:c11 /utf-8`，四个源文件，规则写在 `manage.sh` 的
+  `cmd_quickjs()` 里，改了 QuickJS 版本只需要重跑一次第 10 项。
+
+链接方式是 `source/jsruntime/QuickJSHandler.hx` 顶部的 `@:buildXml`，用的是**相对路径**
+（`third_party/quickjs-ng`），所以整个项目挪目录、换机器都不用改。
+
+> 只影响 Windows 桌面版。JS 运行时不参与 web / 移动端构建。
+
+---
+
 # Dependencies
 
 - `git`

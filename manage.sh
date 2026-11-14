@@ -226,6 +226,16 @@ cmd_env() {
 	command -v rc.exe >/dev/null 2>&1 || [ -f "$SDK_BASE/bin/$SDK_VER/x64/rc.exe" ] \
 		&& ok "rc.exe" || warn "rc.exe 不在 PATH（lime 8.3+ 编资源要用）"
 	command -v python >/dev/null 2>&1 && ok "python" || warn "没有 python（只影响审计功能）"
+	# JS 运行时：源码随仓库来，静态库编译时自动生成
+	if [ -f "$QJS_SRC/quickjs.c" ]; then
+		if [ -f "$QJS_LIB" ]; then
+			ok "QuickJS-NG 源码 + 静态库（$(du -h "$QJS_LIB" | cut -f1)）"
+		else
+			ok "QuickJS-NG 源码（静态库还没编，第一次 build 会自动编）"
+		fi
+	else
+		bad "third_party/quickjs-ng 源码缺失（JS 脚本会编不过）"
+	fi
 	printf '\n'
 	[ "$BAD" -eq 0 ] && say "环境完整。" "Environment looks fine." || say "有 $BAD 项缺失。" "$BAD problem(s)."
 	return $([ "$BAD" -eq 0 ] && echo 0 || echo 1)
@@ -243,6 +253,10 @@ cmd_build() {
 		taskkill //F //IM PsychEngine.exe >/dev/null 2>&1
 		sleep 1
 	fi
+	# 引擎要链接 QuickJS-NG（JS 运行时）。源码在仓库里，静态库在本机编；
+	# 缺了或比源码旧就先编，编不出来就别往下走（否则链接阶段才炸，报错更难认）。
+	ensure_quickjs || return 1
+
 	if [ "$clean" = 1 ]; then
 		say "  清 obj/src" "  wiping obj/src"
 		rm -rf "export/$MODE/windows/obj" "export/$MODE/windows/src" 2>/dev/null
@@ -489,10 +503,41 @@ EOF
 # ---------------------------------------------------------------- QuickJS-NG
 # JS 运行时。源码在 third_party/quickjs-ng（自己 clone 进来的，不自动下载）。
 # 只需要三个 .c：这个 fork 把 cutils.c 并进 quickjs.c 了，没有独立的 cutils.c。
+# QuickJS-NG：源码已入库（third_party/quickjs-ng），只需要在本机编成静态库。
+# 引擎（source/jsruntime/QuickJSHandler.hx）通过 @:buildXml 链 build/quickjs-ng.lib。
+QJS_SRC="$ROOT/third_party/quickjs-ng"
+QJS_LIB="$QJS_SRC/build/quickjs-ng.lib"
+QJS_SOURCES="quickjs.c libregexp.c libunicode.c dtoa.c"
+
+# 静态库缺失，或任意一个源文件比它新 → 需要重编
+quickjs_stale() {
+	[ -f "$QJS_LIB" ] || return 0
+	local f
+	for f in $QJS_SOURCES; do
+		[ "$QJS_SRC/$f" -nt "$QJS_LIB" ] && return 0
+	done
+	return 1
+}
+
+# build 之前调用：缺了/旧了就编，已经最新就跳过
+ensure_quickjs() {
+	if ! [ -f "$QJS_SRC/quickjs.c" ]; then
+		bad "third_party/quickjs-ng/quickjs.c 不存在 —— 源码应该随仓库一起来，检查是不是没拉全"
+		return 1
+	fi
+	if quickjs_stale; then
+		say "  QuickJS-NG 需要（重新）编译" "  building QuickJS-NG static library"
+		cmd_quickjs || return 1
+	else
+		ok "QuickJS-NG 静态库已是最新（$(du -h "$QJS_LIB" | cut -f1)）"
+	fi
+	return 0
+}
+
 cmd_quickjs() {
-	local src="$ROOT/third_party/quickjs-ng"
+	local src="$QJS_SRC"
 	head_ "QuickJS-NG 静态库"
-	[ -f "$src/quickjs.c" ] || { bad "没有 third_party/quickjs-ng/quickjs.c（先 clone 源码）"; return 1; }
+	[ -f "$src/quickjs.c" ] || { bad "没有 third_party/quickjs-ng/quickjs.c —— 源码在仓库里，检查拉取是否完整"; return 1; }
 
 	setup_msvc >/dev/null || return 1
 
@@ -591,7 +636,7 @@ print_menu() {
 		printf '  7)  Repair libraries     haxelib install/set whatever is missing\n'
 		printf '  8)  Lua compat audit     function-name diff against an upstream tree\n'
 		printf '  9)  Rebuild import table regenerate the vanilla HScript import map\n'
-		printf ' 10)  Build QuickJS-NG     compile the JS runtime static library\n'
+		printf ' 10)  Build QuickJS-NG     rebuild the JS runtime static library (build does it too)\n'
 		printf '  0)  Quit\n'
 	else
 		printf '  1)  环境体检       Haxe / 库 / MSVC / SDK / rc.exe，只读不改\n'
@@ -603,7 +648,7 @@ print_menu() {
 		printf '  7)  补/修依赖库    缺哪个 haxelib 库就装/切哪个（要网络）\n'
 		printf '  8)  Lua 兼容审计   拿上游源码树当基准，比 add_callback 注册的函数名\n'
 		printf '  9)  重建 import 表 扫 source_vanilla 重生成 HScript 的 import 隔离表\n'
-		printf ' 10)  构建 QuickJS-NG 把 JS 运行时编成静态库（third_party/quickjs-ng）\n'
+		printf ' 10)  重建 QuickJS-NG  强制重编 JS 运行时静态库（平时编译会自动做）\n'
 		printf '  0)  退出\n'
 	fi
 	printf '\n  > '

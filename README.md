@@ -201,6 +201,9 @@ bash manage.sh --en 6   # 跳过菜单：只校验资产
 菜单里的功能：环境体检、编译 release / debug / 全量重编、铺素材并校验、只校验资产、
 补/修 haxelib 库、Lua 兼容审计、重建 vanilla 的 HScript import 表。
 
+编译前会自动检查并通过本机 MSVC 构建 `third_party/quickjs-ng`（JS 运行时的静态库，
+源码随仓库提交、产物不入库）。第一次编译或 QuickJS 源码变动时会多花十几秒，之后命中缓存直接跳过。
+
 编译产物 `export/<release|debug>/windows/bin/PsychEngine.exe`；编译日志在 `.cache/build-<mode>.log`。
 从零装环境（装 Haxe 本体）照 [docs/BUILDING.md](docs/BUILDING.md) 的上游步骤走一次，
 之后日常都交给 `manage.sh`。

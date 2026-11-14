@@ -29,15 +29,22 @@ import backend.MusicBeatState;
  * - runtime/context 是 C++ 文件级 static，不往 Dynamic 里塞裸指针（GC 会移动对象）。
  * - 错误只 trace + 写 testout/js_log.txt，不抛异常：一个脚本挂了不能带走整个游戏。
  */
+// 路径说明（写死层级看着丑，但没有更好的办法）：
+//   hxcpp 的编译/链接工作目录是 export/<mode>/windows/obj，
+//   生成的 .cpp 在 obj/src/jsruntime/ 下 —— 因此：
+//     libpath 相对 obj：../../../../third_party/quickjs-ng/build
+//     #include 相对 cpp：../../../../../../third_party/quickjs-ng/quickjs.h
+//   buildXml 的 <include> 在这个 hxcpp 版本里不会生成 -I（试过，无效），
+//   所以头文件只能用带引号的相对包含。
+//   好处：项目换目录、换机器都不用改，静态库由 manage.sh 在本机编。
 @:buildXml('
 <target id="haxe">
-	<include name="D:/FNF/FNF code/FNF-PE_RealQuickJs_Engine/third_party/quickjs-ng" />
-	<libpath name="D:/FNF/FNF code/FNF-PE_RealQuickJs_Engine/third_party/quickjs-ng/build" />
+	<libpath name="../../../../third_party/quickjs-ng/build" />
 	<lib name="quickjs-ng.lib" />
 </target>
 ')
 @:cppFileCode('
-#include "D:/FNF/FNF code/FNF-PE_RealQuickJs_Engine/third_party/quickjs-ng/quickjs.h"
+#include "../../../../../../third_party/quickjs-ng/quickjs.h"
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
