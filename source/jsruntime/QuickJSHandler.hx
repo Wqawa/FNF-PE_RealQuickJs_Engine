@@ -629,6 +629,13 @@ class QuickJSHandler
 		globalThis.startVideo = (f, sk, mid, lp, pl) => __h(224, f, sk, mid, lp, pl);
 		globalThis.precacheVideo = (f) => __h(225, f);
 		globalThis.startDialogue = (f, m) => __h(226, f, m);
+		globalThis.changePresence = (d, s, k, hs, e) => __h(227, d, s, k, hs, e);
+		globalThis.loadSong = (n, d) => __h(228, n, d) === "1";
+		// Lua 的 startTween 收的是 table；这里把对象序列化成 "x=100,angle=90" 再解析回去
+		globalThis.startTween = (t, v, vals, dur, ease) => __h(229, t, v,
+			(vals !== null && typeof vals === "object")
+				? Object.keys(vals).map(k => k + "=" + vals[k]).join(",")
+				: String(vals === undefined ? "" : vals), dur, ease) === "1";
 	';
 
 	/** 编号 → 实现。加函数只在这张表里加一行。 */
@@ -1886,6 +1893,47 @@ class QuickJSHandler
 				var dlg226 = cutscenes.DialogueBoxPsych.parseDialogue(Paths.json('$songPath226/$a'));
 				if (dlg226 == null) return '0';
 				PlayState.instance.startDialogue(dlg226, (b.length > 0) ? b : null);
+				return '1';
+
+
+			// ---- 227..229 Discord / loadSong / startTween
+			case 227: // changePresence
+				#if DISCORD_ALLOWED
+				backend.DiscordClient.changePresence(a,
+					(b.length > 0) ? b : null,
+					(c.length > 0) ? c : null,
+					truthy(d), fnum(e, 0));
+				#end
+				return '1';
+
+			case 228: // loadSong(name, difficulty)
+				var nm228:String = (a.length > 0) ? a : backend.Song.loadedSongName;
+				var diff228:Int = inum(b, -1);
+				if (diff228 == -1) diff228 = PlayState.storyDifficulty;
+				var poop228:String = backend.Highscore.formatSong(nm228, diff228);
+				PlayState.SONG = backend.Song.loadFromJson(poop228, nm228);
+				PlayState.storyDifficulty = diff228;
+				return '1';
+
+			case 229: // startTween(tag, vars, "x=100,angle=90", duration, ease)
+				var tgt229:Dynamic = LuaUtils.tweenPrepare(a, b);
+				if (tgt229 == null) return '0';
+				var props229:Dynamic = untyped {};
+				if (c.length > 0)
+				{
+					for (pair229 in c.split(','))
+					{
+						var kv229:Array<String> = pair229.split('=');
+						if (kv229.length != 2) continue;
+						Reflect.setField(props229, kv229[0].trim(), coerce(kv229[1].trim()));
+					}
+				}
+				var dur229:Float = fnum(d, 1);
+				if (dur229 <= 0) dur229 = 1;
+				tweenStore(a, FlxTween.tween(tgt229, props229, dur229, {
+					ease: LuaUtils.getTweenEaseByString(e),
+					onComplete: function(_) onTweenDone(a, b)
+				}));
 				return '1';
 
 			default:
