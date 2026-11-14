@@ -81,6 +81,9 @@ import states.TitleState;
 	// true = every single occurrence gets printed, useful when debugging
 	public var moreLuaErrors:Bool = false;
 
+	/** .js 脚本用哪个引擎跑：'troll' = 原来那个玩笑解释器，'quickjs' = QuickJS-NG */
+	public var jsEngine:String = 'troll';
+
 	// ------------------------------------------------------------------
 	// 版本差异开关（只影响本仓的 body 树，原版树不受影响）
 	// 全部默认 false = 保持 1.0.4 原本行为；打开才回退成 0.6.3 那套。
