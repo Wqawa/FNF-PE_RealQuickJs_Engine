@@ -173,19 +173,27 @@ class Main extends Sprite
 
 		// QuickJS-NG 链接自检（先只打印一次，确认静态库能链上）
 		trace('[quickjs-ng] smoke: ' + jsruntime.QuickJS.smokeTest());
-		if (jsruntime.QuickJSHandler.init()) {
-			jsruntime.QuickJSHandler.registerBasics();
+		// 自检放到 PlayState 里跑：getProperty('health') 只有 PlayState 才有意义，
+		// 主菜单阶段 health 根本不存在（拿到的会是 null）。
+		var jsProbed:Bool = false;
+		flixel.FlxG.signals.postUpdate.add(function() {
+			if (jsProbed) return;
+			var st:Dynamic = flixel.FlxG.state;
+			if (st == null) return;
+			var cn:Null<String> = Type.getClassName(Type.getClass(st));
+			if (cn == null || cn.indexOf('PlayState') < 0) return;
+			jsProbed = true;
+
+			if (!jsruntime.QuickJSHandler.init()) return;
 			jsruntime.QuickJSHandler.installHostFunctions();
-			jsruntime.QuickJSHandler.eval("trace('hello from js'); globalThis.__bridge = 'js-ok'; globalThis.__p = getProperty('health'); setProperty('health', '1.5'); globalThis.__h2 = getProperty('health');", "<bridge-test>");
+			jsruntime.QuickJSHandler.eval("globalThis.__p = getProperty('health');", "<probe>");
 			try {
 				sys.FileSystem.createDirectory('./testout');
 				var bf = sys.io.File.write('./testout/js_bridge.txt', false);
-				bf.writeString('trace=' + jsruntime.QuickJSHandler.globalString('__bridge')
-					+ ' getProperty=' + jsruntime.QuickJSHandler.globalString('__p')
-					+ ' afterSet=' + jsruntime.QuickJSHandler.globalString('__h2') + '\n');
+				bf.writeString('health=' + jsruntime.QuickJSHandler.globalString('__p') + '\n');
 				bf.close();
 			} catch (e:Dynamic) {}
-		}
+		});
 		addChild(new FlxGame(game.width, game.height, game.initialState, game.framerate, game.framerate, game.skipSplash, game.startFullscreen));
 
 		#if !mobile
