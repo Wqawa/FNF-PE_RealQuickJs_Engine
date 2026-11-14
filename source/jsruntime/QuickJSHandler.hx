@@ -572,6 +572,54 @@ class QuickJSHandler
 		globalThis.loadGraphic = (t, img, gx, gy) => __h(167, t, img, gx, gy) === "1";
 		globalThis.addAnimationByIndicesLoop = (t, n, p, i, f) => __h(168, t, n, p, i, f);
 		globalThis.addLuaText = (t) => __h(169, t) === "1";
+		globalThis.loadFrames = (t, img, ty) => __h(170, t, img, ty) === "1";
+		globalThis.loadMultipleFrames = (t, imgs) => __h(171, t, imgs) === "1";
+		globalThis.makeFlxAnimateSprite = (t, x, y, f) => __h(172, t, x, y, f);
+		globalThis.loadAnimateAtlas = (t, f, sj, aj) => __h(173, t, f, sj, aj);
+		globalThis.addAnimationBySymbol = (t, n, sym, fps, loop, mx) => __h(174, t, n, sym, fps, loop, mx) === "1";
+		globalThis.addAnimationBySymbolIndices = (t, n, sym, idx, fps, loop) => __h(175, t, n, sym, idx, fps, loop) === "1";
+		globalThis.addAnimation = (t, n, frames, fps, loop) => __h(176, t, n, frames, fps, loop);
+		globalThis.luaSpriteMakeGraphic = (t, w, h, c) => __h(177, t, w, h, c);
+		globalThis.luaSpriteAddAnimationByPrefix = (t, n, p, fps) => __h(178, t, n, p, fps);
+		globalThis.luaSpriteAddAnimationByIndices = (t, n, p, idx, fps) => __h(179, t, n, p, idx, fps);
+		globalThis.luaSpritePlayAnimation = (t, n, f) => __h(180, t, n, f);
+		globalThis.setLuaSpriteCamera = (t, c) => __h(181, t, c);
+		globalThis.setLuaSpriteScrollFactor = (t, x, y) => __h(182, t, x, y);
+		globalThis.getPropertyLuaSprite = (t, v) => __h(183, t, v);
+		globalThis.setPropertyLuaSprite = (t, v, val) => __h(184, t, v, val);
+		globalThis.addLuaScript = (f, ig) => __h(185, f, ig) === "1";
+		globalThis.removeLuaScript = (f) => __h(186, f) === "1";
+		globalThis.addHScript = (f, ig) => __h(187, f, ig) === "1";
+		globalThis.removeHScript = (f) => __h(188, f) === "1";
+		globalThis.isRunning = (f) => __h(189, f) === "1";
+		globalThis.getRunningScripts = () => __h(190).split(String.fromCharCode(1)).filter(s => s.length > 0);
+		globalThis.callScript = (s, f, a1) => __h(191, s, f, a1);
+		globalThis.callMethod = (f, a1) => __h(192, f, a1);
+		globalThis.callMethodFromClass = (c, m) => __h(193, c, m);
+		globalThis.createInstance = (c) => __h(194, c);
+		globalThis.getVar = (n) => __h(195, n);
+		globalThis.setVar = (n, v) => __h(196, n, v);
+		globalThis.getGlobalFromScript = (s, n) => __h(197, s, n);
+		globalThis.setGlobalFromScript = (s, n, v) => __h(198, s, n, v);
+		globalThis.addInstance = (c, tag) => __h(199, c, tag);
+		globalThis.instanceArg = (n) => __h(200, n);
+		globalThis.getShaderFloat = (o, p) => Number(__h(201, o, p));
+		globalThis.setShaderFloat = (o, p, v) => __h(202, o, p, v) === "1";
+		globalThis.getShaderInt = (o, p) => Number(__h(203, o, p));
+		globalThis.setShaderInt = (o, p, v) => __h(204, o, p, v) === "1";
+		globalThis.getShaderBool = (o, p) => __h(205, o, p) === "1";
+		globalThis.setShaderBool = (o, p, v) => __h(206, o, p, v) === "1";
+		globalThis.getShaderFloatArray = (o, p) => __h(207, o, p).split(String.fromCharCode(1)).map(Number);
+		globalThis.setShaderFloatArray = (o, p, v) => __h(208, o, p, Array.isArray(v) ? v.join(",") : v) === "1";
+		globalThis.getShaderIntArray = (o, p) => __h(209, o, p).split(String.fromCharCode(1)).map(Number);
+		globalThis.setShaderIntArray = (o, p, v) => __h(210, o, p, Array.isArray(v) ? v.join(",") : v) === "1";
+		globalThis.getShaderBoolArray = (o, p) => __h(211, o, p).split(String.fromCharCode(1)).map(s => s === "1");
+		globalThis.setShaderBoolArray = (o, p, v) => __h(212, o, p, Array.isArray(v) ? v.join(",") : v) === "1";
+		globalThis.setShaderSampler2D = (o, p, img) => __h(213, o, p, img) === "1";
+		globalThis.removeSpriteShader = (o) => __h(214, o) === "1";
+		globalThis.anyGamepadJustPressed = (n) => __h(215, n) === "1";
+		globalThis.anyGamepadPressed = (n) => __h(216, n) === "1";
+		globalThis.anyGamepadReleased = (n) => __h(217, n) === "1";
 	';
 
 	/** 编号 → 实现。加函数只在这张表里加一行。 */
@@ -1536,6 +1584,247 @@ class QuickJSHandler
 				inst169.add(o169);
 				return '1';
 
+
+			// ---- 170..176 图集 / FlxAnimate
+			case 170: // loadFrames(tag, image, spriteType)
+				var o170:Dynamic = LuaUtils.getObjectDirectly(a);
+				if (o170 == null || !Std.isOfType(o170, flixel.FlxSprite)) return '0';
+				LuaUtils.loadFrames(cast o170, b, (c.length > 0) ? c : 'auto');
+				return '1';
+
+			case 171: // loadMultipleFrames(tag, "a,b,c")
+				var o171:Dynamic = LuaUtils.getObjectDirectly(a);
+				if (o171 == null || !Std.isOfType(o171, flixel.FlxSprite)) return '0';
+				var sp171:flixel.FlxSprite = cast o171;
+				sp171.frames = Paths.getMultiAtlas(b.split(','));
+				return '1';
+
+			case 172: // makeFlxAnimateSprite(tag, x, y, folder)
+				var t172:String = a.replace('.', '');
+				var old172:Dynamic = vars().get(t172);
+				if (old172 != null)
+				{
+					old172.kill();
+					if (PlayState.instance != null) PlayState.instance.remove(old172);
+					try { old172.destroy(); } catch (e:Dynamic) {}
+				}
+				var anim172:psychlua.ModchartAnimateSprite = new psychlua.ModchartAnimateSprite(fnum(b, 0), fnum(c, 0));
+				if (d != null && d.length > 0) Paths.loadAnimateAtlas(anim172, d);
+				vars().set(t172, anim172);
+				anim172.active = true;
+				return '1';
+
+			case 173: // loadAnimateAtlas(tag, folderOrImg, spriteJson, animJson)
+				var o173:Dynamic = vars().get(a);
+				if (o173 == null) return '0';
+				Paths.loadAnimateAtlas(cast o173, b,
+					(c.length > 0) ? c : null, (d.length > 0) ? d : null);
+				return '1';
+
+			case 174: // addAnimationBySymbol(tag, name, symbol, fps, loop, matX)
+				var o174:Dynamic = vars().get(a);
+				if (o174 == null) return '0';
+				var fps174:Float = fnum(d, 24);
+				o174.anim.addBySymbol(b, c, fps174, truthy(e), fnum(f, 0), 0);
+				if (o174.anim.curSymbol == null) o174.anim.play(b, true);
+				return '1';
+
+			case 175: // addAnimationBySymbolIndices(tag, name, symbol, indices, fps, loop)
+				var o175:Dynamic = vars().get(a);
+				if (o175 == null) return '0';
+				var idxs175:Array<Int> = csvInts(d);
+				if (idxs175.length == 0) idxs175 = [0];
+				o175.anim.addBySymbolIndices(b, c, idxs175, fnum(e, 24), truthy(f));
+				return '1';
+
+			case 176: // addAnimation(tag, name, "0,1,2", fps, loop)
+				return Std.string(LuaUtils.addAnimByIndices(a, b, null, csvInts(c), fnum(d, 24), truthy(e)));
+
+			// ---- 177..184 luaSprite* 旧别名（DeprecatedFunctions.hx 那套）
+			case 177: // luaSpriteMakeGraphic
+				var o177:Dynamic = vars().get(a);
+				if (o177 == null) return '0';
+				o177.makeGraphic(inum(b, 1), inum(c, 1), CoolUtil.colorFromString(d), true);
+				return '1';
+
+			case 178:
+				var o178:Dynamic = vars().get(a);
+				if (o178 == null) return '0';
+				var fps178:Int = inum(d, 24);
+				o178.animation.addByPrefix(b, c, fps178, true);
+				if (o178.animation.curAnim == null) o178.animation.play(b, true);
+				return '1';
+
+			case 179:
+				var o179:Dynamic = vars().get(a);
+				if (o179 == null) return '0';
+				var idxs179:Array<Int> = csvInts(d);
+				if (idxs179.length == 0) return '0';
+				o179.animation.addByIndices(b, c, idxs179, '', inum(e, 24), true);
+				return '1';
+
+			case 180:
+				var o180:Dynamic = vars().get(a);
+				if (o180 == null) return '0';
+				o180.animation.play(b, truthy(c));
+				return '1';
+
+			case 181:
+				var o181:Dynamic = vars().get(a);
+				if (o181 == null) return '0';
+				o181.cameras = [LuaUtils.cameraFromString(b)];
+				return '1';
+
+			case 182:
+				var o182:Dynamic = vars().get(a);
+				if (o182 == null) return '0';
+				var sx182:Float = fnum(b, 1);
+				o182.scrollFactor.set(sx182, (c.length > 0) ? fnum(c, sx182) : sx182);
+				return '1';
+
+			case 183: // getPropertyLuaSprite(tag, variable)
+				var o183:Dynamic = vars().get(a);
+				if (o183 == null) return '';
+				return Std.string(LuaUtils.getVarInArray(o183, b));
+
+			case 184: // setPropertyLuaSprite(tag, variable, value)
+				var o184:Dynamic = vars().get(a);
+				if (o184 == null) return '0';
+				LuaUtils.setVarInArray(o184, b, coerce(c));
+				return '1';
+
+			// ---- 185..200 脚本管理（JS 单 context，语义按注释里那样简化）
+			case 185, 187: // addLuaScript / addHScript
+				var p185:String = resolveScript(a);
+				if (p185 == null) return '0';
+				return JSPlayer.loadFile(p185) ? '1' : '0';
+
+			case 186, 188: // removeLuaScript / removeHScript
+				// 单 context 卸不掉单个文件，只能整首换掉。照实说，不假装成功。
+				log('[warn] removeLuaScript/removeHScript: JS 共用一个 context，无法单独卸载 $a');
+				return '0';
+
+			case 189: // isRunning
+				var p189:String = resolveScript(a);
+				return JSPlayer.isLoaded(p189 != null ? p189 : a) ? '1' : '0';
+
+			case 190: // getRunningScripts
+				return JSPlayer.getLoadedFiles().join(String.fromCharCode(1));
+
+			case 191: // callScript(script, func, arg)
+				return QuickJSHandler.callGlobalStr(b, c) ? '1' : '0';
+
+			case 192: // callMethod(func, arg)
+				return QuickJSHandler.callGlobalStr(a, b) ? '1' : '0';
+
+			case 193: // callMethodFromClass(class, method)
+				var cls193:Dynamic = ScriptClassAliases.resolve(a);
+				if (cls193 == null) return '';
+				var fn193:Dynamic = Reflect.field(cls193, b);
+				if (fn193 == null || !Reflect.isFunction(fn193)) return '';
+				return Std.string(Reflect.callMethod(cls193, fn193, []));
+
+			case 194: // createInstance(class)
+				var cls194:Dynamic = ScriptClassAliases.resolve(a);
+				if (cls194 == null) return '';
+				var inst194:Dynamic = Type.createInstance(cls194, []);
+				if (inst194 == null) return '';
+				vars().set('instance_' + a.split('.').pop(), inst194);
+				return 'instance_' + a.split('.').pop();
+
+			case 195: // getVar
+				var v195:Dynamic = vars().get(a);
+				return (v195 != null) ? Std.string(v195) : '';
+
+			case 196: // setVar
+				vars().set(a, coerce(b));
+				return b;
+
+			case 197: // getGlobalFromScript（单 context，就是读全局）
+				return QuickJSHandler.globalString(b);
+
+			case 198: // setGlobalFromScript
+				QuickJSHandler.setGlobal(b, coerce(c));
+				return c;
+
+			case 199: // addInstance(class, tag)
+				var cls199:Dynamic = ScriptClassAliases.resolve(a);
+				if (cls199 == null) return '';
+				var inst199:Dynamic = Type.createInstance(cls199, []);
+				if (inst199 == null) return '';
+				vars().set((b.length > 0) ? b : a.split('.').pop(), inst199);
+				return (b.length > 0) ? b : a.split('.').pop();
+
+			case 200: // instanceArg
+				// Lua 用它把实例当参数传给 callMethod；JS 侧参数只能是字符串，
+				// 只能把 tag 传过去，脚本里自己 getVar 取回来
+				return a;
+
+			// ---- 201..214 Shader
+			case 201, 203, 205: // getShaderFloat / Int / Bool
+				var sh201:flixel.addons.display.FlxRuntimeShader = psychlua.ShaderFunctions.getShader(a);
+				if (sh201 == null) return '';
+				if (idx == 201) return Std.string(sh201.getFloat(b));
+				if (idx == 203) return Std.string(sh201.getInt(b));
+				return sh201.getBool(b) ? '1' : '0';
+
+			case 202, 204, 206: // setShaderFloat / Int / Bool
+				var sh202:flixel.addons.display.FlxRuntimeShader = psychlua.ShaderFunctions.getShader(a);
+				if (sh202 == null) return '0';
+				if (idx == 202) sh202.setFloat(b, fnum(c, 0));
+				else if (idx == 204) sh202.setInt(b, inum(c, 0));
+				else sh202.setBool(b, truthy(c));
+				return '1';
+
+			case 207, 209, 211: // getShader*Array
+				var sh207:flixel.addons.display.FlxRuntimeShader = psychlua.ShaderFunctions.getShader(a);
+				if (sh207 == null) return '';
+				var arr207:Array<Dynamic> = (idx == 207) ? cast sh207.getFloatArray(b)
+					: (idx == 209) ? cast sh207.getIntArray(b) : cast sh207.getBoolArray(b);
+				if (arr207 == null) return '';
+				var parts207:Array<String> = [];
+				for (v207 in arr207) parts207.push((idx == 211) ? (((v207 == true) ? '1' : '0')) : Std.string(v207));
+				return parts207.join(String.fromCharCode(1));
+
+			case 208, 210, 212: // setShader*Array（逗号分隔）
+				var sh208:flixel.addons.display.FlxRuntimeShader = psychlua.ShaderFunctions.getShader(a);
+				if (sh208 == null) return '0';
+				if (idx == 208) sh208.setFloatArray(b, csvFloats(c));
+				else if (idx == 210) sh208.setIntArray(b, csvInts(c));
+				else sh208.setBoolArray(b, csvBools(c));
+				return '1';
+
+			case 213: // setShaderSampler2D
+				var sh213:flixel.addons.display.FlxRuntimeShader = psychlua.ShaderFunctions.getShader(a);
+				if (sh213 == null) return '0';
+				var bmp213 = Paths.image(b);
+				if (bmp213 == null || bmp213.bitmap == null) return '0';
+				sh213.setSampler2D(c, bmp213.bitmap);
+				return '1';
+
+			case 214: // removeSpriteShader
+				var o214:Dynamic = LuaUtils.getObjectDirectly(a);
+				if (o214 == null) return '0';
+				o214.shader = null;
+				return '1';
+
+			// ---- 215..217 anyGamepad*（按名字查，跟 gamepad* 一样走反射；
+			// FlxGamepadManager.anyJustPressed 要的是枚举 id，不是字符串）
+			case 215, 216, 217:
+				for (i215 in 0...4)
+				{
+					var pad215:Dynamic = FlxG.gamepads.getByID(i215);
+					if (pad215 == null) continue;
+					var st215:Dynamic = switch (idx)
+					{
+						case 215: pad215.justPressed;
+						case 216: pad215.pressed;
+						default: pad215.justReleased;
+					}
+					if (Reflect.getProperty(st215, a) == true) return '1';
+				}
+				return '0';
+
 			default:
 				var m2:String = '[warn] 未实现的宿主函数编号 $idx (a=$a)';
 				Log.trace('[js] ' + m2, null);
@@ -1579,6 +1868,52 @@ class QuickJSHandler
 
 	// 返回强类型：用 Dynamic 访问 size / alignment 这类字段时，hxcpp 反射拿不到值
 	// （表现为 NaN 或 Invalid field），文本那批函数全得靠它
+	static function csvFloats(v:String):Array<Float>
+	{
+		var out:Array<Float> = [];
+		if (v == null) return out;
+		for (part in v.split(','))
+		{
+			var f:Null<Float> = Std.parseFloat(part.trim());
+			if (f != null) out.push(f);
+		}
+		return out;
+	}
+
+	static function csvInts(v:String):Array<Int>
+	{
+		var out:Array<Int> = [];
+		if (v == null) return out;
+		for (part in v.split(','))
+		{
+			var i:Null<Int> = Std.parseInt(part.trim());
+			if (i != null) out.push(i);
+		}
+		return out;
+	}
+
+	static function csvBools(v:String):Array<Bool>
+	{
+		var out:Array<Bool> = [];
+		if (v == null) return out;
+		for (part in v.split(',')) out.push(truthy(part));
+		return out;
+	}
+
+	/** 脚本名 → 实际路径（和 Lua 的 findScript 一个思路，先补扩展名再交给 Paths 找） */
+	static function resolveScript(path:String):String
+	{
+		if (path == null || path.length == 0) return null;
+		var direct:String = Paths.findScriptFile(path);
+		if (direct != null) return direct;
+		if (!path.toLowerCase().endsWith('.js'))
+		{
+			var withExt:String = Paths.findScriptFile(path + '.js');
+			if (withExt != null) return withExt;
+		}
+		return null;
+	}
+
 	static function textObj(tag:String):flixel.text.FlxText
 	{
 		if (tag == null) return null;

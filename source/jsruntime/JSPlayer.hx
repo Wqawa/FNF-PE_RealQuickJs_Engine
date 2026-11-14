@@ -118,6 +118,19 @@ class JSPlayer
 		QuickJSHandler.callGlobalStrNumNum('onTimerCompleted', tag, loops, loopsLeft);
 	}
 
+	/** 这个文件装过没有（脚本管理函数 isRunning 用） */
+	public static function isLoaded(path:String):Bool
+	{
+		if (path == null) return false;
+		if (loadedFiles.contains(path)) return true;
+		for (f in loadedFiles)
+			if (f.toLowerCase() == path.toLowerCase()) return true;
+		return false;
+	}
+
+	public static function getLoadedFiles():Array<String>
+		return loadedFiles.copy();
+
 	/** setOnScripts 同步：Lua 脚本能直接读 curBeat / score 这些，JS 也得有 */
 	public static function setGlobal(name:String, v:Dynamic):Void
 	{
