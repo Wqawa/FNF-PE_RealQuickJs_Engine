@@ -72,6 +72,36 @@ class QuickJSHandler
 {
 	public static inline var NAME:String = 'quickjs';
 
+	// ---------------------------------------------------------------- 文件日志
+	// trace 只往 stdout 走，双击启动的窗口没有控制台，等于全丢。
+	// 脚本相关的输出一律再写一份到 testout/js_log.txt，出问题能直接看。
+	static var LOG_PATH:String = './testout/js_log.txt';
+
+	public static function log(msg:String):Void
+	{
+		#if sys
+		try {
+			sys.FileSystem.createDirectory('./testout');
+			var f = sys.io.File.append(LOG_PATH, false);
+			f.writeString(msg + '\n');
+			f.close();
+		} catch (e:Dynamic) {}
+		#end
+	}
+
+	/** 每首歌开头清一次，免得日志越滚越长 */
+	public static function truncateLog(header:String):Void
+	{
+		#if sys
+		try {
+			sys.FileSystem.createDirectory('./testout');
+			var f = sys.io.File.write(LOG_PATH, false);
+			f.writeString(header + '\n');
+			f.close();
+		} catch (e:Dynamic) {}
+		#end
+	}
+
 	// ---------------------------------------------------------------- 生命周期
 	public static function init(memLimitMB:Int = 0):Bool
 	{
@@ -131,7 +161,12 @@ class QuickJSHandler
 			} else out = true;
 			JS_FreeValue(g_js_ctx, r);
 		');
-		if (!out) Log.trace('[js] eval failed in ' + chunkName + ': ' + lastError(), null);
+		if (!out)
+		{
+			var m:String = '[error] ' + chunkName + ': ' + lastError();
+			Log.trace('[js] ' + m, null);
+			log(m);
+		}
 		return out;
 	}
 
@@ -188,6 +223,12 @@ class QuickJSHandler
 			JS_FreeValue(g_js_ctx, f);
 			JS_FreeValue(g_js_ctx, g);
 		');
+		if (!ok && lastError().length > 0)
+		{
+			var m:String = '[error] ' + name + '(): ' + lastError();
+			Log.trace('[js] ' + m, null);
+			log(m);
+		}
 		return ok;
 	}
 
@@ -234,7 +275,9 @@ class QuickJSHandler
 		try {
 			return dispatchInner(idx, a, b, c, d);
 		} catch (e:Dynamic) {
-			Log.trace('[js] 宿主函数异常 idx=$idx a=$a b=$b : ' + Std.string(e), null);
+			var m:String = '[error] host idx=$idx a=$a b=$b : ' + Std.string(e);
+			Log.trace('[js] ' + m, null);
+			log(m);
 			return '';
 		}
 	}
@@ -243,6 +286,11 @@ class QuickJSHandler
 	{
 		switch (idx)
 		{
+			case -1: // trace / console.log
+				Log.trace('[js] ' + a, null);
+				log(a);
+				return '';
+
 			case 0: // getProperty
 				var split:Array<String> = a.split('.');
 				var v:Dynamic = (split.length > 1)
@@ -321,7 +369,9 @@ class QuickJSHandler
 				return '1';
 
 			default:
-				Log.trace('[js] 未实现的宿主函数编号 $idx', null);
+				var m2:String = '[warn] 未实现的宿主函数编号 $idx (a=$a)';
+				Log.trace('[js] ' + m2, null);
+				log(m2);
 				return '';
 		}
 	}

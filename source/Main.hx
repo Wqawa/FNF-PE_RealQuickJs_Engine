@@ -185,6 +185,9 @@ class Main extends Sprite
 			var cn:Null<String> = Type.getClassName(Type.getClass(st));
 			if (cn == null || cn.indexOf('PlayState') < 0) return;
 			jsProbed = true;
+			// 有真脚本在跑时别再插手：这段探针会往同一个 context 里 eval、
+			// 还会把 camZooming 设成 false，混在业务脚本里只会让人以为脚本有毛病。
+			if (jsruntime.JSPlayer.active) return;
 
 			if (!jsruntime.QuickJSHandler.init()) return;
 			jsruntime.QuickJSHandler.installHostFunctions();

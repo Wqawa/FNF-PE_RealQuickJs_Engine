@@ -29,6 +29,7 @@ class JSPlayer
 		posted = false;
 		loadedFiles = [];
 
+		QuickJSHandler.truncateLog('[js] song start, engine=' + ClientPrefs.data.jsEngine);
 		if (ClientPrefs.data.jsEngine != 'QuickJS') return;
 		// 128MB 上限：mod 脚本正常用不到，跑飞的分配会在这里被掐掉
 		if (!QuickJSHandler.init(128)) return;
@@ -41,10 +42,15 @@ class JSPlayer
 	{
 		if (!active) return false;
 		if (loadedFiles.contains(path)) return true;
-		if (!QuickJSHandler.evalFile(path)) return false;
+		if (!QuickJSHandler.evalFile(path))
+		{
+			QuickJSHandler.log('[error] load failed: ' + path + ' -- ' + QuickJSHandler.lastError());
+			return false;
+		}
 		loadedFiles.push(path);
 		loadedAny = true;
 		Log.trace('[js] loaded $path', null);
+		QuickJSHandler.log('[load] ' + path);
 		return true;
 	}
 
