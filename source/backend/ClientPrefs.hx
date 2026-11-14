@@ -81,6 +81,9 @@ import states.TitleState;
 	// true = every single occurrence gets printed, useful when debugging
 	public var moreLuaErrors:Bool = false;
 
+	/** HScript 报错上不上屏幕。关着就只写 testout/js_log.txt */
+	public var hscriptErrors:Bool = false;
+
 	/** .js 脚本用哪个引擎跑：'troll' = 原来那个玩笑解释器，'quickjs' = QuickJS-NG */
 	public var jsEngine:String = 'Troll';
 

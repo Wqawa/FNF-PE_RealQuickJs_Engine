@@ -2501,21 +2501,36 @@ class PlayState extends MusicBeatState
 	public function initHScript(file:String)
 	{
 		var newScript:HScript = null;
+
+		// manualRun：先只建解释器。脚本本身跑挂时实例还能留住并进 hscriptArray，
+		// 不会像以前那样 —— 构造里 execute 抛出来，对象引用丢了，却在
+		// Iris.instances 里留一个没人管的僵尸（catch 里那句 get(file) 因为 Iris
+		// 会给重名实例加 _1 后缀，基本永远取不到）。
 		try
 		{
-			newScript = new HScript(null, file);
-			if (newScript.exists('onCreate')) newScript.call('onCreate');
-			trace('initialized hscript interp successfully: $file');
-			LuaUtils.logScriptSource('hscript', file, newScript.modFolder);
-			hscriptArray.push(newScript);
+			newScript = new HScript(null, file, null, true);
 		}
 		catch(e:IrisError)
 		{
+			// 连解释器都建不出来（preset 阶段就炸），这种确实没得救
 			var pos:HScriptInfos = cast {fileName: file, showLine: false};
 			Iris.error(Printer.errorToString(e, false), pos);
-			var newScript:HScript = cast (Iris.instances.get(file), HScript);
-			if(newScript != null)
-				newScript.destroy();
+			return;
+		}
+
+		hscriptArray.push(newScript);
+
+		try
+		{
+			newScript.execute();
+			if (newScript.exists('onCreate')) newScript.call('onCreate');
+			trace('initialized hscript interp successfully: $file');
+			LuaUtils.logScriptSource('hscript', file, newScript.modFolder);
+		}
+		catch(e:IrisError)
+		{
+			// 走实例自己的上报口，受 "Show HScript Errors" 开关和去重控制
+			newScript.reportError(Printer.errorToString(e, false));
 		}
 	}
 	#end

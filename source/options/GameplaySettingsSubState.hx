@@ -129,6 +129,12 @@ class GameplaySettingsSubState extends BaseOptionsMenu
 			BOOL);
 		addOption(option);
 
+		var option:Option = new Option('Show HScript Errors',
+			'If checked, HScript errors show on screen.\nUnchecked, they only go to testout/js_log.txt.',
+			'hscriptErrors',
+			BOOL);
+		addOption(option);
+
 		super();
 	}
 

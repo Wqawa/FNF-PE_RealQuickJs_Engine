@@ -287,7 +287,10 @@ class ScriptClassAliases
 			if(van != null) return van;
 		}
 
-		return Type.resolveClass(className);
+		// 带点的全名直接查；裸名再按包列表猜一遍。
+		// （addHaxeLibrary / getPropertyFromClass 都走这里，裸名要能猜出来）
+		if(className.indexOf('.') > -1) return Type.resolveClass(className);
+		return resolveDeep(className);
 	}
 
 	/**

@@ -33,14 +33,14 @@ class HScript extends Iris implements IScriptHost
 	public var returnValue:Dynamic;
 	public var closed:Bool = false;
 
-	#if LUA_ALLOWED
-	public var parentLua:FunkinLua;
-
-	/** 同一个脚本的同一个错误只报一次，见 reportHaxeError() */
+	/** 同一个脚本的同一个错误只报一次，见 reportHaxeError() / reportError() */
 	static var reportedHaxeErrors:Map<String, Bool> = new Map<String, Bool>();
 
 	public static function resetErrorLog():Void
 		reportedHaxeErrors = new Map<String, Bool>();
+
+	#if LUA_ALLOWED
+	public var parentLua:FunkinLua;
 
 	/**
 	 * 报一条 HScript 错误。
@@ -96,12 +96,11 @@ class HScript extends Iris implements IScriptHost
 		} catch(e:Dynamic) {}
 		#end
 
-		// 屏幕上是否显示，对齐 0.6.3：那边 runHaxeCode 的 catch 走 luaTrace，
-		// 而 luaTrace 只在 luaDebugMode 打开时才输出 —— 所以同一个坏脚本在
-		// 0.6.3 上"一条报错都没有"，不是没出错，是错误通道默认关着。
-		// 这里照做：平时只留日志文件，要看就开 luaDebugMode。
-		var debugMode:Bool = false;
-		if(parent != null)
+		// 屏幕上是否显示：Gameplay Settings 的 "Show HScript Errors"，或者脚本自己
+		// 开了 luaDebugMode。都关着就只留日志文件 —— 对齐 0.6.3（那边的 luaTrace
+		// 默认就不输出，所以同一个坏脚本在 0.6.3 上"一条报错都没有"）。
+		var debugMode:Bool = ClientPrefs.data.hscriptErrors;
+		if(!debugMode && parent != null)
 		{
 			try { debugMode = parent.get('luaDebugMode') == true; } catch(e:Dynamic) {}
 		}
@@ -196,6 +195,7 @@ class HScript extends Iris implements IScriptHost
 		var customInterp:CustomInterp = new CustomInterp();
 		customInterp.parentInstance = currentGame();
 		customInterp.showPosOnLog = false;
+		customInterp.owner = this;
 		this.interp = customInterp;
 		#if LUA_ALLOWED
 		parentLua = parent;
@@ -528,7 +528,7 @@ class HScript extends Iris implements IScriptHost
 		if (funcToRun == null || interp == null) return null;
 
 		if (!exists(funcToRun)) {
-			Iris.error('No function named: $funcToRun', this.interp.posInfos());
+			reportError('No function named: $funcToRun', funcToRun);
 			return null;
 		}
 
@@ -538,29 +538,20 @@ class HScript extends Iris implements IScriptHost
 			return {funName: funcToRun, signature: func, returnValue: ret};
 		}
 		catch(e:IrisError) {
-			var pos:HScriptInfos = cast this.interp.posInfos();
-			pos.funcName = funcToRun;
-			#if LUA_ALLOWED
-			if (parentLua != null)
-			{
-				pos.isLua = true;
-				if (parentLua.lastCalledFunction != '') pos.funcName = parentLua.lastCalledFunction;
-			}
-			#end
-			Iris.error(Printer.errorToString(e, false), pos);
+			reportError(Printer.errorToString(e, false), calledFrom());
 		}
 		catch (e:ValueException) {
-			var pos:HScriptInfos = cast this.interp.posInfos();
-			pos.funcName = funcToRun;
-			#if LUA_ALLOWED
-			if (parentLua != null)
-			{
-				pos.isLua = true;
-				if (parentLua.lastCalledFunction != '') pos.funcName = parentLua.lastCalledFunction;
-			}
-			#end
-			Iris.error('$e', pos);
+			reportError('$e', calledFrom());
 		}
+		return null;
+	}
+
+	/** 出错时报"谁调的"：优先 Lua 那边正在跑的回调名 */
+	function calledFrom():String
+	{
+		#if LUA_ALLOWED
+		if (parentLua != null && parentLua.lastCalledFunction != '') return parentLua.lastCalledFunction;
+		#end
 		return null;
 	}
 
@@ -577,6 +568,45 @@ class HScript extends Iris implements IScriptHost
 	public function scriptId():String return origin;
 	public function scriptMod():String return modFolder;
 	public function isClosed():Bool return closed;
+
+	/**
+	 * 这个实例自己报的错（不是 runHaxeCode 那种外面包着的），统一走这里，
+	 * 才能受 "Show HScript Errors" 开关控制。挂在 Lua 下面就用 parentLua 的
+	 * 脚本名和去重表；独立 .hx 脚本直接进 Iris。
+	 */
+	public function reportError(message:String, ?funcName:String):Void
+	{
+		#if LUA_ALLOWED
+		if (parentLua != null)
+		{
+			reportHaxeError(parentLua, message, funcName);
+			return;
+		}
+		#end
+
+		// 独立 .hx 脚本：没有 Lua 那边可以借，按脚本路径自己兜一份
+		var key:String = (origin != null ? origin : 'HScript') + '|' + message;
+		if(!ClientPrefs.data.moreLuaErrors)
+		{
+			if(reportedHaxeErrors.exists(key)) return;
+			reportedHaxeErrors.set(key, true);
+		}
+
+		#if sys
+		try {
+			sys.FileSystem.createDirectory('./testout');
+			var f = sys.io.File.append('./testout/js_log.txt', false);
+			f.writeString('[hscript] ' + key + '\n');
+			f.close();
+		} catch(e:Dynamic) {}
+		#end
+
+		if(!ClientPrefs.data.hscriptErrors) return;
+
+		var pos:HScriptInfos = cast {fileName: origin != null ? origin : 'HScript', showLine: false};
+		if(funcName != null && funcName != '') pos.funcName = funcName;
+		Iris.error(message, interp != null ? interp.posInfos() : pos);
+	}
 
 	/**
 	 * 脚本该看到的「当前这一局」。
@@ -674,6 +704,9 @@ class CustomInterp extends crowplexus.hscript.Interp
 {
 	public var parentInstance(default, set):Dynamic = [];
 	private var _instanceFields:Array<String>;
+
+	/** 出错了要报到谁那里去（决定走不走 "Show HScript Errors" 开关） */
+	public var owner:HScript = null;
 	function set_parentInstance(inst:Dynamic):Dynamic
 	{
 		parentInstance = inst;
@@ -701,7 +734,9 @@ class CustomInterp extends crowplexus.hscript.Interp
 		var f = get(o, funcToRun);
 
 		if (f == null) {
-			Iris.error('Tried to call null function $funcToRun', posInfos());
+			// 和 runHaxeCode 的错误走同一个出口，不然这里会绕过开关直接刷屏
+			if (owner != null) owner.reportError('Tried to call null function $funcToRun', funcToRun);
+			else Iris.error('Tried to call null function $funcToRun', posInfos());
 			return null;
 		}
 
