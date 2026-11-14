@@ -191,14 +191,20 @@ class Main extends Sprite
 				+ "setProperty('camZooming', 'false');"
 				+ "globalThis.__b = getProperty('camZooming');"
 				+ "globalThis.__c = getPropertyFromClass('ClientPrefs', 'downScroll');"
-				+ "globalThis.__d = playSound('scrollMenu', '0.5');", "<probe>");
+				+ "globalThis.__d = playSound('scrollMenu', '0.5');"
+				+ "globalThis.__e = makeLuaSprite('__probeSpr', 'menuDesat', '100', '100');"
+				+ "globalThis.__f = addLuaSprite('__probeSpr', 'false');"
+				+ "globalThis.__g = setObjectCamera('__probeSpr', 'hud');", "<probe>");
 			try {
 				sys.FileSystem.createDirectory('./testout');
 				var bf = sys.io.File.write('./testout/js_bridge.txt', false);
 				bf.writeString('health=' + jsruntime.QuickJSHandler.globalString('__a')
 					+ ' camZooming=' + jsruntime.QuickJSHandler.globalString('__b')
 					+ ' downScroll=' + jsruntime.QuickJSHandler.globalString('__c')
-					+ ' playSound=' + jsruntime.QuickJSHandler.globalString('__d') + '\n');
+					+ ' playSound=' + jsruntime.QuickJSHandler.globalString('__d')
+					+ ' makeSprite=' + jsruntime.QuickJSHandler.globalString('__e')
+					+ ' addSprite=' + jsruntime.QuickJSHandler.globalString('__f')
+					+ ' setCam=' + jsruntime.QuickJSHandler.globalString('__g') + '\n');
 				bf.close();
 			} catch (e:Dynamic) {}
 		});

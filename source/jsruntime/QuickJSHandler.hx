@@ -5,6 +5,8 @@ import psychlua.LuaUtils;
 import backend.Paths;
 import backend.ScriptClassAliases;
 import flixel.FlxG;
+import states.PlayState;
+import backend.MusicBeatState;
 
 /**
  * QuickJS-NG 运行时 + JS↔Haxe 桥。
@@ -40,7 +42,7 @@ static JSRuntime *g_js_rt = nullptr;
 static JSContext *g_js_ctx = nullptr;
 static char g_js_err[1024];
 
-typedef ::String (*qjs_host_fn)(int, ::String, ::String, ::String);
+typedef ::String (*qjs_host_fn)(int, ::String, ::String, ::String, ::String);
 static qjs_host_fn g_host = nullptr;
 
 static JSValue qjs_trace(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv) {
@@ -55,14 +57,14 @@ static JSValue qjs_host(JSContext *ctx, JSValueConst this_val, int argc, JSValue
 	int idx = 0;
 	if (argc > 0) JS_ToInt32(ctx, &idx, argv[0]);
 
-	char buf[3][1024];
+	char buf[4][1024];
 	memset(buf, 0, sizeof(buf));
-	for (int i = 1; i <= 3 && i < argc; i++) {
+	for (int i = 1; i <= 4 && i < argc; i++) {
 		const char *s = JS_ToCString(ctx, argv[i]);
 		if (s != nullptr) { snprintf(buf[i - 1], 1024, "%s", s); JS_FreeCString(ctx, s); }
 	}
 
-	::String r = g_host ? g_host(idx, ::String(buf[0]), ::String(buf[1]), ::String(buf[2])) : ::String("");
+	::String r = g_host ? g_host(idx, ::String(buf[0]), ::String(buf[1]), ::String(buf[2]), ::String(buf[3])) : ::String("");
 	return JS_NewString(ctx, r.utf8_str());
 }
 ')
@@ -185,17 +187,23 @@ class QuickJSHandler
 	 * 编号必须和下面 hostDispatch 的 case 一一对应。
 	 */
 	static inline var WRAPPERS:String = '
-		const __h = (i, a, b, c) => __host(i, a === undefined ? "" : String(a), b === undefined ? "" : String(b), c === undefined ? "" : String(c));
+		const __h = (i, a, b, c, d) => __host(i, a === undefined ? "" : String(a), b === undefined ? "" : String(b), c === undefined ? "" : String(c), d === undefined ? "" : String(d));
 		globalThis.trace = (m) => __h(-1, m);
 		globalThis.getProperty = (v) => __h(0, v);
 		globalThis.setProperty = (v, val) => __h(1, v, val);
 		globalThis.getPropertyFromClass = (c, v) => __h(2, c, v);
 		globalThis.setPropertyFromClass = (c, v, val) => __h(3, c, v, val);
 		globalThis.playSound = (name, vol) => __h(4, name, vol);
+		globalThis.makeLuaSprite = (tag, img, x, y) => __h(5, tag, img, x, y);
+		globalThis.makeAnimatedLuaSprite = (tag, img, x, y) => __h(6, tag, img, x, y);
+		globalThis.addLuaSprite = (tag, front) => __h(7, tag, front);
+		globalThis.addAnimationByPrefix = (tag, name, prefix, fps) => __h(8, tag, name, prefix, fps);
+		globalThis.objectPlayAnimation = (tag, name, forced) => __h(9, tag, name, forced);
+		globalThis.setObjectCamera = (tag, cam) => __h(10, tag, cam);
 	';
 
 	/** 编号 → 实现。加函数只在这张表里加一行。 */
-	@:keep static function hostDispatch(idx:Int, a:String, b:String, c:String):String
+	@:keep static function hostDispatch(idx:Int, a:String, b:String, c:String, d:String):String
 	{
 		switch (idx)
 		{
@@ -234,6 +242,46 @@ class QuickJSHandler
 				}
 				return '0';
 
+			case 5, 6: // makeLuaSprite / makeAnimatedLuaSprite
+				var x:Float = (c.length > 0) ? Std.parseFloat(c) : 0;
+				var y:Float = (d.length > 0) ? Std.parseFloat(d) : 0;
+				if (Math.isNaN(x)) x = 0;
+				if (Math.isNaN(y)) y = 0;
+				var spr = new psychlua.ModchartSprite(x, y);
+				if (b.length > 0)
+				{
+					if (idx == 5) spr.loadGraphic(Paths.image(b));
+					else LuaUtils.loadFrames(spr, b, 'auto');
+				}
+				MusicBeatState.getVariables().set(a, spr);
+				return '1';
+
+			case 7: // addLuaSprite
+				var spr7:Dynamic = MusicBeatState.getVariables().get(a);
+				if (spr7 == null) return '0';
+				PlayState.instance.add(spr7);
+				return '1';
+
+			case 8: // addAnimationByPrefix
+				var o8:Dynamic = LuaUtils.getObjectDirectly(a);
+				if (o8 == null) return '0';
+				var fps:Int = (d.length > 0) ? Std.parseInt(d) : 24;
+				if (fps <= 0) fps = 24;
+				o8.animation.addByPrefix(b, c, fps, true);
+				return '1';
+
+			case 9: // objectPlayAnimation
+				var o9:Dynamic = LuaUtils.getObjectDirectly(a);
+				if (o9 == null) return '0';
+				o9.animation.play(b, true);
+				return '1';
+
+			case 10: // setObjectCamera
+				var o10:Dynamic = LuaUtils.getObjectDirectly(a);
+				if (o10 == null) return '0';
+				o10.cameras = [b == 'hud' ? PlayState.instance.camHUD : PlayState.instance.camGame];
+				return '1';
+
 			default:
 				Log.trace('[js] 未实现的宿主函数编号 $idx', null);
 				return '';
@@ -248,7 +296,7 @@ class QuickJSHandler
 		untyped __cpp__('g_host = (qjs_host_fn)::jsruntime::QuickJSHandler_obj::hostDispatch;');
 		untyped __cpp__('
 			JSValue g = JS_GetGlobalObject(g_js_ctx);
-			JS_SetPropertyStr(g_js_ctx, g, "__host", JS_NewCFunction(g_js_ctx, qjs_host, "__host", 4));
+			JS_SetPropertyStr(g_js_ctx, g, "__host", JS_NewCFunction(g_js_ctx, qjs_host, "__host", 5));
 			JS_SetPropertyStr(g_js_ctx, g, "console", JS_NewObject(g_js_ctx));
 			JS_FreeValue(g_js_ctx, g);
 		');
