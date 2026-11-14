@@ -72,7 +72,7 @@ class HScript extends Iris implements IScriptHost
 			var diag:String = '';
 			var g:Dynamic = PlayState.instance;
 			if(g != null)
-				diag = '  [game=' + Type.getClassName(Type.getClass(g)) + ' bf=' + (g.boyfriend != null) + ' dad=' + (g.dad != null) + ']';
+				diag = '  [game=' + Type.getClassName(Type.getClass(g)) + ' bf=' + (g.boyfriend != null) + ' dad=' + (g.dad != null) + ' gf=' + (g.gf != null) + ']';
 
 			var hsGame:Dynamic = null;
 			if(parent != null && parent.hscript != null)
@@ -88,7 +88,6 @@ class HScript extends Iris implements IScriptHost
 				diag += ' [hsGame=' + Type.getClassName(Type.getClass(hsGame))
 					+ ' same=' + (hsGame == g)
 					+ ' bf=' + (bf != null)
-					// 如果 bf 在、但这里拿不到 setColorTransform，就是 DCE 把方法裁了
 					+ ' bfHasSCT=' + (bf != null && Reflect.field(bf, 'setColorTransform') != null) + ']';
 			}
 
@@ -96,6 +95,17 @@ class HScript extends Iris implements IScriptHost
 			f.close();
 		} catch(e:Dynamic) {}
 		#end
+
+		// 屏幕上是否显示，对齐 0.6.3：那边 runHaxeCode 的 catch 走 luaTrace，
+		// 而 luaTrace 只在 luaDebugMode 打开时才输出 —— 所以同一个坏脚本在
+		// 0.6.3 上"一条报错都没有"，不是没出错，是错误通道默认关着。
+		// 这里照做：平时只留日志文件，要看就开 luaDebugMode。
+		var debugMode:Bool = false;
+		if(parent != null)
+		{
+			try { debugMode = parent.get('luaDebugMode') == true; } catch(e:Dynamic) {}
+		}
+		if(!debugMode) return;
 
 		var pos:HScriptInfos = cast {fileName: parent != null ? parent.scriptName : 'HScript', isLua: true, showLine: false};
 		if(funcName != null && funcName != '') pos.funcName = funcName;
