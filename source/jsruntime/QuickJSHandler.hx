@@ -2,16 +2,25 @@ package jsruntime;
 
 import haxe.Log;
 import psychlua.LuaUtils;
+import backend.Paths;
+import backend.ScriptClassAliases;
+import flixel.FlxG;
 
 /**
  * QuickJS-NG 运行时 + JS↔Haxe 桥。
  *
- * 设计要点：
- * - runtime/context 是 C++ 文件级 static，不往 Haxe 的 Dynamic 里塞裸指针（GC 会移动对象）。
- * - 桥接用「每个 JS 函数一条专用 trampoline + 一个 Haxe 静态函数指针」。
- *   不走 JS_SetOpaque 存函数名 —— 那条路对 CFunction 不可靠（class id 对不上就取不到）。
- * - C 里引用 Haxe 静态函数只能在方法体里取地址（@:cppFileCode 在类定义之前，写不了 QuickJSHandler_obj）。
- * - 一切错误只 trace，不抛异常：一个脚本死了不能带走整个游戏。
+ * 桥接形态：「单 trampoline + 函数编号」。
+ *   JS 侧:  __host(idx, a, b, c)   ← 由 Haxe 一次性 eval 出来的 wrapper 调
+ *   C  侧:  qjs_host 读编号和三个字符串，回调 Haxe 的 hostDispatch
+ *   Haxe:   按编号查表
+ * 这样加函数只改 Haxe 表 + WRAPPERS 字符串，不用碰 C。
+ *
+ * 之前用过「每函数一条 trampoline」和「JS_SetOpaque 存函数名」，都不划算：
+ * 前者代码量爆炸，后者对 CFunction 不可靠（class id 对不上就读不到）。
+ *
+ * 其它约定：
+ * - runtime/context 是 C++ 文件级 static，不往 Dynamic 里塞裸指针（GC 会移动对象）。
+ * - 错误只 trace，不抛异常：一个脚本挂了不能带走整个游戏。
  */
 @:buildXml('
 <target id="haxe">
@@ -31,11 +40,8 @@ static JSRuntime *g_js_rt = nullptr;
 static JSContext *g_js_ctx = nullptr;
 static char g_js_err[1024];
 
-// Haxe 侧塞进来的函数指针（在 installHostFunctions 里取地址）
-typedef ::String (*qjs_get_fn)(::String);
-typedef ::String (*qjs_set_fn)(::String, ::String);
-static qjs_get_fn g_host_get = nullptr;
-static qjs_set_fn g_host_set = nullptr;
+typedef ::String (*qjs_host_fn)(int, ::String, ::String, ::String);
+static qjs_host_fn g_host = nullptr;
 
 static JSValue qjs_trace(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv) {
 	const char *s = (argc > 0) ? JS_ToCString(ctx, argv[0]) : nullptr;
@@ -44,21 +50,19 @@ static JSValue qjs_trace(JSContext *ctx, JSValueConst this_val, int argc, JSValu
 	return JS_UNDEFINED;
 }
 
-static JSValue qjs_getProperty(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv) {
-	const char *s = (argc > 0) ? JS_ToCString(ctx, argv[0]) : nullptr;
-	::String key(s ? s : "");
-	if (s != nullptr) JS_FreeCString(ctx, s);
-	::String r = g_host_get ? g_host_get(key) : ::String("");
-	return JS_NewString(ctx, r.utf8_str());
-}
+// 唯一的宿主入口：argv[0] = 函数编号，argv[1..3] = 字符串参数
+static JSValue qjs_host(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv) {
+	int idx = 0;
+	if (argc > 0) JS_ToInt32(ctx, &idx, argv[0]);
 
-static JSValue qjs_setProperty(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv) {
-	const char *s1 = (argc > 0) ? JS_ToCString(ctx, argv[0]) : nullptr;
-	const char *s2 = (argc > 1) ? JS_ToCString(ctx, argv[1]) : nullptr;
-	::String k(s1 ? s1 : ""), v(s2 ? s2 : "");
-	if (s1 != nullptr) JS_FreeCString(ctx, s1);
-	if (s2 != nullptr) JS_FreeCString(ctx, s2);
-	::String r = g_host_set ? g_host_set(k, v) : ::String("");
+	char buf[3][1024];
+	memset(buf, 0, sizeof(buf));
+	for (int i = 1; i <= 3 && i < argc; i++) {
+		const char *s = JS_ToCString(ctx, argv[i]);
+		if (s != nullptr) { snprintf(buf[i - 1], 1024, "%s", s); JS_FreeCString(ctx, s); }
+	}
+
+	::String r = g_host ? g_host(idx, ::String(buf[0]), ::String(buf[1]), ::String(buf[2])) : ::String("");
 	return JS_NewString(ctx, r.utf8_str());
 }
 ')
@@ -159,7 +163,7 @@ class QuickJSHandler
 		return out;
 	}
 
-	// ---------------------------------------------------------------- 宿主函数
+	// ---------------------------------------------------------------- 宿主函数表
 	/** 字符串 → 数字 / 布尔 / null / 原字符串 */
 	@:keep static function coerce(v:String):Dynamic
 	{
@@ -176,39 +180,78 @@ class QuickJSHandler
 		return v;
 	}
 
-	/** getProperty(variable)：反射走 LuaUtils，和 Lua 完全同一条路 */
-	@:keep static function hostGet(a:String):String
+	/**
+	 * JS 侧包装：全部走 __host(编号, a, b, c)。
+	 * 编号必须和下面 hostDispatch 的 case 一一对应。
+	 */
+	static inline var WRAPPERS:String = '
+		const __h = (i, a, b, c) => __host(i, a === undefined ? "" : String(a), b === undefined ? "" : String(b), c === undefined ? "" : String(c));
+		globalThis.trace = (m) => __h(-1, m);
+		globalThis.getProperty = (v) => __h(0, v);
+		globalThis.setProperty = (v, val) => __h(1, v, val);
+		globalThis.getPropertyFromClass = (c, v) => __h(2, c, v);
+		globalThis.setPropertyFromClass = (c, v, val) => __h(3, c, v, val);
+		globalThis.playSound = (name, vol) => __h(4, name, vol);
+	';
+
+	/** 编号 → 实现。加函数只在这张表里加一行。 */
+	@:keep static function hostDispatch(idx:Int, a:String, b:String, c:String):String
 	{
-		var split:Array<String> = a.split('.');
-		var v:Dynamic = (split.length > 1)
-			? LuaUtils.getVarInArray(LuaUtils.getPropertyLoop(split, true), split[split.length - 1])
-			: LuaUtils.getVarInArray(LuaUtils.getTargetInstance(), a);
-		return Std.string(v);
+		switch (idx)
+		{
+			case 0: // getProperty
+				var split:Array<String> = a.split('.');
+				var v:Dynamic = (split.length > 1)
+					? LuaUtils.getVarInArray(LuaUtils.getPropertyLoop(split, true), split[split.length - 1])
+					: LuaUtils.getVarInArray(LuaUtils.getTargetInstance(), a);
+				return Std.string(v);
+
+			case 1: // setProperty
+				var split:Array<String> = a.split('.');
+				if (split.length > 1)
+					LuaUtils.setVarInArray(LuaUtils.getPropertyLoop(split, true), split[split.length - 1], coerce(b));
+				else
+					LuaUtils.setVarInArray(LuaUtils.getTargetInstance(), a, coerce(b));
+				return b;
+
+			case 2: // getPropertyFromClass
+				var cls:Dynamic = ScriptClassAliases.resolve(a);
+				return Std.string(LuaUtils.getVarInArray(cls, b));
+
+			case 3: // setPropertyFromClass
+				var cls:Dynamic = ScriptClassAliases.resolve(a);
+				LuaUtils.setVarInArray(cls, b, coerce(c));
+				return c;
+
+			case 4: // playSound
+				var snd = Paths.sound(a);
+				if (snd != null)
+				{
+					var vol:Float = (b.length > 0) ? Std.parseFloat(b) : 1;
+					if (Math.isNaN(vol)) vol = 1;
+					FlxG.sound.play(snd, vol);
+					return '1';
+				}
+				return '0';
+
+			default:
+				Log.trace('[js] 未实现的宿主函数编号 $idx', null);
+				return '';
+		}
 	}
 
-	@:keep static function hostSet(a:String, b:String):String
-	{
-		var split:Array<String> = a.split('.');
-		if (split.length > 1)
-			LuaUtils.setVarInArray(LuaUtils.getPropertyLoop(split, true), split[split.length - 1], coerce(b));
-		else
-			LuaUtils.setVarInArray(LuaUtils.getTargetInstance(), a, coerce(b));
-		return b;
-	}
-
-	/** 注册 trace / getProperty / setProperty */
+	/** 注册 trace + 所有包装函数（一次 eval 搞定） */
 	public static function installHostFunctions():Void
 	{
 		if (!isReady() && !init()) return;
 		// 取地址必须在方法体里：此处 QuickJSHandler_obj 已经定义
-		untyped __cpp__('g_host_get = (qjs_get_fn)::jsruntime::QuickJSHandler_obj::hostGet;');
-		untyped __cpp__('g_host_set = (qjs_set_fn)::jsruntime::QuickJSHandler_obj::hostSet;');
+		untyped __cpp__('g_host = (qjs_host_fn)::jsruntime::QuickJSHandler_obj::hostDispatch;');
 		untyped __cpp__('
 			JSValue g = JS_GetGlobalObject(g_js_ctx);
-			JS_SetPropertyStr(g_js_ctx, g, "trace", JS_NewCFunction(g_js_ctx, qjs_trace, "trace", 1));
-			JS_SetPropertyStr(g_js_ctx, g, "getProperty", JS_NewCFunction(g_js_ctx, qjs_getProperty, "getProperty", 1));
-			JS_SetPropertyStr(g_js_ctx, g, "setProperty", JS_NewCFunction(g_js_ctx, qjs_setProperty, "setProperty", 2));
+			JS_SetPropertyStr(g_js_ctx, g, "__host", JS_NewCFunction(g_js_ctx, qjs_host, "__host", 4));
+			JS_SetPropertyStr(g_js_ctx, g, "console", JS_NewObject(g_js_ctx));
 			JS_FreeValue(g_js_ctx, g);
 		');
+		eval(WRAPPERS + '\nconsole.log = trace;', '<wrappers>');
 	}
 }

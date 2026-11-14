@@ -186,11 +186,19 @@ class Main extends Sprite
 
 			if (!jsruntime.QuickJSHandler.init()) return;
 			jsruntime.QuickJSHandler.installHostFunctions();
-			jsruntime.QuickJSHandler.eval("globalThis.__p = getProperty('health');", "<probe>");
+			jsruntime.QuickJSHandler.eval(
+				"globalThis.__a = getProperty('health');"
+				+ "setProperty('camZooming', 'false');"
+				+ "globalThis.__b = getProperty('camZooming');"
+				+ "globalThis.__c = getPropertyFromClass('ClientPrefs', 'downScroll');"
+				+ "globalThis.__d = playSound('scrollMenu', '0.5');", "<probe>");
 			try {
 				sys.FileSystem.createDirectory('./testout');
 				var bf = sys.io.File.write('./testout/js_bridge.txt', false);
-				bf.writeString('health=' + jsruntime.QuickJSHandler.globalString('__p') + '\n');
+				bf.writeString('health=' + jsruntime.QuickJSHandler.globalString('__a')
+					+ ' camZooming=' + jsruntime.QuickJSHandler.globalString('__b')
+					+ ' downScroll=' + jsruntime.QuickJSHandler.globalString('__c')
+					+ ' playSound=' + jsruntime.QuickJSHandler.globalString('__d') + '\n');
 				bf.close();
 			} catch (e:Dynamic) {}
 		});
