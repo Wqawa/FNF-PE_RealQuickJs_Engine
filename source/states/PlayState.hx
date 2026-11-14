@@ -1103,6 +1103,9 @@ class PlayState extends MusicBeatState
 				stagesFunc(function(stage:BaseStage) stage.countdownTick(tick, swagCounter));
 				callOnLuas('onCountdownTick', [swagCounter]);
 				callOnHScript('onCountdownTick', [tick, swagCounter]);
+				#if LUA_ALLOWED
+				jsruntime.JSPlayer.forward('onCountdownTick', [swagCounter]);
+				#end
 
 				swagCounter += 1;
 			}, 5);
@@ -2292,6 +2295,9 @@ class PlayState extends MusicBeatState
 		}
 
 		#if LUA_ALLOWED
+		// JS 脚本共用一个 context，onDestroy 发一次就行；放在 stop 之前，
+		// 让脚本还能调 setProperty 之类的收尾函数
+		jsruntime.JSPlayer.forward('onDestroy', []);
 		for (lua in luaArray)
 		{
 			lua.call('onDestroy', []);
@@ -2503,6 +2509,14 @@ class PlayState extends MusicBeatState
 	public function callOnScripts(funcToCall:String, args:Array<Dynamic> = null, ignoreStops = false, exclusions:Array<String> = null, excludeValues:Array<Dynamic> = null):Dynamic {
 		var returnVal:Dynamic = LuaUtils.Function_Continue;
 		if(args == null) args = [];
+
+		// 事件顺带转给 JS 脚本一份。放在这里而不是每处调用点，是因为
+		// onUpdate / onUpdatePost / onBeatHit / onStepHit / onSongStart … 全走这个入口，
+		// 一处转发就够，不会漏。jsEngine 不是 QuickJS 时是空转。
+		#if LUA_ALLOWED
+		jsruntime.JSPlayer.forward(funcToCall, args);
+		#end
+
 		if(exclusions == null) exclusions = [];
 		if(excludeValues == null) excludeValues = [LuaUtils.Function_Continue];
 

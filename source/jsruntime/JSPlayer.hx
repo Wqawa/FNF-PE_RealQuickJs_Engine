@@ -9,6 +9,9 @@ import haxe.Log;
  * 它按 Gameplay → JS Engine 分流：QuickJS 就交给这里的 loadFile()，
  * 否则还是原来那套转译成 Lua 的玩笑解释器。
  *
+ * 回调走 PlayState.callOnScripts() 那条主路 —— 那边每处事件都已经在调它，
+ * 在这里转发一份给 JS，就不用往 PlayState 里到处插钩子，也不会漏。
+ *
  * context 一首歌一换：上一首的 onCreatePost / 全局变量留着的话，
  * 下一首会被莫名其妙地再调一遍，所以 beginSong() 先 dispose 再重建。
  */
@@ -17,7 +20,6 @@ class JSPlayer
 	public static var active:Bool = false;
 	public static var loadedAny:Bool = false;
 
-	static var posted:Bool = false;
 	static var loadedFiles:Array<String> = [];
 
 	/** PlayState.create() 里、扫脚本之前调一次。 */
@@ -26,7 +28,6 @@ class JSPlayer
 		QuickJSHandler.dispose();
 		active = false;
 		loadedAny = false;
-		posted = false;
 		loadedFiles = [];
 
 		QuickJSHandler.truncateLog('[js] song start, engine=' + ClientPrefs.data.jsEngine);
@@ -54,16 +55,51 @@ class JSPlayer
 		return true;
 	}
 
-	/** 每帧调一次。第一个 update 才发 onCreatePost，保证所有脚本都 eval 完。 */
+	/** 每帧调一次：只推 Promise / microtask，回调本身由 callOnScripts 转过来。 */
 	public static function update():Void
 	{
 		if (!active) return;
-		if (!posted)
-		{
-			posted = true;
-			QuickJSHandler.callGlobal('onCreatePost');
-		}
-		QuickJSHandler.callGlobal('onUpdatePost');
 		QuickJSHandler.pump();
+	}
+
+	/**
+	 * PlayState.callOnScripts() 转发过来的事件。
+	 * 脚本里没定义这个函数时是空转（callGlobal 会先查是不是函数）。
+	 */
+	public static function forward(name:String, args:Array<Dynamic>):Void
+	{
+		if (!active) return;
+
+		if (args == null || args.length == 0)
+		{
+			QuickJSHandler.callGlobal(name);
+			return;
+		}
+
+		var a:Dynamic = args[0];
+		if (a == null)
+		{
+			QuickJSHandler.callGlobal(name);
+			return;
+		}
+
+		if (Std.isOfType(a, Int) || Std.isOfType(a, Float))
+			QuickJSHandler.callGlobalNum(name, cast a);
+		else
+			QuickJSHandler.callGlobalStr(name, Std.string(a));
+	}
+
+	/** runTimer 的回调：onTimerCompleted(tag, loopsLeft) */
+	public static function onTimerCompleted(tag:String, loops:Int, loopsLeft:Int):Void
+	{
+		if (!active) return;
+		QuickJSHandler.callGlobalStrNum('onTimerCompleted', tag, loopsLeft);
+	}
+
+	/** doTween* 的回调：onTweenCompleted(tag, vars) */
+	public static function onTweenCompleted(tag:String, vars:String):Void
+	{
+		if (!active) return;
+		QuickJSHandler.callGlobalStrStr('onTweenCompleted', tag, vars);
 	}
 }
