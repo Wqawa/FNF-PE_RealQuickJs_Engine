@@ -620,6 +620,15 @@ class QuickJSHandler
 		globalThis.anyGamepadJustPressed = (n) => __h(215, n) === "1";
 		globalThis.anyGamepadPressed = (n) => __h(216, n) === "1";
 		globalThis.anyGamepadReleased = (n) => __h(217, n) === "1";
+		globalThis.saveFile = (p, c, a) => __h(218, p, c, a) === "1";
+		globalThis.deleteFile = (p, ig, a) => __h(219, p, ig, a) === "1";
+		globalThis.directoryFileList = (f) => __h(220, f).split(String.fromCharCode(1)).filter(s => s.length > 0);
+		globalThis.openCustomSubstate = (n, p) => __h(221, n, p);
+		globalThis.closeCustomSubstate = () => __h(222);
+		globalThis.insertToCustomSubstate = (t, i) => __h(223, t, i);
+		globalThis.startVideo = (f, sk, mid, lp, pl) => __h(224, f, sk, mid, lp, pl);
+		globalThis.precacheVideo = (f) => __h(225, f);
+		globalThis.startDialogue = (f, m) => __h(226, f, m);
 	';
 
 	/** 编号 → 实现。加函数只在这张表里加一行。 */
@@ -1824,6 +1833,60 @@ class QuickJSHandler
 					if (Reflect.getProperty(st215, a) == true) return '1';
 				}
 				return '0';
+
+
+			// ---- 218..226 文件 / 自定义子界面 / 视频对话
+			case 218: // saveFile(path, content, absolute)
+				try {
+					var p218:String = truthy(c) ? a : Paths.mods(a);
+					sys.io.File.saveContent(p218, b);
+					return '1';
+				} catch (e:Dynamic) { log('[error] saveFile: ' + Std.string(e)); return '0'; }
+
+			case 219: // deleteFile(path, ignoreModFolders, absolute)
+				try {
+					var p219:String = truthy(c) ? a : Paths.getPath(a);
+					if (sys.FileSystem.exists(p219))
+					{
+						sys.FileSystem.deleteFile(p219);
+						return '1';
+					}
+					return '0';
+				} catch (e:Dynamic) { log('[error] deleteFile: ' + Std.string(e)); return '0'; }
+
+			case 220: // directoryFileList(folder)
+				if (!sys.FileSystem.exists(a)) return '';
+				return sys.FileSystem.readDirectory(a).join(String.fromCharCode(1));
+
+			case 221: // openCustomSubstate(name, pause)
+				psychlua.CustomSubstate.openCustomSubstate(a, truthy(b));
+				return '1';
+
+			case 222: // closeCustomSubstate
+				psychlua.CustomSubstate.closeCustomSubstate();
+				return '1';
+
+			case 223: // insertToCustomSubstate(tag, pos)
+				psychlua.CustomSubstate.insertToCustomSubstate(a, inum(b, -1));
+				return '1';
+
+			case 224: // startVideo(file, canSkip, forMidSong, shouldLoop, playOnLoad)
+				if (PlayState.instance == null) return '0';
+				if (!sys.FileSystem.exists(Paths.video(a))) return '0';
+				PlayState.instance.startVideo(a, truthy(c), truthy(b), truthy(d), truthy(e));
+				return '1';
+
+			case 225: // precacheVideo
+				Paths.video(a);
+				return '1';
+
+			case 226: // startDialogue(file, music)
+				if (PlayState.instance == null) return '0';
+				var songPath226:String = Paths.formatToSongPath(backend.Song.loadedSongName);
+				var dlg226 = cutscenes.DialogueBoxPsych.parseDialogue(Paths.json('$songPath226/$a'));
+				if (dlg226 == null) return '0';
+				PlayState.instance.startDialogue(dlg226, (b.length > 0) ? b : null);
+				return '1';
 
 			default:
 				var m2:String = '[warn] 未实现的宿主函数编号 $idx (a=$a)';
