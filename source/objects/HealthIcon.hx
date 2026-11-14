@@ -5,6 +5,9 @@ class HealthIcon extends FlxSprite
 	public var sprTracker:FlxSprite;
 	private var isPlayer:Bool = false;
 	private var char:String = '';
+	// 图标是按「图片名」缓存的，而不同 mod 的同一角色图片名一模一样（都是 icons/bf）。
+	// 只比 char 的话，编辑器里换 mod 之后图标会一直用上一个 mod 的图。
+	private var loadedMod:String = '~';
 
 	public function new(char:String = 'face', isPlayer:Bool = false, ?allowGPU:Bool = true)
 	{
@@ -24,7 +27,11 @@ class HealthIcon extends FlxSprite
 
 	private var iconOffsets:Array<Float> = [0, 0];
 	public function changeIcon(char:String, ?allowGPU:Bool = true) {
-		if(this.char != char) {
+		var curMod:String = Mods.currentModDirectory;
+		if(curMod == null) curMod = '';
+		if(this.char != char || this.loadedMod != curMod) {
+			if(animation != null && this.char.length > 0 && animation.exists(this.char))
+				animation.remove(this.char);
 			var name:String = 'icons/' + char;
 			if(!Paths.fileExists('images/' + name + '.png', IMAGE)) name = 'icons/icon-' + char; //Older versions of psych engine's support
 			if(!Paths.fileExists('images/' + name + '.png', IMAGE)) name = 'icons/icon-face'; //Prevents crash from missing icon
@@ -56,6 +63,7 @@ class HealthIcon extends FlxSprite
 				animation.add(char, [for(i in 0...frames.frames.length) i], 0, false, isPlayer);
 			animation.play(char);
 			this.char = char;
+			this.loadedMod = curMod;
 
 			// 旧版行为：1.0.4 只在对手按键时才刷新图标的“被打”帧，
 			// 所以 Change Character 事件换完人，图标还是普通脸，状态没同步。
