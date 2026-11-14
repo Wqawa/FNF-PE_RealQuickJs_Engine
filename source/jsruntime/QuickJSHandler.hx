@@ -22,6 +22,15 @@ import haxe.Log;
 #include "D:/FNF/FNF code/FNF-PE_RealQuickJs_Engine/third_party/quickjs-ng/quickjs.h"
 #include <cstdio>
 #include <cstdlib>
+#include <haxe/Log.h>
+
+// JS 侧的 trace()：把字符串交给 Haxe 的 Log.trace
+static JSValue qjs_trace(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv) {
+	const char *s = (argc > 0) ? JS_ToCString(ctx, argv[0]) : nullptr;
+	::haxe::Log_obj::trace(::String(s ? s : ""), null());
+	if (s != nullptr) JS_FreeCString(ctx, s);
+	return JS_UNDEFINED;
+}
 
 static JSRuntime *g_js_rt = nullptr;
 static JSContext *g_js_ctx = nullptr;
@@ -47,6 +56,17 @@ class QuickJSHandler
 			ok = (g_js_ctx != nullptr);
 		');
 		return ok;
+	}
+
+	/** 注册 JS 侧的基础函数。现在只有 trace，用来验证 JS→C→Haxe 这条链路。 */
+	public static function registerBasics():Void
+	{
+		if (!isReady() && !init()) return;
+		untyped __cpp__('
+			JSValue g = JS_GetGlobalObject(g_js_ctx);
+			JS_SetPropertyStr(g_js_ctx, g, "trace", JS_NewCFunction(g_js_ctx, qjs_trace, "trace", 1));
+			JS_FreeValue(g_js_ctx, g);
+		');
 	}
 
 	public static function isReady():Bool
@@ -103,6 +123,24 @@ class QuickJSHandler
 			JSContext *c = nullptr;
 			while (JS_ExecutePendingJob(g_js_rt, &c) > 0) { }
 		');
+	}
+
+	/** 读一个全局变量的字符串值（用来从 JS 侧取回结果，避免依赖控制台） */
+	public static function globalString(name:String):String
+	{
+		if (!isReady()) return '';
+		var out:String = '';
+		untyped __cpp__('
+			JSValue g = JS_GetGlobalObject(g_js_ctx);
+			JSValue v = JS_GetPropertyStr(g_js_ctx, g, name.utf8_str());
+			if (!JS_IsUndefined(v)) {
+				const char *cs = JS_ToCString(g_js_ctx, v);
+				if (cs != nullptr) { out = ::String(cs); JS_FreeCString(g_js_ctx, cs); }
+			}
+			JS_FreeValue(g_js_ctx, v);
+			JS_FreeValue(g_js_ctx, g);
+		');
+		return out;
 	}
 
 	public static function dispose():Void

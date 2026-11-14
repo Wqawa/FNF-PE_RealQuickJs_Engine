@@ -173,6 +173,16 @@ class Main extends Sprite
 
 		// QuickJS-NG 链接自检（先只打印一次，确认静态库能链上）
 		trace('[quickjs-ng] smoke: ' + jsruntime.QuickJS.smokeTest());
+		if (jsruntime.QuickJSHandler.init()) {
+			jsruntime.QuickJSHandler.registerBasics();
+			jsruntime.QuickJSHandler.eval("trace('hello from js'); globalThis.__bridge = 'js-ok';", "<bridge-test>");
+			try {
+				sys.FileSystem.createDirectory('./testout');
+				var bf = sys.io.File.write('./testout/js_bridge.txt', false);
+				bf.writeString('trace=' + jsruntime.QuickJSHandler.globalString('__bridge') + '\n');
+				bf.close();
+			} catch (e:Dynamic) {}
+		}
 		addChild(new FlxGame(game.width, game.height, game.initialState, game.framerate, game.framerate, game.skipSplash, game.startFullscreen));
 
 		#if !mobile
