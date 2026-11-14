@@ -957,6 +957,15 @@ class FunkinJS
 		#if MODS_ALLOWED
 		if(!FileSystem.exists(jsPath)) return null;
 
+		// Gameplay → JS Engine 选了 QuickJS 就走真运行时，不转译、不进 Lua 解释器。
+		// 以前这里无条件下面的 transpile，所以任何带 `+` 拼接的 JS 都会变成
+		// 「unexpected symbol near '+'」——报错还挂着 "lua script"，很容易看错。
+		if(ClientPrefs.data.jsEngine == 'QuickJS')
+		{
+			jsruntime.JSPlayer.loadFile(jsPath);
+			return null;
+		}
+
 		for (script in states.PlayState.instance.luaArray)
 			if(script.scriptName == jsPath) return null;
 

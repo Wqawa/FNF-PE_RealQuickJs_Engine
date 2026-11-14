@@ -1,64 +1,62 @@
 package jsruntime;
 
-import backend.Mods;
-import backend.Paths;
 import haxe.Log;
 
 /**
- * 把 .js 脚本装进 PlayState。
+ * .js 脚本的运行期状态：每首歌一个干净的 QuickJS context。
  *
- * 只做三件事：
- *   1. 进歌时按当前 mod 找 data/<歌名>/*.js 和 scripts/*.js，逐个 eval
- *   2. 跑 onCreatePost / onUpdatePost 两个回调（其余回调走同一机制后补）
- *   3. 每帧 pump() 让 Promise 能动
+ * 装载入口在 psychlua.FunkinJS.start()（PlayState 扫到 .js 就调它），
+ * 它按 Gameplay → JS Engine 分流：QuickJS 就交给这里的 loadFile()，
+ * 否则还是原来那套转译成 Lua 的玩笑解释器。
  *
- * 不碰原来那套玩笑解释器：只有 ClientPrefs.data.jsEngine == 'QuickJS' 才会走到这里。
+ * context 一首歌一换：上一首的 onCreatePost / 全局变量留着的话，
+ * 下一首会被莫名其妙地再调一遍，所以 beginSong() 先 dispose 再重建。
  */
 class JSPlayer
 {
 	public static var active:Bool = false;
-	static var loaded:Bool = false;
+	public static var loadedAny:Bool = false;
 
-	public static function reset():Void
+	static var posted:Bool = false;
+	static var loadedFiles:Array<String> = [];
+
+	/** PlayState.create() 里、扫脚本之前调一次。 */
+	public static function beginSong():Void
 	{
+		QuickJSHandler.dispose();
 		active = false;
-		loaded = false;
-	}
+		loadedAny = false;
+		posted = false;
+		loadedFiles = [];
 
-	/** 进歌时调一次。song 是 SONG.song（文件名不带扩展）。 */
-	public static function load(song:String):Void
-	{
 		if (ClientPrefs.data.jsEngine != 'QuickJS') return;
+		// 128MB 上限：mod 脚本正常用不到，跑飞的分配会在这里被掐掉
 		if (!QuickJSHandler.init(128)) return;
 		QuickJSHandler.installHostFunctions();
-
-		var root:String = Paths.mods(Mods.currentModDirectory + '/');
-		var dirs:Array<String> = [
-			root + 'data/' + song,
-			root + 'scripts'
-		];
-
-		var count:Int = 0;
-		for (dir in dirs)
-		{
-			if (!sys.FileSystem.exists(dir) || !sys.FileSystem.isDirectory(dir)) continue;
-			for (f in sys.FileSystem.readDirectory(dir))
-			{
-				if (!f.endsWith('.js')) continue;
-				if (QuickJSHandler.evalFile(dir + '/' + f)) count++;
-			}
-		}
-
 		active = true;
-		loaded = count > 0;
-		if (loaded) Log.trace('[js] 已装载 $count 个脚本（$song）', null);
-		QuickJSHandler.callGlobal('onCreatePost');
 	}
 
-	/** 每帧调一次 */
+	/** 装一个 .js 文件。同一份脚本不会重复 eval。 */
+	public static function loadFile(path:String):Bool
+	{
+		if (!active) return false;
+		if (loadedFiles.contains(path)) return true;
+		if (!QuickJSHandler.evalFile(path)) return false;
+		loadedFiles.push(path);
+		loadedAny = true;
+		Log.trace('[js] loaded $path', null);
+		return true;
+	}
+
+	/** 每帧调一次。第一个 update 才发 onCreatePost，保证所有脚本都 eval 完。 */
 	public static function update():Void
 	{
 		if (!active) return;
+		if (!posted)
+		{
+			posted = true;
+			QuickJSHandler.callGlobal('onCreatePost');
+		}
 		QuickJSHandler.callGlobal('onUpdatePost');
 		QuickJSHandler.pump();
 	}

@@ -459,6 +459,10 @@ class PlayState extends MusicBeatState
 		}
 		
 		#if (LUA_ALLOWED || HSCRIPT_ALLOWED)
+		// JS 运行时每首歌换一个干净的 context（上一首的回调不能带到这一首）。
+		// jsEngine 不是 QuickJS 时这一步什么都不做。
+		jsruntime.JSPlayer.beginSong();
+
 		// "SCRIPTS FOLDER" SCRIPTS
 		for (folder in Mods.directoriesWithFile(Paths.getSharedPath(), 'scripts/'))
 			for (file in FileSystem.readDirectory(folder))

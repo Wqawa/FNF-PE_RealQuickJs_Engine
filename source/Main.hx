@@ -210,10 +210,6 @@ class Main extends Sprite
 				bf.close();
 			} catch (e:Dynamic) {}
 
-			// 真正装载这首歌的 .js（只有设置里选了 QuickJS 才会执行）
-			var songField:Dynamic = Reflect.getProperty(st, 'SONG');
-			var songName:String = (songField != null) ? Std.string(Reflect.getProperty(songField, 'song')) : '';
-			jsruntime.JSPlayer.load(songName);
 		});
 		addChild(new FlxGame(game.width, game.height, game.initialState, game.framerate, game.framerate, game.skipSplash, game.startFullscreen));
 
