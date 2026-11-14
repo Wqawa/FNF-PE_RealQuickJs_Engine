@@ -42,7 +42,8 @@ typedef ::String (*qjs_host4_fn)(::String, ::String, ::String, ::String);
 static qjs_host4_fn g_host4 = nullptr;
 
 static JSValue qjs_call4(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv) {
-	const char *fn = (const char *)JS_GetOpaque(this_val, 1);
+	// 必须用对象自己的 class id：写死 1 拿不到 opaque，函数名就是空的 → 分发直接落空
+	const char *fn = (const char *)JS_GetOpaque(this_val, JS_GetClassID(this_val));
 	char a[1024] = "", b[1024] = "", c[1024] = "";
 	char *dst[3] = { a, b, c };
 	for (int i = 0; i < 3 && i < argc; i++) {
