@@ -32,6 +32,13 @@ class GameplaySettingsSubState extends BaseOptionsMenu
 			BOOL);
 		addOption(option);
 		
+		var option:Option = new Option('JS Engine',
+			"Which engine runs .js scripts in mods.\nTroll = the joke 'interpreter' that has always been there,\nQuickJS = the real QuickJS-NG runtime.",
+			'jsEngine',
+			STRING,
+			['Troll', 'QuickJS']);
+		addOption(option);
+
 		var option:Option = new Option('Auto Pause',
 			"If checked, the game automatically pauses if the screen isn't on focus.",
 			'autoPause',

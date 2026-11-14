@@ -82,7 +82,7 @@ import states.TitleState;
 	public var moreLuaErrors:Bool = false;
 
 	/** .js 脚本用哪个引擎跑：'troll' = 原来那个玩笑解释器，'quickjs' = QuickJS-NG */
-	public var jsEngine:String = 'troll';
+	public var jsEngine:String = 'Troll';
 
 	// ------------------------------------------------------------------
 	// 版本差异开关（只影响本仓的 body 树，原版树不受影响）
