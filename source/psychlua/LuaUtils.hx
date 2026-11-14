@@ -27,6 +27,31 @@ class LuaUtils
 	public static final Function_StopHScript:String = "##PSYCHLUA_FUNCTIONSTOPHSCRIPT";
 	public static final Function_StopAll:String = "##PSYCHLUA_FUNCTIONSTOPALL";
 
+	/**
+	 * 脚本加载时打一条"这脚本是谁的"，三个通道走同一个格式，方便事后 grep：
+	 *
+	 *   [script] lua      mod=estll      mods/body/estll/scripts/a.lua
+	 *   [script] hscript  mod=<global>   mods/body/scripts/b.hx
+	 *   [script] js->lua  mod=NYA        mods/body/NYA/scripts/c.js
+	 *
+	 * `<global>` 表示不在任何 mod 里（mods/body/scripts/ 根目录、shared、assets）。
+	 * 日志进 testout/js_log.txt，每首歌开头清一次（JSPlayer.beginSong）。
+	 */
+	public static function logScriptSource(channel:String, path:String, mod:String):Void
+	{
+		var owner:String = (mod == null || mod.length == 0) ? '<global>' : mod;
+		var line:String = '[script] ' + channel + '  mod=' + owner + '  ' + path;
+		trace(line);
+		#if sys
+		try {
+			sys.FileSystem.createDirectory('./testout');
+			var f = sys.io.File.append('./testout/js_log.txt', false);
+			f.writeString(line + '\n');
+			f.close();
+		} catch (e:Dynamic) {}
+		#end
+	}
+
 	public static function getLuaTween(options:Dynamic)
 	{
 		return (options != null) ? {

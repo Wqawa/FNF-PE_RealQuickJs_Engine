@@ -592,6 +592,49 @@ class Paths
 	}
 	#end
 
+	/**
+	 * 从脚本路径反推它属于哪个 mod，推不出来就 null。
+	 *
+	 * 上游 Psych 的写法是 `path.split('/')[0] + '/' == Paths.mods()`，前提是 mods
+	 * 目录扁平（mods/<mod>/）。这版在 mods/ 和 mod 名之间插了一层版本目录
+	 * （mods/body/<mod>/、mods/global/<mod>/），于是 'mods/' 永远不等于
+	 * 'mods/body/'，Lua 和 HScript 两边的 modFolder 一直是 null —— 脚本里读到的
+	 * modFolder、getModSetting，以及所有拿 modFolder 去拼的相对路径全废。
+	 *
+	 * 顺带处理 findScriptFile 走 applicationDirectory 兜底时给出的绝对路径。
+	 */
+	public static function modFromScriptPath(path:String):String
+	{
+		if(path == null || path.length == 0) return null;
+
+		var p:String = path.replace('\\', '/');
+
+		// 绝对路径只留 mods/ 之后的部分
+		var idx:Int = p.indexOf('/mods/');
+		if(idx >= 0) p = p.substr(idx + 1);
+		else if(!StringTools.startsWith(p, 'mods/')) return null;
+
+		var rest:String = null;
+		var globalPrefix:String = 'mods/global/';
+		var versionPrefix:String = 'mods/$VERSION_DIR/';
+
+		if(StringTools.startsWith(p, globalPrefix)) rest = p.substr(globalPrefix.length);
+		else if(StringTools.startsWith(p, versionPrefix)) rest = p.substr(versionPrefix.length);
+		else if(StringTools.startsWith(p, 'mods/')) rest = p.substr(5); // 老结构：mods/<mod>/...
+
+		if(rest == null) return null;
+
+		var slash:Int = rest.indexOf('/');
+		if(slash <= 0) return null;
+
+		// mods/body/scripts/ 这种是全局脚本目录，不是某个 mod
+		var name:String = rest.substr(0, slash);
+		if(Mods.ignoreModFolders.contains(name.toLowerCase())) return null;
+		if(name == Mods.currentModDirectory) return name;
+		if(Mods.getGlobalMods().contains(name)) return name;
+		return null;
+	}
+
 	#if flxanimate
 	public static function loadAnimateAtlas(spr:FlxAnimate, folderOrImg:Dynamic, spriteJson:Dynamic = null, animationJson:Dynamic = null)
 	{

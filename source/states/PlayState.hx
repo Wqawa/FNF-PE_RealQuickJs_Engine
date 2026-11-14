@@ -2456,7 +2456,13 @@ class PlayState extends MusicBeatState
 			var jsFile:String = luaFile.substr(0, luaFile.lastIndexOf('.')) + psychlua.FunkinJS.EXTENSION;
 			var jsToLoad:String = Paths.findScriptFile(jsFile);
 			if(jsToLoad != null)
-				return psychlua.FunkinJS.start(jsToLoad) != null;
+			{
+				var luaScript:FunkinLua = psychlua.FunkinJS.start(jsToLoad);
+				if(luaScript != null) return true;
+				// jsEngine=QuickJS 时 start() 按设计返回 null（脚本不进 Lua 解释器），
+				// 直接用它判成功会永远是 false，得回头问运行时到底加载了没。
+				return jsruntime.JSPlayer.isLoaded(jsToLoad);
+			}
 		}
 
 		if(luaToLoad != null)
@@ -2477,7 +2483,11 @@ class PlayState extends MusicBeatState
 		var scriptToLoad:String = Paths.findScriptFile(scriptFile);
 		if(scriptToLoad != null)
 		{
-			if (Iris.instances.exists(scriptToLoad)) return false;
+			// 判重只看本 state 里还活着的脚本。Iris.instances 是进程级的静态表，
+			// 上一首歌残留的实例（或同路径的旧 key）会让新歌的同名脚本被当成
+			// "已存在"直接跳过，表现是脚本静默不执行，日志里还一片正常。
+			for (script in hscriptArray)
+				if(script != null && script.origin == scriptToLoad) return false;
 
 			initHScript(scriptToLoad);
 			return true;
@@ -2493,6 +2503,7 @@ class PlayState extends MusicBeatState
 			newScript = new HScript(null, file);
 			if (newScript.exists('onCreate')) newScript.call('onCreate');
 			trace('initialized hscript interp successfully: $file');
+			LuaUtils.logScriptSource('hscript', file, newScript.modFolder);
 			hscriptArray.push(newScript);
 		}
 		catch(e:IrisError)

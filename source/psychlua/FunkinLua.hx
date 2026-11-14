@@ -91,10 +91,10 @@ class FunkinLua {
 		var game:PlayState = PlayState.instance;
 		if(game != null) game.luaArray.push(this);
 
-		var myFolder:Array<String> = this.scriptName.split('/');
 		#if MODS_ALLOWED
-		if(myFolder[0] + '/' == Paths.mods() && (Mods.currentModDirectory == myFolder[1] || Mods.getGlobalMods().contains(myFolder[1]))) //is inside mods folder
-			this.modFolder = myFolder[1];
+		// 别再用 path.split('/')[0] + '/' == Paths.mods() 那套了：这版 path 里多了
+		// mods/<版本>/ 一层，那个判断永远不成立，modFolder 会一直是 null。
+		this.modFolder = Paths.modFromScriptPath(this.scriptName);
 		#end
 
 		// Lua shit
@@ -1699,6 +1699,8 @@ class FunkinLua {
 			return;
 		}
 		trace('lua file loaded succesfully:' + scriptName);
+		// rawCode 不为 null 说明这脚本本来是 .js，被 FunkinJS 转译后塞进 Lua 解释器
+		LuaUtils.logScriptSource(rawCode != null ? 'js->lua' : 'lua', scriptName, modFolder);
 
 		call('onCreate', []);
 	}

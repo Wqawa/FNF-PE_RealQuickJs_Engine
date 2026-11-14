@@ -74,7 +74,8 @@ class JSPlayer
 		paths.push(path);
 		loadedAny = true;
 		Log.trace('[js] loaded $path (ctx=$h)', null);
-		QuickJSHandler.log('[load] ' + path + ' (ctx=' + h + ')');
+		var owner:String = backend.Paths.modFromScriptPath(path);
+		QuickJSHandler.log('[script] js/qjs  mod=' + (owner == null ? '<global>' : owner) + '  ' + path + ' (ctx=' + h + ')');
 		return true;
 	}
 
