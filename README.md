@@ -2,7 +2,7 @@
 
 基于 [Psych Engine 1.0.4](https://github.com/ShadowMario/FNF-PsychEngine) 的 fork。
 
-主要做两件事：**让 0.6.3 / 0.7.3 时代的 mod 还能跑**，以及**让 `.js` 脚本"能跑"**。
+主要做两件事：**让 0.6.3 / 0.7.3 时代的 mod 还能跑**，以及**让 `.js` 脚本"能跑"**（包括js仅替换转译和使用真正的QuickJS解释器）。
 
 ---
 
