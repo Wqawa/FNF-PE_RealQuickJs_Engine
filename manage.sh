@@ -113,14 +113,21 @@ check_libs() {
 		cur=""
 		[ -f "$curfile" ] && cur="$(tr -d '\r\n' < "$curfile" | tr ',' '.')"
 		if [ -z "$cur" ]; then
-			bad "$name（未安装，期望 $ver）"; missing=$((missing + 1)); continue
+			if [ "$ver" = "git" ]; then
+				# git 源没法自动装，只提示，不计入缺失
+				warn "$name（git 源，需手动 haxelib git）"
+			else
+				bad "$name（未安装，期望 $ver）"; missing=$((missing + 1))
+			fi
+			continue
 		fi
 		if [ "$ver" = "git" ]; then
 			ok "$name (git)"
 		elif [ "$cur" = "$ver" ]; then
 			ok "$name $cur"
 		else
-			warn "$name 版本是 $cur，清单写的是 $ver"
+			# 版本不符也算需要处理，否则 fix_libs 永远不会去切它
+			warn "$name 版本是 $cur，清单写的是 $ver"; missing=$((missing + 1))
 		fi
 	done <<EOF
 $LIBS
@@ -129,20 +136,44 @@ EOF
 }
 
 fix_libs() {
-	setup_toolchain || return 1
 	head_ "补齐 haxelib 库（要网络）"
-	local name ver cur
+	local name ver cur curfile
 	while read -r name ver; do
 		[ -z "${name:-}" ] && continue
-		[ "$name" = "haxe" ] || [ "$ver" = "git" ] && continue
+		if [ "$name" = "haxe" ]; then continue; fi
+		if [ "${ver:-}" = "git" ]; then continue; fi
+
+		curfile="$(lib_path "$name")"
 		cur=""
-		[ -f "$(lib_path "$name")" ] && cur="$(tr -d '\r\n' < "$(lib_path "$name")" | tr ',' '.')"
+		[ -f "$curfile" ] && cur="$(tr -d '\r\n' < "$curfile" | tr ',' '.')"
+
 		if [ -z "$cur" ]; then
-			echo "  装 $name $ver"
-			haxelib install "$name" "$ver" --always >/dev/null 2>&1 || warn "$name 装失败"
+			printf '  装 %s %s\n' "$name" "$ver"
+			# haxelib 会从 stdin 读东西，不隔离的话会把 heredoc 里剩下的库清单整段吃掉
+			if haxelib install "$name" "$ver" --always </dev/null >/dev/null 2>&1; then
+				ok "$name $ver"
+			else
+				warn "$name 装失败"
+			fi
 		elif [ "$cur" != "$ver" ]; then
-			echo "  切 $name -> $ver（当前 $cur）"
-			haxelib set "$name" "$ver" >/dev/null 2>&1 || warn "$name 切换失败"
+			# haxelib set 对没装过的版本也返回 0（只改 .current 不下载），
+			# 所以不能看返回码，要回读 .current + 确认版本目录真的存在
+			haxelib set "$name" "$ver" </dev/null >/dev/null 2>&1 || true
+			local now="" vdir
+			[ -f "$curfile" ] && now="$(tr -d '\r\n' < "$curfile" | tr ',' '.')"
+			vdir="$HAXELIB_PATH/${name//./,}/$(printf '%s' "$ver" | tr '.' ',')"
+			if [ "$now" = "$ver" ] && [ -d "$vdir" ]; then
+				ok "$name $ver"
+			else
+				printf '  装 %s %s（本机没有，开始下载）\n' "$name" "$ver"
+				if haxelib install "$name" "$ver" --always </dev/null >/dev/null 2>&1 \
+					&& haxelib set "$name" "$ver" </dev/null >/dev/null 2>&1 \
+					&& [ -d "$vdir" ]; then
+					ok "$name $ver"
+				else
+					warn "$name 切 $ver 失败（下载或安装没成功）"
+				fi
+			fi
 		fi
 	done <<EOF
 $LIBS
@@ -220,7 +251,18 @@ setup_msvc() {
 cmd_env() {
 	BAD=0
 	setup_toolchain || true
-	if [ -n "${HAXELIB_PATH:-}" ]; then check_libs || warn "库不全，跑「补/修依赖库」"; fi
+	if [ -n "${HAXELIB_PATH:-}" ]; then
+		# 体检顺便修：缺库就直接装/切，补完复查一遍。补库要网络，失败只告警不中断。
+		if ! check_libs; then
+			say "  库不全，自动补齐（要网络）…" "  libraries incomplete, repairing (needs network)..."
+			if fix_libs; then
+				head_ "复查 haxelib 依赖" "re-check haxelib"
+				check_libs || true
+			else
+				warn "自动补库失败，检查网络，或手动装 git 源的库"
+			fi
+		fi
+	fi
 	setup_msvc || true
 	head_ "其它"
 	command -v rc.exe >/dev/null 2>&1 || [ -f "$SDK_BASE/bin/$SDK_VER/x64/rc.exe" ] \
@@ -638,28 +680,26 @@ print_menu() {
 	say "  FNF-PE RealQuickJS 工具箱" "  FNF-PE RealQuickJS Toolbox"
 	printf '==============================================================\n\n'
 	if [ "$L" = "en" ]; then
-		printf '  1)  Environment check    haxe / libs / MSVC / SDK / rc.exe, read-only\n'
+		printf '  1)  Environment check    haxe / libs / MSVC / SDK / rc.exe, auto-repairs libs\n'
 		printf '  2)  Build release        incremental, then copy+verify assets\n'
 		printf '  3)  Build debug          same, -debug\n'
 		printf '  4)  Clean rebuild        wipe obj/src first, then build\n'
 		printf '  5)  Prepare assets       copy assets/base_game into bin, verify\n'
 		printf '  6)  Verify assets only   report missing bits, touch nothing\n'
-		printf '  7)  Repair libraries     haxelib install/set whatever is missing\n'
-		printf '  8)  Lua compat audit     function-name diff against an upstream tree\n'
-		printf '  9)  Rebuild import table regenerate the vanilla HScript import map\n'
-		printf ' 10)  Build QuickJS-NG     rebuild the JS runtime static library (build does it too)\n'
+		printf '  7)  Lua compat audit     function-name diff against an upstream tree\n'
+		printf '  8)  Rebuild import table regenerate the vanilla HScript import map\n'
+		printf '  9)  Build QuickJS-NG     rebuild the JS runtime static library (build does it too)\n'
 		printf '  0)  Quit\n'
 	else
-		printf '  1)  环境体检       Haxe / 库 / MSVC / SDK / rc.exe，只读不改\n'
+		printf '  1)  环境体检       Haxe / 库 / MSVC / SDK / rc.exe，缺库自动补\n'
 		printf '  2)  编译 release   增量编译，编完自动铺素材并校验\n'
 		printf '  3)  编译 debug     同上，debug 模式\n'
 		printf '  4)  全量重编       先清 obj/src 再编（改 Project.xml、换库之后用）\n'
 		printf '  5)  铺素材         把 assets/base_game 铺进 bin 并校验\n'
 		printf '  6)  只校验资产     不动文件，只报缺什么（发版前跑）\n'
-		printf '  7)  补/修依赖库    缺哪个 haxelib 库就装/切哪个（要网络）\n'
-		printf '  8)  Lua 兼容审计   拿上游源码树当基准，比 add_callback 注册的函数名\n'
-		printf '  9)  重建 import 表 扫 source_vanilla 重生成 HScript 的 import 隔离表\n'
-		printf ' 10)  重建 QuickJS-NG  强制重编 JS 运行时静态库（平时编译会自动做）\n'
+		printf '  7)  Lua 兼容审计   拿上游源码树当基准，比 add_callback 注册的函数名\n'
+		printf '  8)  重建 import 表 扫 source_vanilla 重生成 HScript 的 import 隔离表\n'
+		printf '  9)  重建 QuickJS-NG  强制重编 JS 运行时静态库（平时编译会自动做）\n'
 		printf '  0)  退出\n'
 	fi
 	printf '\n  > '
@@ -673,10 +713,9 @@ run_action() {
 		4|clean)    MODE=release; cmd_build 1 ;;
 		5|assets)   cmd_assets 0 ;;
 		6|verify)   cmd_assets 1 ;;
-		7|libs)     fix_libs ;;
-		8|audit)    cmd_audit ;;
-		9|imports)  cmd_imports ;;
-		10|quickjs) cmd_quickjs ;;
+		7|audit)    cmd_audit ;;
+		8|imports)  cmd_imports ;;
+		9|quickjs)  cmd_quickjs ;;
 		0|q|Q)      return 99 ;;
 		*)          say "  没有这个编号" "  no such item"; return 2 ;;
 	esac
