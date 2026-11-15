@@ -254,7 +254,7 @@ source/
 
 <p align="center">
   <img src="docs/contributors/maopou-card.jpg" width="420"><br>
-  <sub>Maopou 在 NovaFlare Engine 的 Programmer 名片。这个仓库兼容层的好几个思路是从那边学的。</sub>
+  <sub>Lanli 为 Maopou 使用 画世界pro 绘制的 Programmer 名片。这个仓库兼容层的好几个思路是从那边学的。</sub>
 </p>
 
 ---
