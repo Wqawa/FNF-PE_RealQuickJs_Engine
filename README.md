@@ -229,8 +229,38 @@ source/
 
 ---
 
+## 参与者
+
+<table>
+  <tr>
+    <td align="center" valign="top" width="33%">
+      <img src="docs/contributors/deepseek.png" width="150"><br>
+      <b>DeepSeek</b><br>
+      <sub>主要开发 · Developer</sub>
+    </td>
+    <td align="center" valign="top" width="33%">
+      <img src="docs/contributors/wq.png" width="150"><br>
+      <b>WQ</b><br>
+      <sub>监督 · Supervision</sub>
+    </td>
+    <td align="center" valign="top" width="33%">
+      <img src="docs/contributors/maopou.png" width="150"><br>
+      <b>Maopou</b><br>
+      <sub>特别感谢 · Special Thanks</sub><br>
+      <sub>NovaFlare Engine</sub>
+    </td>
+  </tr>
+</table>
+
+<p align="center">
+  <img src="docs/contributors/maopou-card.jpg" width="420"><br>
+  <sub>Maopou 在 NovaFlare Engine 的 Programmer 名片。这个仓库兼容层的好几个思路是从那边学的。</sub>
+</p>
+
+---
+
 ## 致谢
 
 - [Psych Engine](https://github.com/ShadowMario/FNF-PsychEngine) —— 上游
-- [NovaFlare Engine](https://github.com/NovaFlare-Engine-Concentration/FNF-NovaFlare-Engine) —— 兼容层的思路参考（`FlxTween.globalManager.clear()` 那套）
+- [NovaFlare Engine](https://github.com/NovaFlare-Engine-Concentration/FNF-NovaFlare-Engine) —— 兼容层的思路参考（`FlxTween.globalManager.clear()` 那套），Maopou 在那边做开发
 - 以及 issue 存档里那 30 位，虽然大概没人希望以这种方式被记住
