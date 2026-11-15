@@ -321,6 +321,17 @@ cmd_assets() {
 			n=$(wc -l < "$TMP/dup.txt")
 			[ "$n" -gt 0 ] && { (cd "$d" && tr '\n' '\0' < "$TMP/dup.txt" | xargs -0 rm -f); printf '  %-11s 清掉 %s 个多余 mp3\n' "$ver" "$n"; }
 		done
+
+		# 老布局残留：assets/ 根下的 shared、songs、fonts 这些现在是按版本分的
+		# （assets/<版本>/shared/...）。根上那几份是 11-08 之前那套结构的，白占 30 多 M，
+		# 还容易让人以为素材没分版本。只清这张白名单，版本目录一个都不碰。
+		local old
+		for old in fonts shared songs images characters data stages weeks music sounds videos dialogues \
+			week1 week2 week3 week4 week5 week6 week7; do
+			[ -d "$BIN/assets/$old" ] || continue
+			rm -rf "${BIN:?}/assets/$old"
+			printf '  %-11s 清掉老布局残留 assets/%s\n' "root" "$old"
+		done
 	fi
 
 	head_ "运行期目录"

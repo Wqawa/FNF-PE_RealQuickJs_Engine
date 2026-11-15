@@ -316,12 +316,28 @@ class Paths
 			xmlExists = true;
 		}
 
-		return FlxAtlasFrames.fromSparrow((imageLoaded != null ? imageLoaded : image(key, library)), (xmlExists ? File.getContent(modsXml(key)) : file('images/$key.xml', library)));
+		return FlxAtlasFrames.fromSparrow((imageLoaded != null ? imageLoaded : image(key, library)), (xmlExists ? File.getContent(modsXml(key)) : readTextOrPath(file('images/$key.xml', library))));
 		#else
-		return FlxAtlasFrames.fromSparrow(image(key, library), file('images/$key.xml', library));
+		return FlxAtlasFrames.fromSparrow(image(key, library), readTextOrPath(file('images/$key.xml', library)));
 		#end
 	}
 
+	/**
+	 * 图集描述文件（.xml / .txt）有磁盘副本就读磁盘内容。
+	 *
+	 * FlxAtlasFrames 拿到字符串先 OpenFlAssets.exists() 当资源 id 查清单，查不到才把字符串
+	 * 本身当 XML 解析。把磁盘 xml 的**路径**传进去时，只要清单里没有它，就会拿路径当 XML
+	 * 去 parse —— 于是整张图集的帧全丢，贴图不显示（看起来就是"背景丢了"）。
+	 * 读成字符串传进去就没这个问题。
+	 */
+	inline static public function readTextOrPath(path:String):String
+	{
+		#if (MODS_ALLOWED && sys)
+		if (path != null && FileSystem.exists(path))
+			return File.getContent(path);
+		#end
+		return path;
+	}
 
 	inline static public function getPackerAtlas(key:String, ?library:String)
 	{
@@ -332,9 +348,9 @@ class Paths
 			txtExists = true;
 		}
 
-		return FlxAtlasFrames.fromSpriteSheetPacker((imageLoaded != null ? imageLoaded : image(key, library)), (txtExists ? File.getContent(modsTxt(key)) : file('images/$key.txt', library)));
+		return FlxAtlasFrames.fromSpriteSheetPacker((imageLoaded != null ? imageLoaded : image(key, library)), (txtExists ? File.getContent(modsTxt(key)) : readTextOrPath(file('images/$key.txt', library))));
 		#else
-		return FlxAtlasFrames.fromSpriteSheetPacker(image(key, library), file('images/$key.txt', library));
+		return FlxAtlasFrames.fromSpriteSheetPacker(image(key, library), readTextOrPath(file('images/$key.txt', library)));
 		#end
 	}
 

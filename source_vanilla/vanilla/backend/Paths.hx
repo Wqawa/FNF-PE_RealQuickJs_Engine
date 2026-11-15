@@ -172,10 +172,43 @@ class Paths
 		if (currentLevel != null && currentLevel != 'shared')
 		{
 			var levelPath = getFolderPath(file, currentLevel);
-			if (OpenFlAssets.exists(levelPath, type))
+			if (existsOnDiskOrManifest(levelPath, type))
 				return levelPath;
 		}
 		return getSharedPath(file);
+	}
+
+	/**
+	 * 文件到底在不在：先看磁盘，再看编译期清单。
+	 *
+	 * 只查 OpenFlAssets.exists 就是只查 lime 编译时生成的清单。我们的素材分两种进 bin：
+	 * 编译期就在仓里的（会进清单），和编译完才由 manage.sh 铺进去的（base_game 那一坨，
+	 * 永远不在清单里）。后者在磁盘上有、清单里没有，于是这里判成"不存在"，
+	 * getPath 直接把 week4/images/gore/*.png 改写成 shared 路径 → 图集加载不到 →
+	 * Limo 的 update 拿到 animation.curAnim == null 当场空指针。
+	 */
+	public static function existsOnDiskOrManifest(path:String, ?type:AssetType = null):Bool
+	{
+		#if MODS_ALLOWED
+		if(FileSystem.exists(path)) return true;
+		#end
+		return OpenFlAssets.exists(path, type);
+	}
+
+	/**
+	 * 图集描述文件（.xml / .txt）优先读磁盘内容。
+	 *
+	 * FlxAtlasFrames 拿到字符串会先 OpenFlAssets.exists() 当资源 id 查，查不到再把字符串
+	 * 本身当 XML 解析。所以我们把磁盘上的 xml **路径** 丢进去时，清单里没有它 → 拿路径
+	 * 当 XML 解析 → 炸。这里把磁盘内容读出来直接传，让 flixel 走 parse 字符串那条路。
+	 */
+	inline static public function readTextOrPath(path:String):String
+	{
+		#if MODS_ALLOWED
+		if (path != null && FileSystem.exists(path))
+			return File.getContent(path);
+		#end
+		return path;
 	}
 
 	inline static public function getFolderPath(file:String, folder = "shared")
@@ -335,30 +368,16 @@ class Paths
 
 	static public function getAtlas(key:String, ?parentFolder:String = null, ?allowGPU:Bool = true):FlxAtlasFrames
 	{
-		var useMod = false;
 		var imageLoaded:FlxGraphic = image(key, parentFolder, allowGPU);
 
-		var myXml:Dynamic = getPath('images/$key.xml', TEXT, parentFolder, true);
-		if(OpenFlAssets.exists(myXml) #if MODS_ALLOWED || (FileSystem.exists(myXml) && (useMod = true)) #end )
-		{
-			#if MODS_ALLOWED
-			return FlxAtlasFrames.fromSparrow(imageLoaded, (useMod ? File.getContent(myXml) : myXml));
-			#else
-			return FlxAtlasFrames.fromSparrow(imageLoaded, myXml);
-			#end
-		}
-		else
-		{
-			var myJson:Dynamic = getPath('images/$key.json', TEXT, parentFolder, true);
-			if(OpenFlAssets.exists(myJson) #if MODS_ALLOWED || (FileSystem.exists(myJson) && (useMod = true)) #end )
-			{
-				#if MODS_ALLOWED
-				return FlxAtlasFrames.fromTexturePackerJson(imageLoaded, (useMod ? File.getContent(myJson) : myJson));
-				#else
-				return FlxAtlasFrames.fromTexturePackerJson(imageLoaded, myJson);
-				#end
-			}
-		}
+		var myXml:String = getPath('images/$key.xml', TEXT, parentFolder, true);
+		if(existsOnDiskOrManifest(myXml, TEXT))
+			return FlxAtlasFrames.fromSparrow(imageLoaded, readTextOrPath(myXml));
+
+		var myJson:String = getPath('images/$key.json', TEXT, parentFolder, true);
+		if(existsOnDiskOrManifest(myJson, TEXT))
+			return FlxAtlasFrames.fromTexturePackerJson(imageLoaded, readTextOrPath(myJson));
+
 		return getPackerAtlas(key, parentFolder);
 	}
 	
@@ -391,9 +410,9 @@ class Paths
 		var xml:String = modsXml(key);
 		if(FileSystem.exists(xml)) xmlExists = true;
 
-		return FlxAtlasFrames.fromSparrow(imageLoaded, (xmlExists ? File.getContent(xml) : getPath(Language.getFileTranslation('images/$key') + '.xml', TEXT, parentFolder)));
+		return FlxAtlasFrames.fromSparrow(imageLoaded, (xmlExists ? File.getContent(xml) : readTextOrPath(getPath(Language.getFileTranslation('images/$key') + '.xml', TEXT, parentFolder))));
 		#else
-		return FlxAtlasFrames.fromSparrow(imageLoaded, getPath(Language.getFileTranslation('images/$key') + '.xml', TEXT, parentFolder));
+		return FlxAtlasFrames.fromSparrow(imageLoaded, readTextOrPath(getPath(Language.getFileTranslation('images/$key') + '.xml', TEXT, parentFolder)));
 		#end
 	}
 
@@ -406,9 +425,9 @@ class Paths
 		var txt:String = modsTxt(key);
 		if(FileSystem.exists(txt)) txtExists = true;
 
-		return FlxAtlasFrames.fromSpriteSheetPacker(imageLoaded, (txtExists ? File.getContent(txt) : getPath(Language.getFileTranslation('images/$key') + '.txt', TEXT, parentFolder)));
+		return FlxAtlasFrames.fromSpriteSheetPacker(imageLoaded, (txtExists ? File.getContent(txt) : readTextOrPath(getPath(Language.getFileTranslation('images/$key') + '.txt', TEXT, parentFolder))));
 		#else
-		return FlxAtlasFrames.fromSpriteSheetPacker(imageLoaded, getPath(Language.getFileTranslation('images/$key') + '.txt', TEXT, parentFolder));
+		return FlxAtlasFrames.fromSpriteSheetPacker(imageLoaded, readTextOrPath(getPath(Language.getFileTranslation('images/$key') + '.txt', TEXT, parentFolder)));
 		#end
 	}
 
@@ -421,9 +440,9 @@ class Paths
 		var json:String = modsImagesJson(key);
 		if(FileSystem.exists(json)) jsonExists = true;
 
-		return FlxAtlasFrames.fromTexturePackerJson(imageLoaded, (jsonExists ? File.getContent(json) : getPath(Language.getFileTranslation('images/$key') + '.json', TEXT, parentFolder)));
+		return FlxAtlasFrames.fromTexturePackerJson(imageLoaded, (jsonExists ? File.getContent(json) : readTextOrPath(getPath(Language.getFileTranslation('images/$key') + '.json', TEXT, parentFolder))));
 		#else
-		return FlxAtlasFrames.fromTexturePackerJson(imageLoaded, getPath(Language.getFileTranslation('images/$key') + '.json', TEXT, parentFolder));
+		return FlxAtlasFrames.fromTexturePackerJson(imageLoaded, readTextOrPath(getPath(Language.getFileTranslation('images/$key') + '.json', TEXT, parentFolder)));
 		#end
 	}
 
