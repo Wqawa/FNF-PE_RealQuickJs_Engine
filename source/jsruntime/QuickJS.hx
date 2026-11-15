@@ -6,18 +6,18 @@ package jsruntime;
  * 静态库由 manage.sh 功能 10 生成：third_party/quickjs-ng/build/quickjs-ng.lib。
  * 只需 quickjs.c / libregexp.c / libunicode.c 三个源文件（这个 fork 把 cutils 并进 quickjs.c 了）。
  *
- * 注意路径里有空格（"FNF code"），buildXml 里的 name 属性用引号包住。
+ * 这里的路径是硬编码的绝对路径，仓库移动后 manage.sh 编译前会自动对齐（见 cmd_build）。
  */
 @:buildXml('
 <target id="haxe">
-	<include name="D:/FNF/FNF code/FNF-PE_RealQuickJs_Engine/third_party/quickjs-ng" />
-	<libpath name="D:/FNF/FNF code/FNF-PE_RealQuickJs_Engine/third_party/quickjs-ng/build" />
+	<include name="D:/FNF/FNF-PE_RealQuickJs_Engine/third_party/quickjs-ng" />
+	<libpath name="D:/FNF/FNF-PE_RealQuickJs_Engine/third_party/quickjs-ng/build" />
 	<lib name="quickjs-ng.lib" />
 </target>
 ')
 @:cppFileCode('
 // 绝对路径直接 include：项目路径带空格，hxcpp 的 <include> 加 -I 会被拆开
-#include "D:/FNF/FNF code/FNF-PE_RealQuickJs_Engine/third_party/quickjs-ng/quickjs.h"
+#include "D:/FNF/FNF-PE_RealQuickJs_Engine/third_party/quickjs-ng/quickjs.h"
 ')
 class QuickJS
 {

@@ -28,7 +28,8 @@ for arg in "$@"; do
 	case "$arg" in
 		--zh|zh) L=zh ;;
 		--en|en) L=en ;;
-		release|debug) MODE="$arg" ;;
+		# release/debug 交给下面的 * 当动作名处理（run_action 里已有 2|release / 3|debug），
+		# 原来在这里截成 MODE 会导致 ACTION 为空、直接掉进交互菜单
 		-h|--help|-help) sed -n '2,18p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
 		*) ACTION="$arg" ;;
 	esac
@@ -199,8 +200,14 @@ pick_msvc() {
 			-requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 \
 			-property installationPath 2>/dev/null | tr -d '\r' | head -1 | sed 's|\\|/|g')"
 		[ -n "$base" ] && [ -d "$base/VC/Tools/MSVC" ] && {
-			ver="$(ls -1 "$base/VC/Tools/MSVC" 2>/dev/null | sort -V | tail -1)"
-			[ -n "$ver" ] && { printf '%s' "$base/VC/Tools/MSVC/$ver"; return; }
+			# 太新的 MSVC 编不过 hxcpp 生成的 C++：VS2026 的 14.4x 起 xlocale 里
+			# _Codecvt_do_length / _Mbstatet 一堆 C2893/C2079，只能退到 14.3x 及以下。
+			# 同一个安装下可能并存多个版本，倒序遍历，挑第一个能用的。
+			for ver in $(ls -1 "$base/VC/Tools/MSVC" 2>/dev/null | sort -Vr); do
+				if [ "$(printf '%s' "$ver" | cut -d. -f2)" -lt 40 ] 2>/dev/null; then
+					printf '%s' "$base/VC/Tools/MSVC/$ver"; return
+				fi
+			done
 		}
 	done
 	for base in \
@@ -287,8 +294,21 @@ cmd_env() {
 cmd_build() {
 	local clean="${1:-0}" args
 	setup_toolchain || return 1
-	check_libs || { say "依赖不齐，先跑 3 号补库" "dependencies missing, run item 3 first"; return 1; }
+	check_libs || { say "依赖不齐，先跑 1 号环境体检（会自动补库）" "dependencies missing, run item 1 (auto-repairs libs)"; return 1; }
 	setup_msvc || return 1
+
+	# QuickJS.hx 的 @:buildXml 里是硬编码绝对路径（hxcpp 的 -I 拆不开带空格的路径），
+	# 仓库搬过就对不上了，编译前静默对齐到当前根目录
+	local qjs_hx="$ROOT/source/jsruntime/QuickJS.hx"
+	if [ -f "$qjs_hx" ]; then
+		local winroot
+		winroot="$(cygpath -m "$ROOT" 2>/dev/null || printf '%s' "$ROOT")"
+		if ! grep -q "$winroot/third_party/quickjs-ng" "$qjs_hx"; then
+			sed -i "s|\(name=\"\)[A-Za-z]:/[^\"]*/third_party/quickjs-ng|\1$winroot/third_party/quickjs-ng|g" "$qjs_hx"
+			sed -i "s|\(#include \"\)[A-Za-z]:/[^\"]*/third_party/quickjs-ng/quickjs.h|\1$winroot/third_party/quickjs-ng/quickjs.h|g" "$qjs_hx"
+			say "  QuickJS 路径已对齐到 $winroot" "  aligned QuickJS paths to $winroot"
+		fi
+	fi
 
 	if tasklist //FI "IMAGENAME eq PsychEngine.exe" 2>/dev/null | grep -qi psychengine; then
 		say "  游戏在跑，先关掉" "  game is running, closing it"
