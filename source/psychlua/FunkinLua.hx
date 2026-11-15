@@ -571,6 +571,7 @@ class FunkinLua implements IScriptHost {
 					groupOrArray.remove(leObj, true);
 					groupOrArray.insert(position, leObj);
 				}
+				stageDbg('order ' + obj + ' -> ' + position);
 				return;
 			}
 			luaTrace('setObjectOrder: Object $obj doesn\'t exist!', false, false, FlxColor.RED);
@@ -1028,6 +1029,7 @@ class FunkinLua implements IScriptHost {
 			{
 				leSprite.loadGraphic(Paths.image(image));
 			}
+			stageDbg('make ' + tag + ' img=' + image + ' w=' + leSprite.frameWidth + ' h=' + leSprite.frameHeight);
 			MusicBeatState.getVariables().set(tag, leSprite);
 			leSprite.active = true;
 		});
@@ -1114,11 +1116,18 @@ class FunkinLua implements IScriptHost {
 
 			var instance = LuaUtils.getTargetInstance();
 			if(inFront)
+			{
 				instance.add(mySprite);
+				stageDbg('add ' + tag + ' front=true len=' + instance.members.length);
+			}
 			else
 			{
 				if(PlayState.instance == null || !PlayState.instance.isDead)
-					instance.insert(instance.members.indexOf(LuaUtils.getLowestCharacterGroup()), mySprite);
+				{
+					var pos:Int = instance.members.indexOf(LuaUtils.getLowestCharacterGroup());
+					stageDbg('add ' + tag + ' front=false pos=' + pos + ' len=' + instance.members.length);
+					instance.insert(pos, mySprite);
+				}
 				else
 					GameOverSubstate.instance.insert(GameOverSubstate.instance.members.indexOf(GameOverSubstate.instance.boyfriend), mySprite);
 			}
@@ -1890,6 +1899,24 @@ class FunkinLua implements IScriptHost {
 
 	// used to collapse repeated warnings/errors, see ClientPrefs.data.moreLuaErrors
 	static var reportedTrace:Map<String, Bool> = new Map<String, Bool>();
+
+	/**
+	 * 临时诊断：把舞台脚本的建对象 / 插入位置写进 testout/stage_dbg.txt。
+	 * pe063 侧有一份同样格式的（前缀 [063]），跑完两边 diff 就能看出
+	 * 是哪个 sprite 没建出来、还是插到了错误的层级。查完可以删。
+	 */
+	public static function stageDbg(msg:String):Void
+	{
+		#if sys
+		try {
+			sys.FileSystem.createDirectory('./testout');
+			var song:String = (PlayState.SONG != null) ? PlayState.SONG.song : '?';
+			var f = sys.io.File.append('./testout/stage_dbg.txt', false);
+			f.writeString('[body] ' + song + ' | ' + msg + '\n');
+			f.close();
+		} catch(e:Dynamic) {}
+		#end
+	}
 
 	public static function luaTrace(text:String, ignoreCheck:Bool = false, deprecated:Bool = false, color:FlxColor = FlxColor.WHITE) {
 		if(ignoreCheck || getBool('luaDebugMode')) {

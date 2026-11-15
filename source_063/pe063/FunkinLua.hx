@@ -64,6 +64,24 @@ class FunkinLua {
 	public static var Function_Continue:Dynamic = 0;
 	public static var Function_StopLua:Dynamic = 2;
 
+	/**
+	 * 临时诊断：把舞台脚本的建对象 / 插入位置写进 testout/stage_dbg.txt。
+	 * body 侧有一份同格式的（前缀 [body]），跑完两边 diff 就能看出是哪个
+	 * sprite 没建出来、还是插错了层级。查完可以删。
+	 */
+	public static function stageDbg(msg:String):Void
+	{
+		#if sys
+		try {
+			sys.FileSystem.createDirectory('./testout');
+			var song:String = (PlayState.SONG != null) ? PlayState.SONG.song : '?';
+			var f = sys.io.File.append('./testout/stage_dbg.txt', false);
+			f.writeString('[063] ' + song + ' | ' + msg + '\n');
+			f.close();
+		} catch(e:Dynamic) {}
+		#end
+	}
+
 	//public var errorHandler:String->Void;
 	#if LUA_ALLOWED
 	public var lua:State = null;
@@ -1142,6 +1160,7 @@ class FunkinLua {
 			if(leObj != null) {
 				getInstance().remove(leObj, true);
 				getInstance().insert(position, leObj);
+				stageDbg('order ' + obj + ' -> ' + position);
 				return;
 			}
 			luaTrace("setObjectOrder: Object " + obj + " doesn't exist!", false, false, FlxColor.RED);
@@ -1779,6 +1798,7 @@ class FunkinLua {
 				leSprite.loadGraphic(Paths.image(image));
 			}
 			leSprite.antialiasing = ClientPrefs.globalAntialiasing;
+			stageDbg('make ' + tag + ' img=' + image + ' w=' + leSprite.frameWidth + ' h=' + leSprite.frameHeight);
 			PlayState.instance.modchartSprites.set(tag, leSprite);
 			leSprite.active = true;
 		});
@@ -1940,6 +1960,7 @@ class FunkinLua {
 							} else if(PlayState.instance.members.indexOf(PlayState.instance.dadGroup) < position) {
 								position = PlayState.instance.members.indexOf(PlayState.instance.dadGroup);
 							}
+							stageDbg('add ' + tag + ' front=false pos=' + position + ' len=' + PlayState.instance.members.length);
 							PlayState.instance.insert(position, shit);
 						}
 					}
