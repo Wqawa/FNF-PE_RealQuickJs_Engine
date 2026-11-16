@@ -465,11 +465,6 @@ class Paths
 		return 'mods/0.6.3/' + key;
 	}
 
-	/** 全局模组目录，放在 mods/global/，三个版本共用。 */
-	inline static public function globalModPath(key:String = '') {
-		return 'mods/global/' + key;
-	}
-
 	inline static public function modsFont(key:String) {
 		return modFolders('fonts/' + key);
 	}
@@ -520,69 +515,7 @@ class Paths
 			}
 		}
 
-		for(mod in getGlobalMods()){
-			// 全局模组优先看 mods/global/，老位置当兼容
-			var globalCheck:String = globalModPath(mod + '/' + key);
-			if(FileSystem.exists(globalCheck))
-				return globalCheck;
-
-			var fileToCheck:String = mods(mod + '/' + key);
-			if(FileSystem.exists(fileToCheck))
-				return fileToCheck;
-		}
 		return mods(key);
-	}
-
-	public static var globalMods:Array<String> = [];
-
-	static public function getGlobalMods()
-		return globalMods;
-
-	static public function pushGlobalMods() // prob a better way to do this but idc
-	{
-		globalMods = [];
-
-		// mods/global/ 里的文件夹直接算全局：三次改造里这条规则三棵树统一
-		// （0.6.3 原来压根没有这条路，所以那边 global 一直不生效）。
-		var globalRoot:String = globalModPath('');
-		if(FileSystem.exists(globalRoot))
-		{
-			for (folder in FileSystem.readDirectory(globalRoot))
-			{
-				var dir:String = haxe.io.Path.join([globalRoot, folder]);
-				if(sys.FileSystem.isDirectory(dir) && !ignoreModFolders.contains(folder.toLowerCase()) && !globalMods.contains(folder))
-					globalMods.push(folder);
-			}
-		}
-
-		var path:String = 'mods/0.6.3/modsList.txt';
-		if(FileSystem.exists(path))
-		{
-			var list:Array<String> = CoolUtil.coolTextFile(path);
-			for (i in list)
-			{
-				var dat = i.split("|");
-				if (dat[1] == "1")
-				{
-					var folder = dat[0];
-					var path = Paths.mods(folder + '/pack.json');
-					if(FileSystem.exists(path)) {
-						try{
-							var rawJson:String = File.getContent(path);
-							if(rawJson != null && rawJson.length > 0) {
-								var stuff:Dynamic = Json.parse(rawJson);
-								var global:Bool = Reflect.getProperty(stuff, "runsGlobally");
-								if(global && !globalMods.contains(dat[0])) globalMods.push(dat[0]);
-							}
-						} catch(e:Dynamic){
-							trace(e);
-						}
-					}
-				}
-			}
-		}
-		if(globalMods.length > 0) trace('[mods] global: ' + globalMods.join(', '));
-		return globalMods;
 	}
 
 	static public function getModDirectories():Array<String> {

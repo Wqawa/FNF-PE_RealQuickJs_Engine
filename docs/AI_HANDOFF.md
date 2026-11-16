@@ -29,7 +29,8 @@
 | `pe063` | Psych Engine 0.6.3 | `source_063/pe063/` | `assets/0.6.3/` |
 
 三份 Options 菜单里都有 `Switch Engine`，选完写 `engine.txt` + `Sys.exit(0)`，重启生效。
-mod 同样分组：`mods/body`、`mods/1.0.4`、`mods/0.6.3`、`mods/global`（全局，三版本共用）。
+mod 同样分组：`mods/body`、`mods/1.0.4`、`mods/0.6.3`，各版本只读自己那本 `modsList.txt`
+（2026-11-16 起 `mods/global/` 这套「全局 mod」机制整个删掉了，那个目录不再被读取）。
 
 细节看 `docs/HANDOFF_DUAL_ENGINE.md` 第六点五、六点六节。
 

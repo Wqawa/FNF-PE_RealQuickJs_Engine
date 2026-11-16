@@ -66,7 +66,7 @@ class FunkinLua {
 
 		var myFolder:Array<String> = this.scriptName.split('/');
 		#if MODS_ALLOWED
-		if(myFolder[0] + '/' == Paths.mods() && (Mods.currentModDirectory == myFolder[1] || Mods.getGlobalMods().contains(myFolder[1]))) //is inside mods folder
+		if(myFolder[0] + '/' == Paths.mods() && (Mods.currentModDirectory == myFolder[1])) //is inside mods folder
 			this.modFolder = myFolder[1];
 		#end
 
@@ -1836,8 +1836,7 @@ class FunkinLua {
 		if(Mods.currentModDirectory != null && Mods.currentModDirectory.length > 0)
 			foldersToCheck.insert(0, Paths.mods(Mods.currentModDirectory + '/shaders/'));
 
-		for(mod in Mods.getGlobalMods())
-			foldersToCheck.insert(0, Paths.mods(mod + '/shaders/'));
+
 		#end
 
 		for (folder in foldersToCheck)

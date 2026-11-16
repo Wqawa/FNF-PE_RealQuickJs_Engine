@@ -84,7 +84,6 @@ class Main extends Sprite
 		#end
 
 		#if LUA_ALLOWED
-		Mods.pushGlobalMods();
 		#end
 		Mods.loadTopMod();
 

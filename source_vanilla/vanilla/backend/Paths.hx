@@ -347,10 +347,6 @@ class Paths
 			var modKey:String = key;
 			if(parentFolder == 'songs') modKey = 'songs/$key';
 
-			for(mod in Mods.getGlobalMods())
-				if (FileSystem.exists(mods('$mod/$modKey')))
-					return true;
-
 			if (FileSystem.exists(mods(Mods.currentModDirectory + '/' + modKey)) || FileSystem.exists(mods(modKey)))
 				return true;
 		}
@@ -483,13 +479,6 @@ class Paths
 	inline static public function mods(key:String = '')
 		return 'mods/$VERSION_DIR/$key';
 
-	/**
-	 * 全局模组目录。放在 mods/global/，和版本目录平级，所以哪个版本跑都能读到。
-	 * modsList.txt 里标了 runsGlobally 的模组会优先从这里找。
-	 */
-	inline static public function globalMods(key:String = '')
-		return 'mods/global/$key';
-
 	/** 当前版本自己的 modsList.txt，各版本互不干扰。 */
 	inline static public function modsListPath():String
 		return 'mods/$VERSION_DIR/modsList.txt';
@@ -524,17 +513,6 @@ class Paths
 				return fileToCheck;
 		}
 
-		for(mod in Mods.getGlobalMods())
-		{
-			// 全局模组优先看 mods/global/，老位置（本版本的 mods 目录）留着当兼容
-			var globalCheck:String = globalMods(mod + '/' + key);
-			if(FileSystem.exists(globalCheck))
-				return globalCheck;
-
-			var fileToCheck:String = mods(mod + '/' + key);
-			if(FileSystem.exists(fileToCheck))
-				return fileToCheck;
-		}
 		return mods(key);
 	}
 	#end

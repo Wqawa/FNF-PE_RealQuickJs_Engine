@@ -31,53 +31,6 @@ class Mods
 		'achievements'
 	];
 
-	private static var globalMods:Array<String> = [];
-
-	inline public static function getGlobalMods()
-		return globalMods;
-
-	/**
-	 * mods/global/ 下面实际存在的 mod 文件夹名。
-	 * 位置决定语义：放进来就算全局，三个版本都能读到，不再依赖各版本 modsList / pack.json 标记。
-	 */
-	public static function getGlobalDirs():Array<String>
-	{
-		var out:Array<String> = [];
-		#if MODS_ALLOWED
-		var root:String = Paths.globalMods();
-		if(FileSystem.exists(root))
-		{
-			for (folder in FileSystem.readDirectory(root))
-			{
-				var path:String = haxe.io.Path.join([root, folder]);
-				if(FileSystem.isDirectory(path) && !ignoreModFolders.contains(folder.toLowerCase()) && !out.contains(folder))
-					out.push(folder);
-			}
-		}
-		#end
-		return out;
-	}
-
-	public static function pushGlobalMods():Array<String>
-	{
-		globalMods = [];
-
-		for (mod in getGlobalDirs())
-			if(!globalMods.contains(mod)) globalMods.push(mod);
-
-		// 老位置兼容：还在 mods/<版本>/ 里、pack.json 标了 runsGlobally 的照旧认
-		for(mod in parseList().enabled)
-		{
-			if(globalMods.contains(mod)) continue;
-			var pack:Dynamic = getPack(mod);
-			if(pack != null && pack.runsGlobally) globalMods.push(mod);
-		}
-
-		// 启动时留一条，省得以后又出现「global 到底生效了没」的猜谜
-		if(globalMods.length > 0) trace('[mods] global: ' + globalMods.join(', '));
-		return globalMods;
-	}
-
 	inline public static function getModDirectories():Array<String>
 	{
 		var list:Array<String> = [];
@@ -140,22 +93,6 @@ class Mods
 		#if MODS_ALLOWED
 		if(mods)
 		{
-			// Global mods first（mods/global/ 优先，老位置当兼容）
-			for(mod in Mods.getGlobalMods())
-			{
-				var gFolder:String = Paths.globalMods(mod + '/' + fileToFind);
-				var hasGlobal:Bool = FileSystem.exists(gFolder);
-				if(hasGlobal && !foldersToCheck.contains(gFolder)) foldersToCheck.push(gFolder);
-
-				// 同名副本同时留在 mods/<版本>/ 里的时候只认 global 那份。
-				// 两边都推的话脚本会装两遍（同一个 mod 两套 lua/hscript 同时跑，
-				// 实测直接把游戏搞崩），这也是 global 改造最容易踩的坑。
-				if(hasGlobal) continue;
-
-				var folder:String = Paths.mods(mod + '/' + fileToFind);
-				if(FileSystem.exists(folder) && !foldersToCheck.contains(folder)) foldersToCheck.push(folder);
-			}
-
 			// Then "PsychEngine/mods/" main folder
 			var folder:String = Paths.mods(fileToFind);
 			if(FileSystem.exists(folder) && !foldersToCheck.contains(folder)) foldersToCheck.push(Paths.mods(fileToFind));
@@ -177,8 +114,6 @@ class Mods
 		if(folder == null) folder = Mods.currentModDirectory;
 
 		var path = Paths.mods(folder + '/pack.json');
-		// 只放在 mods/global/ 里的 mod 在版本目录下没有包，回退去那边读
-		if(!FileSystem.exists(path)) path = Paths.globalMods(folder + '/pack.json');
 		if(FileSystem.exists(path)) {
 			try {
 				#if sys

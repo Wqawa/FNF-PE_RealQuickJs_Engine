@@ -37,10 +37,7 @@ class QJSShaders
 		#if MODS_ALLOWED
 		folders.push(Paths.mods('shaders/'));
 		if (Mods.currentModDirectory != null && Mods.currentModDirectory.length > 0)
-			folders.insert(0, Paths.mods(Mods.currentModDirectory + '/shaders/'));
-		for (mod in Mods.getGlobalMods())
-			folders.insert(0, Paths.mods(mod + '/shaders/'));
-		#end
+			folders.insert(0, Paths.mods(Mods.currentModDirectory + '/shaders/'));		#end
 
 		for (folder in folders)
 		{

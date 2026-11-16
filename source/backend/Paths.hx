@@ -379,10 +379,6 @@ class Paths
 			var modKey:String = key;
 			if(parentFolder == 'songs') modKey = 'songs/$key';
 
-			for(mod in Mods.getGlobalMods())
-				if (FileSystem.exists(mods('$mod/$modKey')))
-					return true;
-
 			if (FileSystem.exists(mods(Mods.currentModDirectory + '/' + modKey)) || FileSystem.exists(mods(modKey)))
 				return true;
 		}
@@ -536,13 +532,6 @@ class Paths
 	inline static public function mods(key:String = '')
 		return 'mods/$VERSION_DIR/$key';
 
-	/**
-	 * 全局模组目录。放在 mods/global/，和版本目录平级，所以哪个版本跑都能读到。
-	 * modsList.txt 里标了 runsGlobally 的模组会优先从这里找。
-	 */
-	inline static public function globalMods(key:String = '')
-		return 'mods/global/$key';
-
 	/** 当前版本自己的 modsList.txt，各版本互不干扰。 */
 	inline static public function modsListPath():String
 		return 'mods/$VERSION_DIR/modsList.txt';
@@ -577,17 +566,6 @@ class Paths
 				return fileToCheck;
 		}
 
-		for(mod in Mods.getGlobalMods())
-		{
-			// 全局模组优先看 mods/global/，老位置（本版本的 mods 目录）留着当兼容
-			var globalCheck:String = globalMods(mod + '/' + key);
-			if(FileSystem.exists(globalCheck))
-				return globalCheck;
-
-			var fileToCheck:String = mods(mod + '/' + key);
-			if(FileSystem.exists(fileToCheck))
-				return fileToCheck;
-		}
 		return mods(key);
 	}
 	#end
@@ -597,7 +575,7 @@ class Paths
 	 *
 	 * 上游 Psych 的写法是 `path.split('/')[0] + '/' == Paths.mods()`，前提是 mods
 	 * 目录扁平（mods/<mod>/）。这版在 mods/ 和 mod 名之间插了一层版本目录
-	 * （mods/body/<mod>/、mods/global/<mod>/），于是 'mods/' 永远不等于
+	 * （mods/body/<mod>/），于是 'mods/' 永远不等于
 	 * 'mods/body/'，Lua 和 HScript 两边的 modFolder 一直是 null —— 脚本里读到的
 	 * modFolder、getModSetting，以及所有拿 modFolder 去拼的相对路径全废。
 	 *
@@ -615,11 +593,9 @@ class Paths
 		else if(!StringTools.startsWith(p, 'mods/')) return null;
 
 		var rest:String = null;
-		var globalPrefix:String = 'mods/global/';
 		var versionPrefix:String = 'mods/$VERSION_DIR/';
 
-		if(StringTools.startsWith(p, globalPrefix)) rest = p.substr(globalPrefix.length);
-		else if(StringTools.startsWith(p, versionPrefix)) rest = p.substr(versionPrefix.length);
+		if(StringTools.startsWith(p, versionPrefix)) rest = p.substr(versionPrefix.length);
 		else if(StringTools.startsWith(p, 'mods/')) rest = p.substr(5); // 老结构：mods/<mod>/...
 
 		if(rest == null) return null;
@@ -631,7 +607,6 @@ class Paths
 		var name:String = rest.substr(0, slash);
 		if(Mods.ignoreModFolders.contains(name.toLowerCase())) return null;
 		if(name == Mods.currentModDirectory) return name;
-		if(Mods.getGlobalMods().contains(name)) return name;
 		return null;
 	}
 

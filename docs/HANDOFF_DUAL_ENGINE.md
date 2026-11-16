@@ -174,7 +174,6 @@ assets/
 mods/
   body/            本体的 mod + modsList.txt
   1.0.4/           原版的 mod + modsList.txt
-  global/          全局 mod，三个版本都读
 ```
 
 `body` 这个名字跟 `bin/engine.txt` 里的 `body` / `vanilla` 是同一套术语，`Engine.BODY` 现成能用。
@@ -202,10 +201,12 @@ public static var VERSION_DIR:String = '1.0.4';
 | `font(key)` | `assets/$VERSION_DIR/$folderKey` |
 | `mods(key)` | `mods/$VERSION_DIR/$key` |
 | `modsListPath()` | `mods/$VERSION_DIR/modsList.txt`（新增） |
-| `globalMods(key)` | `mods/global/$key`（新增） |
 
-`Mods.hx` 里三处硬编码 `'modsList.txt'` 全部换成 `Paths.modsListPath()`，
-`directoriesWithFile` 里全局 mod 优先查 `mods/global/`、再退回本版本目录。
+`Mods.hx` 里三处硬编码 `'modsList.txt'` 全部换成 `Paths.modsListPath()`。
+
+> 2026-11-16：`mods/global/` 的「全局 mod」机制已整体移除（三棵树都删干净了）。
+> 每个版本只认自己 `mods/<版本>/` 下的 mod，跨版本共享靠手动拷贝，避免
+> 同名副本被装两遍那种混乱。
 
 ### 新增一个版本要做什么
 
