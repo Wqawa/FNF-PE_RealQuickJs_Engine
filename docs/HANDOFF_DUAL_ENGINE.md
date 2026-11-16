@@ -1,5 +1,14 @@
 > **2026-11-13 晚：** 所有编译/素材/审计脚本已合并进仓库根目录的 `manage.sh` + `manage.bat`，
 > 本文里出现的 `building/*.sh`、`tools/*.py`、`setup/*` 命令都已作废，只当历史记录看。
+>
+> **2026-11-16 变更（读本文前先知道这几条）：**
+> - `mods/global/` 的「全局 mod」机制**已整体删除**。每个版本只读 `mods/<版本>/` 和自己那本
+>   `modsList.txt`，跨版本共享靠手动拷贝。`Paths.globalMods` / `Mods.pushGlobalMods`
+>   这些符号三棵树里都不存在了，别照着旧代码找。
+> - 崩溃拦截器改成三棵树共用（`backend.EngineCrash` + `backend.CrashState`），挂在
+>   `Main.main()` 分叉之前。以前只在 `Main.new()` 里挂，切到原版 / 0.6.3 崩了连 dump 都没有。
+> - 旧版回退那三个开关（Legacy HUD / Health / Icons）并进了 Gameplay 设置，
+>   原来独立的 Compat 页已删除。
 
 # 交接文档：0.6.3 移植 + 原版 1.0.4 双引擎（2026-11-13）
 
@@ -142,7 +151,7 @@ RatioScaleMode → scale=1.275,1.275
 
 ```bash
 # 主仓
-cd D:/FNF/FNF-PE_RealQuickJs_Engine && bash building/build.sh
+cd D:/FNF/FNF-PE_RealQuickJs_Engine && bash manage.sh release
 # 0.6.3（用主仓的库根编）
 bash .workbuddy/tmp/build063.sh
 ```

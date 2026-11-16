@@ -15,7 +15,7 @@
   由本机 MSVC 现场编译。
 - `bash manage.sh` 的第 2/3/4 项（编译）会**自动检查**：静态库不存在、或
   `quickjs.c` / `libregexp.c` / `libunicode.c` / `dtoa.c` 比它新，就先编译静态库再编引擎。
-  想强制重编用第 10 项。
+  想强制重编用 9 号功能。
 - 编译命令固定为 MSVC `cl /c /O2 /std:c11 /utf-8`，四个源文件，规则写在 `manage.sh` 的
   `cmd_quickjs()` 里，改了 QuickJS 版本只需要重跑一次第 10 项。
 

@@ -14,9 +14,9 @@
 
 ---
 
-## 0. 2026-11-13 交接：当前状态与未解决的问题
+## 0. 当前状态与未解决的问题
 
-> 这一节是给接手的人看的。**两个问题没修好**，先看这里再动代码。
+> 这一节是给接手的人看的：先看 0.0 搞清楚现在长什么样，再看 0.1 / 0.2 那两个没修的问题。
 
 ### 0.0 现在是什么状态
 
@@ -50,9 +50,30 @@ bash .workbuddy/build.sh -debug       # 薄壳，会自己裹 conhost --headless
 跑游戏/跑测试一律不弹窗：`AutoTestState` 会把窗口最小化 + 挪到屏幕外 + 静音，
 只有设 `PE_AUTOTEST_SHOW=1` 才显示画面。
 
+### 0.0.1 2026-11-16 这一轮做了什么
+
+四笔提交，都编译过、跑过验证：
+
+| 提交 | 内容 |
+|---|---|
+| `e0a7aab` | **QuickJS 通道补完**：`getVar` 取值、`Function_Stop*` 哨兵、脚本装卸、`onCreate` 分发，外加与 Lua 对齐的 23 个宿主函数；新增 `jsruntime/QJSShaders.hx`。细节看 `docs/JS_QUICKJS.md` |
+| `e1b57fe` | **崩溃拦截器**（`backend/EngineCrash` + `backend/CrashState`）；旧版回退开关并进 Gameplay；global mod 改造（下一笔撤销） |
+| `353852b` | **删掉 `mods/global/` 全局机制**，每个引擎只读 `mods/<版本>/` |
+| `f4a79b3` | **修 0.7.3 的 `getObjectOrder`**：hxcpp 反射不调 getter，HUD 元素上必抛空引用 |
+
+现在几条硬事实，别再照旧印象做事：
+
+- `.js` 有两条路（Troll 转译 / 真 QuickJS-NG），**默认还是 Troll**。QuickJS 那边和 Lua
+  只差 `runHaxeCode` / `runHaxeFunction` / `addHaxeLibrary` 三个（Haxe 互操作，刻意不做）。
+- **没有全局 mod 了**。跨版本共享自己拷一份，`mods/global/` 不再被读。
+- **崩溃不再弹系统对话框**：写 `crash/` dump 后切引擎内的崩溃屏（三棵树共用），
+  C 键或 COPY 按钮复制全文，可选退出 / 回当前引擎主菜单；`Ctrl+Alt+Shift+Q` 手动触发。
+- 旧版回退三项（Legacy HUD / Health / Icons）在 **Gameplay** 里，独立的 Compat 页已删除。
+- Lua 回归之前是坏的（路径停在双引擎改造前），2026-11-16 修好并重新全绿，见第 3 节。
+
 ---
 
-### 0.1 未解决：0.6.3 的 Options → Switch Engine 打不开
+### 0.1 未解决（2026-11-13 记录，之后没复核）：0.6.3 的 Options → Switch Engine 打不开
 
 **现象**：0.6.3 里选中 Switch Engine，界面不出现（卡住 / 一闪即回）。
 
@@ -86,7 +107,7 @@ if (controls.ACCEPT && subState == null) {
 4. 注意：**不要**把 `initialState` 直接设成 `OptionsState` 来测——那会跳过
    `PlayerSettings` 初始化，`controls` 为 null，得到的是假崩溃。
 
-### 0.2 未解决：0.6.3 里 lua 创建贴图找不到资源
+### 0.2 未解决（2026-11-13 记录，之后没复核）：0.6.3 里 lua 创建贴图找不到资源
 
 **现象**：0.6.3 里 lua 建的贴图（`makeAnimatedLuaSprite` 的 `texture` 模式等）出不来。
 
@@ -129,7 +150,7 @@ if (controls.ACCEPT && subState == null) {
 - **0.6.3 画面里没有 BOTPLAY 文字**：0.6.3 本来就没有这个元素，不是缺资源。
 - **`StageEditorState` 列出 body/1.0.4/0.6.3 当 stage 名**：已修。
 
-### 0.4 这一轮已经做完的
+### 0.4 2026-11-13 那一轮做完的
 
 - 三引擎并进同一个 exe（`1fd1c78`）
 - 资产按版本分组：`assets/{body,1.0.4,0.6.3}`，`Project.xml` 三段对称声明（`6ef5666`）
@@ -142,12 +163,15 @@ if (controls.ACCEPT && subState == null) {
 
 ## 1. 项目是什么
 
-Psych Engine 1.0.4 的源码 fork，目标是让 0.6.3 / 0.7.3 时代的老 mod（Lua + HScript）不改一行就能跑，
-外加一个把 `.js` 转译成 Lua 的 FunkinJS。
+Psych Engine 1.0.4 的源码 fork，目标是让 0.6.3 / 0.7.3 时代的老 mod（Lua + HScript）不改一行就能跑。
+`.js` 有两条路：默认 Troll（把 JS 转译成 Lua 塞回 LuaJIT，兼容优先），
+切到 QuickJS 后走真的 QuickJS-NG 运行时（`source/jsruntime/`，见 `docs/JS_QUICKJS.md`）。
+
+同一个 exe 里并了三棵树（本体 / 原版 1.0.4 / 0.6.3），靠 `bin/engine.txt` 选。
 
 - 仓库：`D:\FNF\FNF-PE_RealQuickJs_Engine`
 - 上游参照：`.workbuddy/upstream/`（pe063 / pe073 / pe104 完整，novaflare 只有 `source/`）
-- 审计工具：`python tools/lua_compat_audit.py --ref .workbuddy/upstream/<v>/source --label <v>`
+- 审计工具：`bash manage.sh audit`（7 号功能，拿 `.workbuddy/upstream/` 当基准比 Lua 函数名）
 
 ## 2. 用户偏好（务必遵守）
 
@@ -161,46 +185,57 @@ Psych Engine 1.0.4 的源码 fork，目标是让 0.6.3 / 0.7.3 时代的老 mod�
 ## 3. 构建与测试
 
 ```bash
-bash building/build.sh            # 增量 release，约 1 分钟
-bash building/build.sh -debug     # debug
-bash building/build.sh -clean     # 全量重编，约 15~30 分钟
-bash building/build.sh -dry       # 只打印计划
+bash manage.sh release                 # 增量 release（= 2 号功能，约 1 分钟）
+bash manage.sh debug                   # debug
+bash manage.sh clean                   # 全量重编（先清 obj/src）
+bash manage.sh env                     # 环境体检，缺库会自动补
+bash .workbuddy/build.sh [-debug|-clean]   # 薄壳：翻译参数 + 裹 conhost --headless
 ```
 
-`building/build.sh` 六步：找 Haxe → 用 `haxelib list` 核对 `Project.xml` 要求的库 → 扫 MSVC/SDK →
-关运行中的游戏 / `-clean` → `lime build windows` → 验收 + 铺 `assets/base_game`。
-Windows 上双击 `building/Build.bat` 等价。日志在 `building/logs/`。
+`manage.sh` 现在是唯一的脚本（以前散在 `building/`、`tools/` 里的都并进来了）：
+环境体检 → 补库 → `lime build windows` → 铺 `assets/base_game` 并校验。
+**直接 `haxelib run lime build` 会失败**，缺 MSVC/SDK 的环境变量。
 
-- **hxcpp 缓存默认开**（`.cache/hxcpp`，命中时直接拷 `.obj` 不跑 cl.exe）。首次填充要算哈希 + 写缓存，
-  那次增量 152s；往后稳态增量 73s 左右（不开缓存 42~62s），全量重编省得多。怀疑缓存里躺的是旧 obj 时用 `-no-cache`。
-- `assets/base_game` 是编译**之后**才拷进 bin 的（`BASE_GAME_FILES` 故意留在 `Project.xml` 的 officialBuild 段）
-- `VIDEOS_ALLOWED` 已移出 officialBuild 段（视频要用），代价是 bin 多 111MB 的 libvlc
+- hxcpp 缓存在 `.cache/hxcpp`，命中时直接拷 `.obj`
+- `assets/base_game` 是编译**之后**才铺进 bin 的（`BASE_GAME_FILES` 故意留在 `Project.xml` 的 officialBuild 段）
+- 无控制台环境（编辑器 / CI / 后台任务）要裹 `conhost --headless`，否则 haxe、cl、link
+  各弹一个黑框。`.workbuddy/build.sh` 已经包好了，并且用临时文件把退出码带出来
+  —— `conhost` 会把子进程退出码吃成 0
+- 跑游戏/跑测试一律不弹窗：`AutoTestState` 把窗口最小化 + 挪屏幕外 + 静音，
+  只有 `PE_AUTOTEST_SHOW=1` 才显示画面
 
-回归：
+回归（两条，别混）：
 
 ```bash
-bash .workbuddy/run_test.sh [song]        # 注入 AutoTestState → 编译 → 放脚本 → 自动开局 → 收结果 → 清理
+bash .workbuddy/run_test.sh [song]        # Lua / 兼容层
+bash .workbuddy/run_qjs_test.sh [song]    # QuickJS 真运行时
 PE_BUILD=debug bash .workbuddy/run_test.sh
 NOPATCH=1 bash .workbuddy/run_test.sh     # 不给谱面打补丁
 ```
 
 - 测试入口 `AutoTestState.hx` 由 `harness/apply_hook.py on/off` 临时拷进 `source/`，跑完自动撤
-- 测试脚本在 `.workbuddy/luatest/scripts/`，舞台/事件/音符类型脚本在 `.workbuddy/luatest/{mods,assets}/`
+- 脚本放 `bin/mods/body/scripts/` —— **按版本分目录**，`bin/mods/scripts` 是扫不到的
 - 结果写 `.workbuddy/testout/*.txt`，格式 `PASS|名字` / `FAIL|名字` / `ERR|...`
-- **`run_test.sh` 的 cleanup 是白名单**：新增测试脚本必须同时加进 cleanup，否则会留在 `bin/mods` 里
+- 两个 runner 都会把 `engine.txt` 强制成 `body`、跑完还原：不强制的话 `Main.main()`
+  走进 pe063/vanilla 分支，测试入口那个补丁不在那条路上，一个结果文件都不会有
+- **cleanup 是白名单**：新增测试脚本必须同时加进 cleanup，否则会留在 `bin/mods` 里
 
-**最近一次全绿（2026-11-10 13:04）**
+**最近一次全绿（2026-11-16）**
 
 ```
-edge 10/0   more 37/0   v073 58/0   v104 32/0
+edge 10/0   more 37/0   v073 58/0   v104 32/0   jssyntax 1/0
 versiontag 1/0（带 %run_v_0.7.3 的脚本看到 0.7.3）
 versionplain 1/0（不带标记的脚本仍是 1.0.4）
 stage / notetype / event 三类脚本都正常
+QuickJS 冒烟 26 项（run_qjs_test.sh）
 ```
 
 ## 4. 兼容层现在有哪些东西
 
 分五层，改之前先确认改的是哪一层（详见 `docs/LUA_COMPAT.md` 第一节）：
+
+> `.js` 那条是另算的：默认走 Troll 转译（转成 Lua 塞进 FunkinLua，所以上面五层全部继承），
+> 切成 QuickJS 之后走 `source/jsruntime/`，那套桥的规则在 `docs/JS_QUICKJS.md`。
 
 | 层 | 位置 | 管什么 |
 |---|---|---|
@@ -245,18 +280,48 @@ stage / notetype / event 三类脚本都正常
 5. 写 Haxe 时对象字面量的 key（`{songSpeed: ...}`）不能加前缀；签名行尾的 `//` 注释会吞后面生成的代码；
    `:Void` 不能加 `return`（搬运脚本的经验）。
 6. `Project.xml` 里 `BASE_GAME_FILES` 和 `VIDEOS_ALLOWED` 是两个独立开关，前者故意留在 officialBuild 段。
+7. **hxcpp 的反射不调用 getter**。flixel 里 `FlxTypedSpriteGroup.members` 是
+   `var members(get, never)`，用 `Dynamic` 取只会拿到 null，接着 `.indexOf()` 就是
+   Null Object Reference（0.7.3 的 `getObjectOrder` 就栽在这，见 `FunkinLua.memberArray()`）。
+   同一个家族还有 `FlxText.width`：create 阶段它等于 `fieldWidth`，别拿它算居中。
+8. flixel 5.6 的 `FlxGroup` / `FlxSpriteGroup` **不是泛型类**，写成 `FlxGroup<FlxBasic>`
+   会报 "Too many type parameters"。
+9. `conhost --headless` 会把子进程的退出码吃成 0，用它包命令必须另想办法把真状态带出来。
+10. 同名 mod 在版本目录和其他位置各留一份会被加载两遍（两套 lua/hscript 同时跑），
+    以前 global 机制下实测直接把游戏跑崩 —— 这也是删掉那个机制的原因之一。
+11. 别用 `bmp.draw(FlxG.game)` 截屏做布局验证：`allow-high-dpi` + RatioScaleMode 下
+    拿到的是放大 1.5 倍又被裁掉的图，看着像排版错了，其实屏幕上是对的。
+12. 崩溃屏、启动屏这类**要跨三棵树共用**的 state 只能用 flixel 原生控件，
+    不能碰各树的 `Button` / `Alphabet`；而且 `create` 里必须
+    `FlxG.cameras.reset()`，否则会带着上一个 state 的 zoom/scroll 摆版。
 
 ## 6. 已知未修
 
 - ~~`weeb/` / `pauseAlt/` / `ui/` / `philly/` 素材在 bin 里不存在~~ —— 2026-11-13 晚修好：
   根因是 `assets/base_game`（官方素材单一源，713 个文件）没被铺进 `bin/assets/<版本>/`，
   连带两棵 1.0.4 树的 `shared/weeks/*.json`、`week*`、`songs`、`characters` 全都缺。
-  现在由 `building/prep_assets.sh`（build.sh 第 6 步）用硬链接补齐，已核对两棵树 0 缺。
+  现在由 `manage.sh` 的铺素材步骤（5 号功能）用硬链接补齐，已核对三棵树 0 缺。
 - `noteSplashes` 的老式扁平图集如果**和 1.0 内置皮肤同名**，仍会被解析到内置皮肤（优先能加载的那个）。
 - `FlxUIDropDownMenuCustom` 这类依赖 flixel-ui 的类，1.0 已经没有对应库，接不了。
 - 画面层面的兼容（贴图位置、动画观感、UI 层级）这套测试看不出来，只能人眼验。
 - 备选没做：virtualPad 移植、lua 报错去重、`NotesSubState` —— 用户没点头就不要动。
+- ~~`run_test.sh` 跑不起来~~ —— 2026-11-16 修好：`patch_chart.py`、测试脚本目录、
+  素材目录全都停在双引擎改造前，要加 `mods/body/`、`assets/body/` 这一层。修完 140 条断言全绿。
+- `run_test.sh` / `run_qjs_test.sh` 都在 `.workbuddy/` 里，**git 不跟踪**，换机器要自己带。
+- JS 那三个 Haxe 互操作函数（`runHaxeCode` / `runHaxeFunction` / `addHaxeLibrary`）没做，
+  要做的话得给 `JSScriptHost` 挂一个嵌入式 HScript（`HScript.new` 的 parent 是 `Dynamic`，
+  只用 `scriptName` / `modFolder` / `lastCalledFunction` / `hscript` / `get` 五个东西）。
 
 ## 7. git 状态
 
-工作区未提交改动集中在 11-10 的三块工作 + `building/`。上一笔提交 `4559448` 是 11-09 的全量兼容层。
+2026-11-16 之后的四笔（都在 master 上，已推不推看用户）：
+
+```
+f4a79b3 compat: 修 0.7.3 的 getObjectOrder 在 HUD 元素上必崩
+353852b mods: 去掉 mods/global 全局机制，每个引擎只读自己的
+e1b57fe engine: global mod 三树通用、崩溃拦截器、兼容开关并进 gameplay
+e0a7aab js: QuickJS 通道补完取值/停止/装卸，宿主函数对齐 Lua
+```
+
+工作区干净。`export/` 里是编译产物，`.workbuddy/` 整个被 ignore（测试脚本、记忆、构建壳都在
+里面，搬机器要单独拷）。

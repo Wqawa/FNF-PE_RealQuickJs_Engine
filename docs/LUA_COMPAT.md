@@ -317,6 +317,26 @@ v073 掉 4 项、v104 掉 3 项。回调签名补上显式 `:Dynamic` 就恢复�
 `Bar` 里 override `set_color`，只染 `leftBar`，跳过 `rightBar` 和 `bg`。
 实测 `alone`：修复前 `bgColor` 跟着变 `0xFF3E25`，修复后保持 `0xFFFFFF`，`leftClip` 照常从 0 增长。
 
+### 第 9 轮：0.7.3 HUD 层号（2026-11-16）
+
+**24. `getObjectOrder('healthBar')` 抛 Null Object Reference** — `FunkinLua.hx`
+
+现象：老 mod 读 HUD 元素的层号，直接 `CALLBACK ERROR! Exception: Null Object Reference`；
+`setObjectOrder` 跟着挂（它第一步就读旧层号）。0.7.3 那套 HUD 排序写法在 1.0.4 上完全不能用。
+
+不是对象找不到 —— 诊断打出来 `leObj = objects.Bar` 是好的。真因是 **hxcpp 的反射不调用 getter**：
+`PlayState.uiGroup` 是 `FlxTypedSpriteGroup`，它的 `members` 声明为
+`public var members(get, never):Array<T>`（内部转发 `group.members`），
+在 `Dynamic` 上取 `.members` 只会得到 `null`，紧接着 `.indexOf()` 就空引用。
+`getUIContainer()` 里同名字段没事，因为那儿是静态类型访问、走了 getter。
+
+修法：新增 `FunkinLua.memberArray(container)`，按容器类型取真数组
+（`FlxSpriteGroup` → `group.members`，`FlxGroup` → `members`，`Array` 原样），
+`getObjectOrder` 两条分支都走它，取不到返回 `-1` 而不是抛。
+
+顺带记一下：`run_test.sh` / `patch_chart.py` 的路径停在双引擎改造前
+（少了 `mods/body/`、`assets/body/` 这一层），这一轮修好后这条回归才真正跑起来。
+
 ### 当前状态
 
 | 脚本 | 用例 | 失败 |
@@ -325,14 +345,16 @@ v073 掉 4 项、v104 掉 3 项。回调签名补上显式 `:Dynamic` 就恢复�
 | `compat_v104.lua`（1.0.4 写法） | 32 | 0 |
 | `compat_more.lua`（补充） | 37 | 0 |
 | `compat_edge.lua`（边界 + js） | 10 | 0 |
+| `jsSyntax.js`（转译器语法覆盖） | 1 | 0 |
 | `versionTag(%run_v_0.7.3).lua`（版本标记） | 1 | 0 |
 | `versionPlain.lua`（版本标记不泄漏） | 1 | 0 |
-| `stages/stage.lua` / `custom_notetypes/*.lua` / `custom_events/*.lua` | 三类都能加载并收到回调 | 0 |
+| `stages/stage.lua` / `custom_notetypes/*.lua` / `custom_events/*.lua` | 三类都能加载并收到回调（2026-11-16 实测：stage ok / notetype ok(assets-root) / event ok(fired)） | 0 |
 | `compat_callbacks.lua`（回调计数） | onCreate / onCreatePost / onStepHit / onBeatHit / onSectionHit / onSpawnNote / opponentNoteHit 全部有触发 | — |
 
 ### 还没验的
 
 - **画面**。所有判定都停在「属性值 / 返回值」这一层，贴图位置、动画观感、UI 层级到底对不对，
   这套测试看不出来。
-- **stage / notetype / event 脚本**（`stages/x.lua`、`custom_notetypes/x.lua`、`custom_events/x.lua`）。
+- ~~stage / notetype / event 脚本~~ —— 2026-11-16 补验：三类都能按 `mods/body/{stages,custom_events}` /
+  `assets/body/custom_notetypes` 加载并收到回调（custom_notetype 走的是 assets 根兜底那条路）。
 - **0.6.3 的 `FlxUIDropDownMenuCustom` 这类**：依赖 flixel-ui，1.0 已经没有这个库，接不了。

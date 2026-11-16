@@ -128,7 +128,13 @@ mods/xxx/scripts/legacy-thing(%run_v_0.6.3).lua
 
 ## 二、FunkinJS
 
-让引擎读 `.js` 脚本。
+让引擎读 `.js` 脚本。有两条路，开关在 **Gameplay 设置 → JS Engine**：
+
+- **Troll（默认）** —— 转译成 Lua 塞回现成的解释器，兼容优先，下面这一节讲的就是它
+- **QuickJS** —— 真的 QuickJS-NG 运行时，一文件一个 context，`getVar` / `Function_Stop` /
+  脚本装卸 / shader / 成就那一批 API 和 Lua 对齐。结构和扩展方法见 `docs/JS_QUICKJS.md`
+
+### 转译路线（Troll）
 
 实现方式：**照样交给现成的 Lua 解释器，但转译比分花括号多做了几层**。
 
@@ -156,7 +162,7 @@ total += 1;                         →   total = total + 1;
 
 每遍都是「扫描 + 重写」而不是正则替换，所以字符串里的 `=>`、注释里的 `{` 不会被误伤。
 
-用法：把脚本放 `mods/<mod>/scripts/xxx.js`，或者 `mods/<mod>/data/<song>/xxx.js`。引擎在找不到同名 `.lua` 时会自动回退到 `.js`。
+用法：把脚本放 `mods/<版本>/<mod>/scripts/xxx.js`，或者 `mods/<版本>/<mod>/data/<song>/xxx.js`（`<版本>` 是 `body` / `1.0.4` / `0.6.3`）。引擎在找不到同名 `.lua` 时会自动回退到 `.js`。
 
 **还是做不了的**（不是 bug，是转译路线的边界）：
 
@@ -188,6 +194,22 @@ python .workbuddy/hash_utils.py
 
 ---
 
+## 四、崩溃屏
+
+三棵树共用一个拦截器（`backend.EngineCrash`），装在 `Main.main()` 分叉之前 —— 切到原版
+1.0.4 或 0.6.3 崩了也一样走这条路。
+
+- 崩了先写 `crash/PsychEngine_<时间>.txt`（错误 + 调用栈），再切到引擎内的崩溃屏，
+  不再弹系统对话框
+- 屏幕上显示引擎、时间、错误和调用栈；按 **C** 或点 **COPY** 复制全文
+- **QUIT** 退出，**MAIN MENU** 回到当前引擎的主菜单（按 `engine.txt` 判）
+- `Ctrl+Alt+Shift+Q` 手动触发一次，用来验证这个屏本身
+
+界面只用 flixel 原生控件（色块 + `FlxText`），不依赖任何一棵树的 Button / Alphabet ——
+崩溃的时候最不该假设的就是「引擎自己的 UI 还好使」。
+
+---
+
 ## 构建
 
 所有脚本都合并成了根目录一个 `manage.sh`（Windows 双击 `manage.bat`，它只负责找 bash）：
@@ -211,15 +233,21 @@ bash manage.sh --en 6   # 跳过菜单：只校验资产
 ## 目录
 
 ```
-building/
-├── build.sh                     # 一站式编译（探工具链 → 查库 → 编译 → 铺素材 → 验收）
-└── Build.bat                    # Windows 双击入口
+manage.sh                        # 唯一的脚本：体检 / 补库 / 编译 / 铺素材 / 校验 / 审计
+manage.bat                       # Windows 双击入口
 
-source/
+source/                          # 本体这棵树（engine.txt = body）
 ├── backend/
+│   ├── EngineCrash.hx           # 崩溃拦截（三棵树共用）
+│   ├── CrashState.hx            # 崩溃屏幕
 │   ├── ScriptClassAliases.hx    # 0.6.3 裸类名 → 现代全名
 │   ├── ClientPrefs.hx           # 含旧静态字段转发
 │   └── Song.hx                  # 谱面格式识别
+├── jsruntime/                   # 真 QuickJS-NG 运行时（engine.txt = QuickJS 的模式）
+│   ├── QuickJSHandler.hx        # 桥 + 宿主函数总表
+│   ├── JSPlayer.hx              # 脚本清单 / 分发 / 装卸
+│   ├── JSScriptHost.hx          # IScriptHost 实现
+│   └── QJSShaders.hx            # runtime shader 表
 ├── psychlua/
 │   ├── FunkinJS.hx              # JS 转译层 + 完整性校验
 │   └── JavaScriptUtils.hx       # issue 存档（纯注释）
