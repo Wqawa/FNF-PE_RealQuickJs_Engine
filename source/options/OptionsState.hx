@@ -12,7 +12,6 @@ class OptionsState extends MusicBeatState
 		'Graphics',
 		'Visuals',
 		'Gameplay',
-		'Compat',
 		'Switch Engine'
 		#if TRANSLATIONS_ALLOWED , 'Language' #end
 	];
@@ -34,8 +33,6 @@ class OptionsState extends MusicBeatState
 				openSubState(new options.VisualsSettingsSubState());
 			case 'Gameplay':
 				openSubState(new options.GameplaySettingsSubState());
-			case 'Compat':
-				openSubState(new options.CompatSubState());
 			case 'Switch Engine':
 				openSubState(new options.EngineSelectSubState());
 			case 'Adjust Delay and Combo':

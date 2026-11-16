@@ -541,6 +541,20 @@ class Paths
 	static public function pushGlobalMods() // prob a better way to do this but idc
 	{
 		globalMods = [];
+
+		// mods/global/ 里的文件夹直接算全局：三次改造里这条规则三棵树统一
+		// （0.6.3 原来压根没有这条路，所以那边 global 一直不生效）。
+		var globalRoot:String = globalModPath('');
+		if(FileSystem.exists(globalRoot))
+		{
+			for (folder in FileSystem.readDirectory(globalRoot))
+			{
+				var dir:String = haxe.io.Path.join([globalRoot, folder]);
+				if(sys.FileSystem.isDirectory(dir) && !ignoreModFolders.contains(folder.toLowerCase()) && !globalMods.contains(folder))
+					globalMods.push(folder);
+			}
+		}
+
 		var path:String = 'mods/0.6.3/modsList.txt';
 		if(FileSystem.exists(path))
 		{
@@ -558,7 +572,7 @@ class Paths
 							if(rawJson != null && rawJson.length > 0) {
 								var stuff:Dynamic = Json.parse(rawJson);
 								var global:Bool = Reflect.getProperty(stuff, "runsGlobally");
-								if(global)globalMods.push(dat[0]);
+								if(global && !globalMods.contains(dat[0])) globalMods.push(dat[0]);
 							}
 						} catch(e:Dynamic){
 							trace(e);
@@ -567,6 +581,7 @@ class Paths
 				}
 			}
 		}
+		if(globalMods.length > 0) trace('[mods] global: ' + globalMods.join(', '));
 		return globalMods;
 	}
 
