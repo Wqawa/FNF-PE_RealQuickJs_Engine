@@ -525,10 +525,15 @@ class FunkinLua implements IScriptHost {
 				// 1.0 packs every HUD element into PlayState.uiGroup, so their index has to be
 				// read from that group instead of PlayState.members (where they no longer live)
 				var uiContainer:Dynamic = getUIContainer(leObj);
-				if(uiContainer != null) return uiContainer.members.indexOf(leObj);
+				if(uiContainer != null)
+				{
+					var uiMembers:Array<Dynamic> = memberArray(uiContainer);
+					if(uiMembers != null) return uiMembers.indexOf(leObj);
+				}
 
 				var groupOrArray:Dynamic = CustomSubstate.instance != null ? CustomSubstate.instance : LuaUtils.getTargetInstance();
-				return groupOrArray.members.indexOf(leObj);
+				var members:Array<Dynamic> = memberArray(groupOrArray);
+				return (members == null) ? -1 : members.indexOf(leObj);
 			}
 			luaTrace('getObjectOrder: Object $obj doesn\'t exist!', false, false, FlxColor.RED);
 			return -1;
@@ -1886,6 +1891,24 @@ class FunkinLua implements IScriptHost {
 	 * but the ordering helpers (getObjectOrder / setObjectOrder) still assume those objects sit
 	 * directly in PlayState.members. Resolve the container an object really lives in first.
 	 */
+	/**
+	 * 取容器里的成员数组。
+	 *
+	 * FlxTypedSpriteGroup.members 是个 getter（内部转发 group.members），
+	 * 用 Dynamic 取会直接拿到 null —— hxcpp 的反射不会调 getter。0.7.3 的
+	 * getObjectOrder 在 HUD 元素上必抛 Null Object Reference 就是栽在这。
+	 */
+	public static function memberArray(container:Dynamic):Array<Dynamic>
+	{
+		if(container == null) return null;
+		if(Std.isOfType(container, flixel.group.FlxSpriteGroup))
+			return cast (cast container : flixel.group.FlxSpriteGroup).group.members;
+		if(Std.isOfType(container, flixel.group.FlxGroup))
+			return cast (cast container : flixel.group.FlxGroup).members;
+		if(Std.isOfType(container, Array)) return cast container;
+		return null;
+	}
+
 	public static function getUIContainer(obj:FlxBasic):Dynamic
 	{
 		var ps = PlayState.instance;
