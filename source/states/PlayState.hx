@@ -2564,21 +2564,33 @@ class PlayState extends MusicBeatState
 	}
 
 	public function callOnScripts(funcToCall:String, args:Array<Dynamic> = null, ignoreStops = false, exclusions:Array<String> = null, excludeValues:Array<Dynamic> = null):Dynamic {
-		var returnVal:Dynamic = LuaUtils.Function_Continue;
 		if(args == null) args = [];
+		if(exclusions == null) exclusions = [];
+		if(excludeValues == null) excludeValues = [LuaUtils.Function_Continue];
 
 		// 事件顺带转给 JS 脚本一份。放在这里而不是每处调用点，是因为
 		// onUpdate / onUpdatePost / onBeatHit / onStepHit / onSongStart … 全走这个入口，
 		// 一处转发就够，不会漏。jsEngine 不是 QuickJS 时是空转。
+		//
+		// JS 排在 Lua / HScript 前面，所以它喊停时后面两条这次就不发了 ——
+		// 和 Lua 里 break 掉剩下的 lua 脚本同一个意思。返回值也必须往上交：
+		// 调用方只认 LuaUtils.Function_Stop，吞掉就等于「JS 永远停不了引擎动作」。
+		var jsStopped:Dynamic = null;
 		#if LUA_ALLOWED
-		jsruntime.JSPlayer.forward(funcToCall, args);
+		var jsRet:Dynamic = jsruntime.JSPlayer.forward(funcToCall, args);
+		if(jsRet != null && !excludeValues.contains(jsRet)
+			&& (jsRet == LuaUtils.Function_Stop || jsRet == LuaUtils.Function_StopLua || jsRet == LuaUtils.Function_StopAll))
+		{
+			// ignoreStops 挡的是「后面两条通道发不发」，不是「值往不往上交」
+			if(!ignoreStops) return jsRet;
+			jsStopped = jsRet;
+		}
 		#end
-
-		if(exclusions == null) exclusions = [];
-		if(excludeValues == null) excludeValues = [LuaUtils.Function_Continue];
 
 		var result:Dynamic = callOnLuas(funcToCall, args, ignoreStops, exclusions, excludeValues);
 		if(result == null || excludeValues.contains(result)) result = callOnHScript(funcToCall, args, ignoreStops, exclusions, excludeValues);
+		if(jsStopped != null && (result == null || result == LuaUtils.Function_Continue || excludeValues.contains(result)))
+			result = jsStopped;
 		return result;
 	}
 

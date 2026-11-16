@@ -3,11 +3,14 @@
 
 # AI 交接文档 — FNF-PE_RealQuickJs_Engine
 
-> 最后更新 2026-11-10 13:10。逐条修复记录在 `docs/LUA_COMPAT.md`（**改兼容层必须同步更新它**），
+> 最后更新 2026-11-16。逐条修复记录在 `docs/LUA_COMPAT.md`（**改兼容层必须同步更新它**），
 > 逐日流水账在 `.workbuddy/memory/YYYY-MM-DD.md`。
 >
-> **2026-11-13 起另有一份 `docs/HANDOFF_DUAL_ENGINE.md`**：讲 0.6.3 移植、原版 1.0.4 并进
-> 同一个 exe、以及 `Std.parseInt` 颜色饱和和窗口缩放两个坑。看那份之前先看这份了解本体。
+> - `docs/HANDOFF_DUAL_ENGINE.md`（2026-11-13）：0.6.3 移植、原版 1.0.4 并进同一个 exe、
+>   `Std.parseInt` 颜色饱和和窗口缩放两个坑。看那份之前先看这份了解本体。
+> - `docs/JS_QUICKJS.md`（2026-11-16）：`.js` 两条路（Troll 转译 / 真 QuickJS-NG）的分流、
+>   桥的协议、加宿主函数的步骤、停止哨兵、脚本装卸、已知限制、验证方法。
+>   **动 `source/jsruntime/` 之前先看这份。**
 
 ---
 
@@ -33,12 +36,18 @@ mod 同样分组：`mods/body`、`mods/1.0.4`、`mods/0.6.3`、`mods/global`（�
 **编译**（全程纯命令行，不弹窗）：
 
 ```bash
-bash building/build.sh                # 增量
-bash building/setup.sh                # 环境体检
+bash manage.sh release                # 增量（= 2 号功能）
+bash manage.sh env                    # 环境体检（= 1 号功能）
+bash .workbuddy/build.sh -debug       # 薄壳，会自己裹 conhost --headless
 ```
 
-如果从没有控制台的环境启动编译，Windows 会给 haxe/cl/link 各分配一个控制台窗口，
-用 `conhost --headless bash building/build.sh` 包一层就没有窗口了。
+从没有控制台的环境（编辑器 / CI / 后台任务）启动编译时，Windows 会给 haxe/cl/link
+各分配一个控制台窗口，屏幕上一排黑框闪。`.workbuddy/build.sh` 已经用
+`conhost --headless` 包好了 —— 它会把子进程退出码吃成 0，所以真结果走临时文件带出来。
+直接调 `manage.sh` 时记得自己裹一层。
+
+跑游戏/跑测试一律不弹窗：`AutoTestState` 会把窗口最小化 + 挪到屏幕外 + 静音，
+只有设 `PE_AUTOTEST_SHOW=1` 才显示画面。
 
 ---
 

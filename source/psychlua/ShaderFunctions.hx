@@ -7,8 +7,10 @@ import openfl.filters.ShaderFilter;
 
 class ShaderFunctions
 {
-	// 相机上挂过的 shader，按 tag 记，removeCamShader 靠它找回来
-	private static var storedFilters:Map<String, ShaderFilter> = [];
+	// 相机上挂过的 shader，按 tag 记，removeCamShader 靠它找回来。
+	// public 是给 jsruntime.QJSShaders 用的：JS 和 Lua 共用这一张表，
+	// 不然同一个 tag 在两个通道里互相看不见，谁摘谁都不对。
+	public static var storedFilters:Map<String, ShaderFilter> = [];
 
 	public static function getCam(obj:String):Dynamic
 	{
@@ -52,13 +54,14 @@ class ShaderFunctions
 				return false;
 			}
 
-			@:privateAccess
-			{
-				if(camera._filters == null) camera._filters = [];
-				var filter = new ShaderFilter(new FlxRuntimeShader(arr[0], arr[1]));
-				storedFilters.set(index, filter);
-				camera._filters.push(filter);
-			}
+			// flixel 5.6 把 _filters 改成了 deprecated 的 get/set 属性，真实字段是 filters。
+			// 老写法 camera._filters 在 Dynamic 上会抛 Invalid field:_filters —— 这条以前是坏的，
+			// 和 jsruntime.QJSShaders 一起改成走公开的 filters / setFilters。
+			var cur:Array<openfl.filters.BitmapFilter> = camera.filters;
+			if(cur == null) cur = [];
+			var filter = new ShaderFilter(new FlxRuntimeShader(arr[0], arr[1]));
+			storedFilters.set(index, filter);
+			camera.setFilters(cur.concat([filter]));
 			return true;
 			#else
 			FunkinLua.luaTrace("addShaderToCam: Platform unsupported for Runtime Shaders!", false, false, FlxColor.RED);
@@ -71,24 +74,26 @@ class ShaderFunctions
 			var camera = getCam(cam);
 			if(camera == null) return false;
 
-			@:privateAccess
+			if(!storedFilters.exists(shader))
 			{
-				if(!storedFilters.exists(shader))
-				{
-					FunkinLua.luaTrace('removeCamShader: $shader does not exist!', false, false, FlxColor.YELLOW);
-					return false;
-				}
-
-				if(camera._filters == null)
-				{
-					FunkinLua.luaTrace('removeCamShader: camera $cam does not have any shaders!', false, false, FlxColor.YELLOW);
-					return false;
-				}
-
-				camera._filters.remove(storedFilters.get(shader));
-				storedFilters.remove(shader);
-				return true;
+				FunkinLua.luaTrace('removeCamShader: $shader does not exist!', false, false, FlxColor.YELLOW);
+				return false;
 			}
+
+			var cur:Array<openfl.filters.BitmapFilter> = camera.filters;
+			if(cur == null)
+			{
+				FunkinLua.luaTrace('removeCamShader: camera $cam does not have any shaders!', false, false, FlxColor.YELLOW);
+				return false;
+			}
+
+			var dead = storedFilters.get(shader);
+			var next:Array<openfl.filters.BitmapFilter> = [];
+			for (f in cur)
+				if(f != dead) next.push(f);
+			camera.setFilters(next);
+			storedFilters.remove(shader);
+			return true;
 			#else
 			FunkinLua.luaTrace('removeCamShader: Platform unsupported for Runtime Shaders!', false, false, FlxColor.RED);
 			#end

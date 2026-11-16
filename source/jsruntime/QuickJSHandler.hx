@@ -56,6 +56,7 @@ static JSContext *g_ctxs[QJS_MAX_CTX];
 static int g_cur = -1;			// trampoline 用：当前正在跑哪个 context
 static char g_js_err[1024];
 static char g_js_out[8192];
+static char g_js_ret[1024];		// 上一次 js_invoke 的返回值（字符串化）
 
 // 每个 .js 文件一个 context（对齐 Lua「一个文件一个解释器」），
 // 这样同名回调不会互相覆盖。runtime 只有一个，context 用整数句柄表示。
@@ -140,6 +141,31 @@ static const char *js_get_str_h(int h, const char *name) {
 	return g_js_out;
 }
 
+// 读全局，顺便告诉 Haxe 它是什么类型：
+//   0 = undefined/null（等于「没有这个变量」），1 = 布尔，2 = 数字，3 = 字符串，
+//   4 = 对象 / 函数（只有字符串化结果，桥是字符串桥，搬不过去）。
+// 不给类型的话，setOnScripts 塞进来的 true / 3.5 读回去就全成了 "true" / "3.5"。
+static int js_get_typed_h(int h, const char *name) {
+	JSContext *c = js_ctx(h);
+	g_js_out[0] = 0;
+	if (c == nullptr) return 0;
+	JSValue g = JS_GetGlobalObject(c);
+	JSValue v = JS_GetPropertyStr(c, g, name);
+	int kind = 0;
+	if (JS_IsBool(v)) kind = 1;
+	else if (JS_IsNumber(v)) kind = 2;
+	else if (JS_IsString(v)) kind = 3;
+	else if (!JS_IsUndefined(v) && !JS_IsNull(v)) kind = 4;
+	if (kind != 0) {
+		const char *cs = JS_ToCString(c, v);
+		if (cs == nullptr) kind = 0;
+		else { snprintf(g_js_out, sizeof(g_js_out), "%s", cs); JS_FreeCString(c, cs); }
+	}
+	JS_FreeValue(c, v);
+	JS_FreeValue(c, g);
+	return kind;
+}
+
 typedef ::String (*qjs_host_fn)(int, ::String, ::String, ::String, ::String, ::String, ::String);
 static qjs_host_fn g_host = nullptr;
 
@@ -164,10 +190,13 @@ static JSValue qjs_host(JSContext *ctx, JSValueConst this_val, int argc, JSValue
 // 调用 JS 全局函数（回调用）：
 //   mode 0 = 无参，1 = (number)，2 = (string)，
 //   mode 3 = (string, number)，4 = (string, string)，5 = (string, number, number)
+// 返回值顺手字符串化丢进 g_js_ret：脚本 return Function_Stop 要靠它往上传。
+// 截断上限 1KB —— 回调返回值本来就只该是哨兵或短值，长字符串自己写文件。
 static bool js_invoke(int h, const char *name, int mode, double num, const char *str, const char *str2, double extra) {
 	JSContext *c = js_ctx(h);
 	if (c == nullptr) return false;
 	g_js_err[0] = 0; // 清掉上一次的残留，否则「函数不存在」会被误报成异常
+	g_js_ret[0] = 0;
 	g_cur = h;
 
 	bool ok = false;
@@ -197,6 +226,10 @@ static bool js_invoke(int h, const char *name, int mode, double num, const char 
 		JSValue r = JS_Call(c, f, g, n, n > 0 ? a : nullptr);
 		ok = !JS_IsException(r);
 		if (!ok) js_take_err(c);
+		else if (!JS_IsUndefined(r) && !JS_IsNull(r)) {
+			const char *cs = JS_ToCString(c, r);
+			if (cs != nullptr) { snprintf(g_js_ret, sizeof(g_js_ret), "%s", cs); JS_FreeCString(c, cs); }
+		}
 		JS_FreeValue(c, r);
 		for (int i = 0; i < n; i++) JS_FreeValue(c, a[i]);
 	}
@@ -314,6 +347,34 @@ class QuickJSHandler
 		return out;
 	}
 
+	/**
+	 * 读脚本里的全局，带回类型。undefined / null 都算「没有」，返回 null。
+	 * 对象 / 函数只能拿到字符串化结果（String(obj)），桥是字符串桥。
+	 */
+	public static function getGlobal(h:Int, name:String):Dynamic
+	{
+		if (!isReady(h) || name == null || name.length == 0) return null;
+		var kind:Int = 0;
+		untyped __cpp__('kind = js_get_typed_h(h, name.utf8_str());');
+		if (kind == 0) return null;
+		var s:String = '';
+		untyped __cpp__('s = ::String(g_js_out);');
+		return switch (kind)
+		{
+			case 1: s == 'true';
+			case 2: Std.parseFloat(s);
+			default: s;
+		};
+	}
+
+	/** 上一次 callGlobal* 的返回值（字符串化）；脚本没 return 就是空串。 */
+	public static function lastReturn():String
+	{
+		var s:String = '';
+		untyped __cpp__('s = ::String(g_js_ret);');
+		return s;
+	}
+
 	// ---------------------------------------------------------------- 回调调用
 	/** 无参回调。函数不存在时静默返回 false。 */
 	public static function callGlobal(h:Int, name:String):Bool
@@ -395,8 +456,8 @@ class QuickJSHandler
 	}
 
 	// ---------------------------------------------------------------- 宿主函数表
-	/** 字符串 → 数字 / 布尔 / null / 原字符串 */
-	@:keep static function coerce(v:String):Dynamic
+	/** 字符串 → 数字 / 布尔 / null / 原字符串（回调返回值也靠它还原类型） */
+	@:keep public static function coerce(v:String):Dynamic
 	{
 		if (v == null) return null;
 		var t:String = v.trim();
@@ -441,6 +502,13 @@ class QuickJSHandler
 			a === undefined ? "" : String(a), b === undefined ? "" : String(b),
 			c === undefined ? "" : String(c), d === undefined ? "" : String(d),
 			e === undefined ? "" : String(e), f === undefined ? "" : String(f));
+		// 停止哨兵：Lua 里 return Function_Stop 那一套，JS 侧同名可用。
+		// 值必须和 LuaUtils 里那五个常量逐字一致，PlayState 靠字符串比对认人。
+		globalThis.Function_Continue = "##PSYCHLUA_FUNCTIONCONTINUE";
+		globalThis.Function_Stop = "##PSYCHLUA_FUNCTIONSTOP";
+		globalThis.Function_StopLua = "##PSYCHLUA_FUNCTIONSTOPLUA";
+		globalThis.Function_StopHScript = "##PSYCHLUA_FUNCTIONSTOPHSCRIPT";
+		globalThis.Function_StopAll = "##PSYCHLUA_FUNCTIONSTOPALL";
 		globalThis.trace = (m) => __h(-1, m);
 		globalThis.getProperty = (v) => __h(0, v);
 		globalThis.setProperty = (v, val) => __h(1, v, val);
@@ -678,6 +746,32 @@ class QuickJSHandler
 			(vals !== null && typeof vals === "object")
 				? Object.keys(vals).map(k => k + "=" + vals[k]).join(",")
 				: String(vals === undefined ? "" : vals), dur, ease) === "1";
+
+		// ---- 230..252 补齐 Lua 那边有、这边以前缺的
+		globalThis.getModSetting = (k, m) => __h(230, k, m);
+		globalThis.setOnScripts = (v, a, ignoreSelf) => __h(231, v, a, ignoreSelf) === "1";
+		globalThis.setOnLuas = (v, a, ignoreSelf) => __h(232, v, a, ignoreSelf) === "1";
+		globalThis.setOnHScript = (v, a, ignoreSelf) => __h(233, v, a, ignoreSelf) === "1";
+		globalThis.callOnScripts = (f, a, ignoreStops) => __h(234, f, a, ignoreStops);
+		globalThis.callOnLuas = (f, a, ignoreStops) => __h(235, f, a, ignoreStops);
+		globalThis.callOnHScript = (f, a, ignoreStops) => __h(236, f, a, ignoreStops);
+		globalThis.initLuaShader = (n) => __h(237, n) === "1";
+		globalThis.setSpriteShader = (o, s) => __h(238, o, s) === "1";
+		globalThis.addShaderToCam = (c, s, i) => __h(239, c, s, i) === "1";
+		globalThis.removeCamShader = (c, s) => __h(240, c, s) === "1";
+		globalThis.clearCamShaders = (c) => __h(241, c) === "1";
+		globalThis.unlockAchievement = (n) => __h(242, n);
+		globalThis.isAchievementUnlocked = (n) => __h(243, n) === "1";
+		globalThis.achievementExists = (n) => __h(244, n) === "1";
+		globalThis.getAchievementScore = (n) => Number(__h(245, n));
+		globalThis.setAchievementScore = (n, v, save) => Number(__h(246, n, v, save));
+		globalThis.addAchievementScore = (n, v, save) => Number(__h(247, n, v, save));
+		// Lua 里的名字，和上面 227 的 changePresence 是同一个东西，纯别名
+		globalThis.changeDiscordPresence = (d, s, k, hs, e) => __h(227, d, s, k, hs, e);
+		globalThis.changeDiscordClientID = (id) => __h(248, id);
+		globalThis.getTranslationPhrase = (k, d) => __h(249, k, d);
+		globalThis.getFileTranslation = (k) => __h(250, k);
+		globalThis.close = () => __h(251) === "1";
 	';
 
 	/** 编号 → 实现。加函数只在这张表里加一行。 */
@@ -1752,15 +1846,20 @@ class QuickJSHandler
 				LuaUtils.setVarInArray(o184, b, coerce(c));
 				return '1';
 
-			// ---- 185..200 脚本管理（JS 单 context，语义按注释里那样简化）
+			// ---- 185..200 脚本管理
 			case 185, 187: // addLuaScript / addHScript
 				var p185:String = resolveScript(a);
 				if (p185 == null) return '0';
 				return JSPlayer.loadFile(p185) ? '1' : '0';
 
 			case 186, 188: // removeLuaScript / removeHScript
-				// 单 context 卸不掉单个文件，只能整首换掉。照实说，不假装成功。
-				log('[warn] removeLuaScript/removeHScript: JS 共用一个 context，无法单独卸载 $a');
+				// 每个 .js 一个 context，能单独卸。脚本卸自己（或卸一个正在回调里的脚本）时
+				// C 那边还在这个 ctx 的栈上，立刻 JS_FreeContext 会直接崩，
+				// 所以 JSPlayer 会把 free 推到下一帧。
+				var p186:String = resolveScript(a);
+				var p186name:String = (p186 != null) ? p186 : a;
+				if (JSPlayer.unloadFile(p186name)) return '1';
+				log('[warn] removeLuaScript/removeHScript: 没有这个脚本在跑 $a');
 				return '0';
 
 			case 189: // isRunning
@@ -1771,9 +1870,13 @@ class QuickJSHandler
 				return JSPlayer.getLoadedFiles().join(String.fromCharCode(1));
 
 			case 191: // callScript(script, func, arg) —— 调那个脚本自己的 context
+				// Lua 那边是把被调函数的返回值原样交回去的，这里也照做：
+				// 函数不存在才返回 '0'（Lua 是返回 nil，JS 侧没有 nil 就沿用 '0' 这个约定）。
 				var h191:Int = JSPlayer.handleOf(a);
 				if (h191 < 0) h191 = QuickJSHandler.current();
-				return QuickJSHandler.callGlobalStr(h191, b, c) ? '1' : '0';
+				if (!QuickJSHandler.callGlobalStr(h191, b, c)) return '0';
+				var r191:String = QuickJSHandler.lastReturn();
+				return (r191.length > 0) ? r191 : '1';
 
 			case 192: // callMethod(func, arg)
 				return QuickJSHandler.callGlobalStr(QuickJSHandler.current(), a, b) ? '1' : '0';
@@ -1984,6 +2087,144 @@ class QuickJSHandler
 					onComplete: function(_) onTweenDone(a, b)
 				}));
 				return '1';
+
+			// ---- 230..252 补齐 Lua 有、这边以前缺的
+			// 语义全对着 FunkinLua / ShaderFunctions / Achievements / Language 的实现对齐，
+			// 只是参数只能是字符串（桥的限制），数组型参数收不进来。
+			case 230: // getModSetting(setting, ?mod) —— 不给 mod 就用脚本自己属于的那个
+				if (a == null || a.length == 0) return '';
+				var mod230:String = b;
+				if (mod230 == null || mod230.length == 0)
+				{
+					var host230:JSScriptHost = JSPlayer.hostOfHandle(current());
+					mod230 = (host230 != null) ? host230.modFolder : null;
+				}
+				if (mod230 == null || mod230.length == 0)
+				{
+					log('[warn] getModSetting: 没给 mod 名，脚本又不在 mod 目录里');
+					return '';
+				}
+				var v230:Dynamic = LuaUtils.getModSetting(a, mod230);
+				return (v230 == null) ? '' : Std.string(v230);
+
+			case 231, 232, 233: // setOnScripts / setOnLuas / setOnHScript
+				var ps231:PlayState = PlayState.instance;
+				if (ps231 == null) return '0';
+				var ex231:Array<String> = [];
+				// 第三个参数是 ignoreSelf：默认 false（和 Lua 一样）
+				if (truthy(c))
+				{
+					var self231:JSScriptHost = JSPlayer.hostOfHandle(current());
+					if (self231 != null) ex231.push(self231.scriptId());
+				}
+				var val231:Dynamic = coerce(b);
+				if (idx == 231) ps231.setOnScripts(a, val231, ex231);
+				else if (idx == 232) ps231.setOnLuas(a, val231, ex231);
+				else ps231.setOnHScript(a, val231, ex231);
+				return '1';
+
+			case 234, 235, 236: // callOnScripts / callOnLuas / callOnHScript
+				var ps234:PlayState = PlayState.instance;
+				if (ps234 == null) return '';
+				var ex234:Array<String> = [];
+				// Lua 那边 ignoreSelf 默认 true：不排除自己的话，自己发的事件自己先收一遍，
+				// 写在回调里就是死循环。
+				var self234:JSScriptHost = JSPlayer.hostOfHandle(current());
+				if (self234 != null) ex234.push(self234.scriptId());
+				var args234:Array<Dynamic> = (b != null && b.length > 0) ? [coerce(b)] : [];
+				var stops234:Bool = truthy(c);
+				var r234:Dynamic = (idx == 234) ? ps234.callOnScripts(a, args234, stops234, ex234)
+					: (idx == 235) ? ps234.callOnLuas(a, args234, stops234, ex234)
+					: ps234.callOnHScript(a, args234, stops234, ex234);
+				return (r234 == null) ? '' : Std.string(r234);
+
+			#if (!flash && sys)
+			case 237: // initLuaShader(name)
+				return QJSShaders.init(a) ? '1' : '0';
+
+			case 238: // setSpriteShader(obj, shader)
+				return QJSShaders.setSprite(a, b) ? '1' : '0';
+
+			case 239: // addShaderToCam(cam, shader, ?index)
+				return QJSShaders.addToCam(a, b, c) ? '1' : '0';
+
+			case 240: // removeCamShader(cam, index)
+				return QJSShaders.removeFromCam(a, b) ? '1' : '0';
+
+			case 241: // clearCamShaders(cam)
+				return QJSShaders.clearCam(a) ? '1' : '0';
+			#end
+
+			case 242: // unlockAchievement(name)
+				#if ACHIEVEMENTS_ALLOWED
+				if (!backend.Achievements.exists(a))
+				{
+					log('[warn] unlockAchievement: 没有这个成就 $a');
+					return '';
+				}
+				return backend.Achievements.unlock(a);
+				#else
+				return '';
+				#end
+
+			case 243: // isAchievementUnlocked(name)
+				#if ACHIEVEMENTS_ALLOWED
+				if (!backend.Achievements.exists(a)) return '';
+				return backend.Achievements.isUnlocked(a) ? '1' : '0';
+				#else
+				return '';
+				#end
+
+			case 244: // achievementExists(name)
+				#if ACHIEVEMENTS_ALLOWED
+				return backend.Achievements.exists(a) ? '1' : '0';
+				#else
+				return '0';
+				#end
+
+			case 245: // getAchievementScore(name)
+				#if ACHIEVEMENTS_ALLOWED
+				if (!backend.Achievements.exists(a)) return '-1';
+				return Std.string(backend.Achievements.getScore(a));
+				#else
+				return '-1';
+				#end
+
+			case 246, 247: // setAchievementScore / addAchievementScore
+				#if ACHIEVEMENTS_ALLOWED
+				if (!backend.Achievements.exists(a)) return '-1';
+				var val246:Float = fnum(b, (idx == 246) ? 0 : 1);
+				// 第三个参数是 saveIfNotUnlocked，Lua 那边默认 true；这里空串也当 true
+				var save246:Bool = (c == null || c.length == 0) ? true : truthy(c);
+				var r246:Float = (idx == 246)
+					? backend.Achievements.setScore(a, val246, save246)
+					: backend.Achievements.addScore(a, val246, save246);
+				return Std.string(r246);
+				#else
+				return '-1';
+				#end
+
+			case 248: // changeDiscordClientID(?id) —— 空串 = 回默认 ID
+				#if DISCORD_ALLOWED
+				// 默认 ID 是 private final，Lua 那边是在同一个类里直接用的；
+				// 这里绕过可见性读一下，别传 null 进去（set_clientID 会拿它去重连）
+				var id248:String = (a != null && a.length > 0) ? a : @:privateAccess backend.DiscordClient._defaultID;
+				backend.DiscordClient.clientID = id248;
+				return '1';
+				#else
+				return '0';
+				#end
+
+			case 249: // getTranslationPhrase(key, ?default)
+				return backend.Language.getPhrase(a, (b != null && b.length > 0) ? b : null, null);
+
+			case 250: // getFileTranslation(key)
+				return backend.Language.getFileTranslation(a);
+
+			case 251: // close() —— Lua 是把自己标 dead，JS 这边就是卸掉自己的 context
+				var self251:JSScriptHost = JSPlayer.hostOfHandle(current());
+				if (self251 == null) return '0';
+				return JSPlayer.unloadFile(self251.path) ? '1' : '0';
 
 			default:
 				var m2:String = '[warn] 未实现的宿主函数编号 $idx (a=$a)';

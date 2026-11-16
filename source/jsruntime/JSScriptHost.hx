@@ -38,11 +38,15 @@ class JSScriptHost implements IScriptHost
 	}
 
 	/**
-	 * QuickJS 这侧只有 setGlobal，没有反着读的宿主函数。
-	 * 要读脚本内部的变量，走 QuickJSHandler 里 getGlobalFromScript 那条通道。
+	 * 读脚本自己的全局变量。数字 / 布尔 / 字符串带回原类型，没定义返回 null。
+	 * 跟 Lua 那边一样是「这个脚本内部」的量，不是 MusicBeatState.variables
+	 * （那个是跨脚本共享的 setVar/getVar 宿主函数管的东西）。
 	 */
 	public function getVar(name:String):Dynamic
-		return null;
+	{
+		if (closed || !QuickJSHandler.isReady(handle)) return null;
+		return QuickJSHandler.getGlobal(handle, name);
+	}
 
 	public function shutdown():Void
 	{
