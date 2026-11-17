@@ -47,7 +47,7 @@ import backend.Highscore;
 #end
 
 // // // // // // // // //
-class BodyMain extends Sprite
+class Main extends Sprite
 {
 	public static final game = {
 		width: 1280, // WINDOW width
@@ -62,7 +62,7 @@ class BodyMain extends Sprite
 	
 	// You can pretty much ignore everything from here on - your code should go in your states.
 
-	// 入口在公共层 source/Main.hx：装崩溃拦截、读 engine.txt、分叉。
+	// 入口在公共层 source/EngineBoot.hx：装崩溃拦截、读 engine.txt、分叉。
 	// 这里只负责本体这棵树启动（窗口、存档、脚本桥自检）。
 
 	public function new()

@@ -128,16 +128,15 @@ vanilla 分支没有自动入口，只能人工开机验；pe063 有探针（只
 
 `source/` 一刀切成两层：
 
-- `source/` **只留公共层**：`Main.hx`（入口：装崩溃拦截 → 读 engine.txt → 分叉）、
+- `source/` **只留公共层**：`EngineBoot.hx`（入口：装崩溃拦截 → 读 engine.txt → 分叉）、
   `Engine.hx`、`backend/EngineCrash.hx`、`backend/CrashState.hx`。没有 `import.hx`，
   公共文件自己写 import，`Engine.hx` 补了 `using StringTools`。
-- `source_body/body/` 收原 `source/` 的全部内容；`Main.hx` 改名 `BodyMain.hx`（类名同步），
-  去掉 `main()`，`FunkinJS.verifyUtilsIntegrity()` 挪进构造函数。
-  `ClientPrefs` / `VisualsSettingsSubState` / `Native` 里 6 处 `Main.fpsVar` / `Main.game`
-  改成 `BodyMain.`。
-- `Project.xml` 加一条 `<classpath name="source_body" />`；`<app main="Main">` 不变，
-  指向公共入口。
-- `.workbuddy/harness/apply_hook.py` 的注入点跟着走（`source_body/body/BodyMain.hx` +
+- `source_body/body/` 收原 `source/` 的全部内容，**body 的类还叫 `Main`**：
+  公共入口改名 `EngineBoot`（`<app main="EngineBoot">`），所以 `Main.fpsVar` / `Main.game`
+  那些引用一个字都不用改。body 的 `main()` 去掉，`FunkinJS.verifyUtilsIntegrity()`
+  挪进构造函数。
+- `Project.xml` 加一条 `<classpath name="source_body/body" />`；`<app main>` 指向 `EngineBoot`。
+- `.workbuddy/harness/apply_hook.py` 的注入点跟着走（`source_body/body/Main.hx` +
   `source_body/body/AutoTestState.hx`）；`manage.sh` 里 QuickJS 的路径同步。
 
 回归照旧全绿：Lua 10/37/58/32/1/1/1/10、QuickJS 26/27/2、0.6.3 探针 98 帧 ×2。
@@ -161,7 +160,7 @@ vanilla 分支没有自动入口，只能人工开机验；pe063 有探针（只
 |---|---|---|
 | `jsruntime/QuickJSHandler.hx` 的 `@:buildXml` libpath | 相对 obj 目录（`export/<mode>/windows/obj`） | 否，包名没变 → 生成路径还是 `obj/src/jsruntime/` |
 | 同文件 `@:cppFileCode` 的 `#include "../../../.."` | 相对生成的 cpp（`obj/src/jsruntime/`） | 否，同上 |
-| `BodyMain.hx` 的 `@:cppInclude('./external/gamemode_client.h')` | 相对源文件 | 否，`external/` 跟目录树一起搬了；而且只在 linux 分支生效 |
+| body `Main.hx` 的 `@:cppInclude('./external/gamemode_client.h')` | 相对源文件 | 否，`external/` 跟目录树一起搬了；而且只在 linux 分支生效 |
 | `manage.sh` 的 QuickJS 源码检查 | 绝对路径 | 已同步 |
 | `harness/apply_hook.py` 注入点 | 绝对路径 | 已同步 |
 

@@ -3,17 +3,17 @@ package;
 import openfl.Lib;
 
 /**
- * 三棵树的唯一入口。
+ * 三棵树的唯一入口（Project.xml 的 <app main> 指这里）。
  *
  * 这里只干三件事：装崩溃拦截、读 engine.txt 决定走哪棵树、把那一棵的 Sprite 挂上去。
  * **不要往这个文件里加业务代码** —— 它属于公共层（`source/`），三棵树共用同一份；
  * 一旦它 import 了 `backend.*` / `states.*` / `objects.*`，切到原版或 0.6.3 之后就会
  * 变成「本体的代码在别的树里跑」，资源路径也会跟着跑到 `assets/body`。
  *
- * 目录约定：`source/` = 公共层，`source_body/` = 改版 1.0.4，`source_vanilla/vanilla/`、
+ * 目录约定：`source/` = 公共层，`source_body/body/` = 改版 1.0.4，`source_vanilla/vanilla/`、
  * `source_063/pe063/` = 另外两棵树。公共层只允许依赖 flixel / lime / std。
  */
-class Main
+class EngineBoot
 {
 	public static function main():Void
 	{
@@ -42,6 +42,6 @@ class Main
 			return;
 		}
 
-		Lib.current.addChild(new BodyMain());
+		Lib.current.addChild(new Main());
 	}
 }
