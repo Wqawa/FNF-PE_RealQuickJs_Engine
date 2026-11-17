@@ -337,6 +337,77 @@ v073 掉 4 项、v104 掉 3 项。回调签名补上显式 `:Dynamic` 就恢复�
 顺带记一下：`run_test.sh` / `patch_chart.py` 的路径停在双引擎改造前
 （少了 `mods/body/`、`assets/body/` 这一层），这一轮修好后这条回归才真正跑起来。
 
+### 第 10 轮：脚本隔离收口（2026-11-17）
+
+不是某一条兼容 bug，是「同一个脚本被两条路认成两个文件」这一类。审计表在
+`docs/SCRIPT_ISOLATION_AUDIT.md`，这里只记结论。
+
+**25. `isRunning` / `addHScript` 找不到 `startLuasNamed` 找得到的脚本** — `FunkinLua.hx`
+
+`findScript` 走 `Paths.getPath`（mod → 关卡 → shared），没有 `assets/<ver>/<file>` 根兜底。
+0.6.x 扁平布局和「构建后才铺进 bin」的素材正靠那一级，于是：
+- `startLuasNamed('custom_notetypes/x.lua')` 加载成功；
+- `isRunning('custom_notetypes/x.lua')` 返回 false → 脚本被判成"没在跑" → `addLuaScript` 再加载一份。
+
+修法：`findScript` 直接调 `Paths.findScriptFile`（旧的两条兜底保留：绝对路径 / CWD 相对路径），
+扩展名判断改成 `toLowerCase().endsWith(ext)`。
+
+**26. 判重三种口径** — `FunkinLua.hx` / `PlayState.hx` / `JSPlayer.hx`
+
+Lua 和 HScript 都是 `scriptName == path` 字符串直比，JS 用 `toLowerCase`。Windows 的
+`FileSystem.exists` 不区分大小写、但返回的是**你传进去的那个字符串**，所以
+`Scripts/Hud.lua` 和 `scripts/hud.lua` 都能过 exists、却不相等 → 同一脚本两份。
+目录扫描那条路（`PlayState.create`）干脆没有判重。
+
+修法：新增 `Paths.scriptKey` / `Paths.sameScript`（斜杠归一 + 小写），五个入口统一；
+`PlayState` 新增 `isLuaScriptRunning` / `isHScriptRunning`，目录扫描和 `startXxxNamed` 共用。
+
+**27. 角色脚本用 `Iris.instances` 判重** — `PlayState.startCharacterScripts`
+
+`Iris.instances` 是进程级静态表，重名实例会被加 `_1` 后缀、取不回来。上一首歌留下的实例
+会让新歌的同名角色脚本被当成"已存在"直接跳过 —— 日志里一片正常，脚本就是不跑。
+
+修法：`startCharacterScripts` 直接调 `startLuasNamed('characters/x.lua')` /
+`startHScriptsNamed('characters/x.hx')`，判重看本 state 的 `luaArray` / `hscriptArray`。
+
+**28. hscript 拿到另一棵树的类** — `ScriptClassAliases.hx` / vanilla `HScript.hx`
+
+`resolveDeep` 的兜底只按 body 包名猜；vanilla 的 `CustomInterp.resolve` 未知标识符直接报错，
+而 `import` 那条一旦 `IsolatedImports` 表里没有就落回 `Type.resolveClass` → body 的类。
+拿到的类内部 `Paths.VERSION_DIR` 是 `body`，资源就从 `assets/body` 里出 —— 而那里装的正是
+1.0.4 官方素材，找得到、不报错，只是图是错的。
+
+修法：`resolve`/`resolveDeep` 加 `isForeignTree` 守卫（vanilla 模式只认 `vanilla.` 前缀，
+body 模式拒绝 `vanilla.*`/`pe063.*`）；`init()` 里清扫 `Iris.proxyImports` 的别树条目；
+vanilla `CustomInterp.resolve` 兜底走 `LuaUtils.resolveClass`；`IsolatedImports.register`
+先清后灌；pe063 `resolveClass` 撞树时改试 `pe063.<简单名>`。
+
+**29. `import` 的落点没人管** — body / vanilla 两份 `CustomInterp`
+
+前面 2.1~2.7 那些防线全在「查完表之后」，而 hscript `import` 的默认路径是
+`Iris.proxyImports` → `Tools.getClass` → `Type.resolveClass`，后两步照样命中另一棵树。
+`IsolatedImports` 是扫目录生成的静态表，漏一个名字就露洞。
+
+修法：两棵树各自 `override getOrImportClass` —— 解析结果属于别树就按本树规则重指
+（`ScriptClassAliases.resolve` / `LuaUtils.resolveClass`），指不到返回 null。
+表从此只是缓存，不再是正确性依赖。
+
+**30. hscript 没有 `%run_v_` 版本标记** — `HScript.hx`
+
+`preset()` 里塞 `version` 全局，规则和 `FunkinLua.parseVersionTag` 一致。
+只覆盖 `version`；脚本直接读 `MainMenuState.psychEngineVersion` 仍是真实值。
+
+**31. `removeHScript` 之后实例还留在数组里** — `FunkinLua.hx` / `PlayState.hx`
+
+`destroy()` 只把实例废掉，`hscriptArray` 里的引用还在，每次分发都要靠 `exists()` 兜。
+改成 destroy 后摘掉；`callOnHScript` / `allScripts` / `setOnHScript` 都跳过 `isClosed()`。
+
+**32. 离开 PlayState 后 `Paths.currentLevel` 不复位** — `MusicBeatState.hx`（两棵树）
+
+story / freeplay / 谱面编辑器都是直接 `switchState`，不经过 `LoadingState`，于是
+`currentLevel` 停在上一首歌的 week 目录，菜单里的图会先去 `assets/<ver>/<week>/` 找。
+`switchState` 里对非 PlayState 的目标复位成 `shared`。
+
 ### 当前状态
 
 | 脚本 | 用例 | 失败 |
@@ -348,6 +419,7 @@ v073 掉 4 项、v104 掉 3 项。回调签名补上显式 `:Dynamic` 就恢复�
 | `jsSyntax.js`（转译器语法覆盖） | 1 | 0 |
 | `versionTag(%run_v_0.7.3).lua`（版本标记） | 1 | 0 |
 | `versionPlain.lua`（版本标记不泄漏） | 1 | 0 |
+| `compat_isolation.lua`（脚本查找 / 判重 / 跨树类 / hscript 版本 / 卸载，2026-11-17） | 10 | 0 |
 | `stages/stage.lua` / `custom_notetypes/*.lua` / `custom_events/*.lua` | 三类都能加载并收到回调（2026-11-16 实测：stage ok / notetype ok(assets-root) / event ok(fired)） | 0 |
 | `compat_callbacks.lua`（回调计数） | onCreate / onCreatePost / onStepHit / onBeatHit / onSectionHit / onSpawnNote / opponentNoteHit 全部有触发 | — |
 

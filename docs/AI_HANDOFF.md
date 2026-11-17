@@ -3,9 +3,12 @@
 
 # AI 交接文档 — FNF-PE_RealQuickJs_Engine
 
-> 最后更新 2026-11-16。逐条修复记录在 `docs/LUA_COMPAT.md`（**改兼容层必须同步更新它**），
+> 最后更新 2026-11-17。逐条修复记录在 `docs/LUA_COMPAT.md`（**改兼容层必须同步更新它**），
 > 逐日流水账在 `.workbuddy/memory/YYYY-MM-DD.md`。
 >
+> - `docs/SCRIPT_ISOLATION_AUDIT.md`（2026-11-17）：三棵树所有「脚本隔离」点的问题表
+>   （查找 / 类解析 / 资源路径 / 装载判重），动手改 `Paths`、`ScriptClassAliases`、
+>   `IsolatedImports` 之前先看它。
 > - `docs/HANDOFF_DUAL_ENGINE.md`（2026-11-13）：0.6.3 移植、原版 1.0.4 并进同一个 exe、
 >   `Std.parseInt` 颜色饱和和窗口缩放两个坑。看那份之前先看这份了解本体。
 > - `docs/JS_QUICKJS.md`（2026-11-16）：`.js` 两条路（Troll 转译 / 真 QuickJS-NG）的分流、
@@ -73,6 +76,35 @@ bash .workbuddy/build.sh -debug       # 薄壳，会自己裹 conhost --headless
 
 ---
 
+### 0.0.2 2026-11-17 这一轮做了什么
+
+**脚本隔离收口**（不做兼容函数，专治「同一个脚本被认成两个」「类拿到另一棵树」）：
+
+- 四套脚本查找入口合成一套：`findScriptFile` 补 `currentLevel`；`FunkinLua.findScript`、
+  `scripts/` 目录扫描、角色脚本全部走它；判重统一 `Paths.sameScript`。
+- hscript 类解析加跨树守卫：body 拒绝 `vanilla.*` / `pe063.*`；vanilla 模式只认 `vanilla.`
+  前缀、未知标识符兜底走 `LuaUtils.resolveClass`、`IsolatedImports` 先清 `proxyImports` 再灌；
+  pe063 撞树时改试扁平同名类。
+- 两棵树各自 override `getOrImportClass`：`import` 的落点直接拦，不再依赖 `IsolatedImports`
+  那张生成表；`HScript` 补 `version` 全局（`%run_v_x.x.x` 对 `.hx` 也生效）。
+- 离开 PlayState 时把 `Paths.currentLevel` 挂回 `shared`；`removeHScript` 之后从
+  `hscriptArray` 摘掉，分发时跳过 `isClosed()`。
+- 新增 `compat_isolation.lua`（10 条），进 `run_test.sh` 白名单。
+- 新增 0.6.3 路径探针 `source_063/pe063/debug/Probe.hx` + `.workbuddy/run_063_probe.sh`：
+  不进游戏、不建 state，只算路径 + 真构造一次图集。
+- 测试窗口现在会 `visible=false`，任务栏里不留格子（`PE_AUTOTEST_TASKBAR=1` 可恢复）。
+
+全量回归（2026-11-17）：`edge 10 / more 37 / v073 58 / v104 32 / jssyntax 1 / versiontag 1 /
+versionplain 1 / isolation 10`，失败 0；QuickJS 26 + 27 + 2，失败 0。
+vanilla 分支没有自动入口，只能人工开机验；pe063 有探针（只验路径/图集，不跑 PlayState）。
+
+问题表在 `docs/SCRIPT_ISOLATION_AUDIT.md`。
+
+**0.2 那个悬案结案了**：不是路径 bug。探针实测官方图集和 mod 图集都能正确解析并
+`construct`（98 帧），`images/` 没拼两遍。真正原因是图集格式 —— 0.6.3 的 `AtlasFrameMaker`
+只认 Animate 2018 的单个 `spritemap.json`，0.7+ 的 mod 用 `spritemap1.json`，在真 0.6.3 上
+也不可见。详见审计表。
+
 ### 0.1 未解决（2026-11-13 记录，之后没复核）：0.6.3 的 Options → Switch Engine 打不开
 
 **现象**：0.6.3 里选中 Switch Engine，界面不出现（卡住 / 一闪即回）。
@@ -107,7 +139,10 @@ if (controls.ACCEPT && subState == null) {
 4. 注意：**不要**把 `initialState` 直接设成 `OptionsState` 来测——那会跳过
    `PlayerSettings` 初始化，`controls` 为 null，得到的是假崩溃。
 
-### 0.2 未解决（2026-11-13 记录，之后没复核）：0.6.3 里 lua 创建贴图找不到资源
+### 0.2 已结案（2026-11-17）：0.6.3 里 lua 创建贴图找不到资源
+
+> 结论：不是路径问题，是图集格式不兼容（Animate 2019+ 的 `spritemap1.*`）。下面保留
+> 2026-11-13 的排查记录，`Paths` 那三处修正本身是对的，别回退。
 
 **现象**：0.6.3 里 lua 建的贴图（`makeAnimatedLuaSprite` 的 `texture` 模式等）出不来。
 
