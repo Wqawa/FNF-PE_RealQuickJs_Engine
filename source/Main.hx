@@ -29,15 +29,6 @@ class Main
 
 		if (Engine.isPe063())
 		{
-			#if desktop
-			// 0.6.3 path probe: no game, no state, exits when done. See pe063/debug/Probe.hx
-			var probe:Null<String> = Sys.getEnv('PE_063_PROBE');
-			if (probe != null && probe == '1')
-			{
-				pe063.debug.Probe.run();
-				return;
-			}
-			#end
 			Lib.current.addChild(new pe063.Main());
 			return;
 		}
