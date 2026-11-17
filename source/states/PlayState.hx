@@ -470,19 +470,28 @@ class PlayState extends MusicBeatState
 		#end
 
 		// "SCRIPTS FOLDER" SCRIPTS
+		// 这条路拿到的是磁盘上的真实路径（readDirectory 返回的大小写），按名字加载那条路
+		// 拿到的是 exists() 回给你的字符串。两条路必须用同一个判重键（Paths.sameScript），
+		// 否则同一个脚本会进两份 —— 以前这里连判重都没有。
 		for (folder in Mods.directoriesWithFile(Paths.getSharedPath(), 'scripts/'))
 			for (file in FileSystem.readDirectory(folder))
 			{
+				var scriptPath:String = folder + file;
+
 				#if LUA_ALLOWED
 				if(file.toLowerCase().endsWith('.lua'))
-					new FunkinLua(folder + file);
+				{
+					if(!isLuaScriptRunning(scriptPath)) new FunkinLua(scriptPath);
+				}
 				else if(psychlua.FunkinJS.isJSFile(file))
-					psychlua.FunkinJS.start(folder + file);
+					psychlua.FunkinJS.start(scriptPath);
 				#end
 
 				#if HSCRIPT_ALLOWED
 				if(file.toLowerCase().endsWith('.hx'))
-					initHScript(folder + file);
+				{
+					if(!isHScriptRunning(scriptPath)) initHScript(scriptPath);
+				}
 				#end
 			}
 		#end
@@ -807,69 +816,12 @@ class PlayState extends MusicBeatState
 
 	function startCharacterScripts(name:String)
 	{
-		// Lua
-		#if LUA_ALLOWED
-		var doPush:Bool = false;
-		var luaFile:String = 'characters/$name.lua';
-		#if MODS_ALLOWED
-		var replacePath:String = Paths.modFolders(luaFile);
-		if(FileSystem.exists(replacePath))
-		{
-			luaFile = replacePath;
-			doPush = true;
-		}
-		else
-		{
-			luaFile = Paths.getSharedPath(luaFile);
-			if(FileSystem.exists(luaFile))
-				doPush = true;
-		}
-		#else
-		luaFile = Paths.getSharedPath(luaFile);
-		if(Assets.exists(luaFile)) doPush = true;
-		#end
-
-		if(doPush)
-		{
-			for (script in luaArray)
-			{
-				if(script.scriptName == luaFile)
-				{
-					doPush = false;
-					break;
-				}
-			}
-			if(doPush) new FunkinLua(luaFile);
-		}
-		#end
-
-		// HScript
-		#if HSCRIPT_ALLOWED
-		var doPush:Bool = false;
-		var scriptFile:String = 'characters/' + name + '.hx';
-		#if MODS_ALLOWED
-		var replacePath:String = Paths.modFolders(scriptFile);
-		if(FileSystem.exists(replacePath))
-		{
-			scriptFile = replacePath;
-			doPush = true;
-		}
-		else
-		#end
-		{
-			scriptFile = Paths.getSharedPath(scriptFile);
-			if(FileSystem.exists(scriptFile))
-				doPush = true;
-		}
-
-		if(doPush)
-		{
-			if(Iris.instances.exists(scriptFile))
-				doPush = false;
-
-			if(doPush) initHScript(scriptFile);
-		}
-		#end
+		// 角色脚本也走和舞台/音符/事件同一条查找链（mod → 关卡 → shared → 根 → exe 锚定），
+		// 判重同样走 isLuaScriptRunning / isHScriptRunning。
+		// 以前这里是手写的两层 fallback + Iris.instances 判重：既找不到 assets 根
+		// 那一级，又会被上一首歌残留的 Iris 实例骗过去，脚本静默不跑。
+		#if LUA_ALLOWED startLuasNamed('characters/$name.lua'); #end
+		#if HSCRIPT_ALLOWED startHScriptsNamed('characters/$name.hx'); #end
 	}
 
 	public function getLuaObject(tag:String):Dynamic
@@ -2448,6 +2400,15 @@ class PlayState extends MusicBeatState
 	}
 
 	#if LUA_ALLOWED
+	/** 这条 lua 是不是已经在跑。判重键统一走 Paths.sameScript（大小写 + 斜杠）。 */
+	public function isLuaScriptRunning(path:String):Bool
+	{
+		if (luaArray == null || path == null) return false;
+		for (script in luaArray)
+			if (script != null && backend.Paths.sameScript(script.scriptName, path)) return true;
+		return false;
+	}
+
 	public function startLuasNamed(luaFile:String)
 	{
 		var luaToLoad:String = Paths.findScriptFile(luaFile);
@@ -2470,8 +2431,7 @@ class PlayState extends MusicBeatState
 
 		if(luaToLoad != null)
 		{
-			for (script in luaArray)
-				if(script.scriptName == luaToLoad) return false;
+			if(isLuaScriptRunning(luaToLoad)) return false;
 
 			new FunkinLua(luaToLoad);
 			return true;
@@ -2481,6 +2441,15 @@ class PlayState extends MusicBeatState
 	#end
 
 	#if HSCRIPT_ALLOWED
+	/** 这条 hscript 是不是已经在跑。和 isLuaScriptRunning 同款，别再用 Iris.instances 判。 */
+	public function isHScriptRunning(path:String):Bool
+	{
+		if (hscriptArray == null || path == null) return false;
+		for (script in hscriptArray)
+			if (script != null && backend.Paths.sameScript(script.origin, path)) return true;
+		return false;
+	}
+
 	public function startHScriptsNamed(scriptFile:String)
 	{
 		var scriptToLoad:String = Paths.findScriptFile(scriptFile);
@@ -2489,8 +2458,7 @@ class PlayState extends MusicBeatState
 			// 判重只看本 state 里还活着的脚本。Iris.instances 是进程级的静态表，
 			// 上一首歌残留的实例（或同路径的旧 key）会让新歌的同名脚本被当成
 			// "已存在"直接跳过，表现是脚本静默不执行，日志里还一片正常。
-			for (script in hscriptArray)
-				if(script != null && script.origin == scriptToLoad) return false;
+			if(isHScriptRunning(scriptToLoad)) return false;
 
 			initHScript(scriptToLoad);
 			return true;
@@ -2557,7 +2525,7 @@ class PlayState extends MusicBeatState
 		#if HSCRIPT_ALLOWED
 		if (hscriptArray != null)
 			for (s in hscriptArray)
-				if (s != null) out.push(s);
+				if (s != null && !s.isClosed()) out.push(s);
 		#end
 
 		return out;
@@ -2648,7 +2616,7 @@ class PlayState extends MusicBeatState
 		for(script in hscriptArray)
 		{
 			@:privateAccess
-			if(script == null || !script.exists(funcToCall) || exclusions.contains(script.origin))
+			if(script == null || script.isClosed() || !script.exists(funcToCall) || exclusions.contains(script.origin))
 				continue;
 
 			var callValue = script.call(funcToCall, args);
@@ -2710,7 +2678,7 @@ class PlayState extends MusicBeatState
 		#if HSCRIPT_ALLOWED
 		if(exclusions == null) exclusions = [];
 		for (script in hscriptArray) {
-			if(exclusions.contains(script.origin))
+			if(script.isClosed() || exclusions.contains(script.origin))
 				continue;
 
 			script.set(variable, arg);

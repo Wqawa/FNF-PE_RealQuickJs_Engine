@@ -249,7 +249,7 @@ class FunkinLua implements IScriptHost {
 			var foundScript:String = findScript(luaFile);
 			if(foundScript != null)
 				for (luaInstance in game.luaArray)
-					if(luaInstance.scriptName == foundScript)
+					if(backend.Paths.sameScript(luaInstance.scriptName, foundScript))
 						return luaInstance.get(global);
 
 			return null;
@@ -258,7 +258,7 @@ class FunkinLua implements IScriptHost {
 			var foundScript:String = findScript(luaFile);
 			if(foundScript != null)
 				for (luaInstance in game.luaArray)
-					if(luaInstance.scriptName == foundScript)
+					if(backend.Paths.sameScript(luaInstance.scriptName, foundScript))
 						luaInstance.set(global, val);
 		});
 
@@ -320,7 +320,7 @@ class FunkinLua implements IScriptHost {
 			var luaPath:String = findScript(luaFile);
 			if(luaPath != null)
 				for (luaInstance in game.luaArray)
-					if(luaInstance.scriptName == luaPath)
+					if(backend.Paths.sameScript(luaInstance.scriptName, luaPath))
 						return luaInstance.call(funcName, args);
 
 			return null;
@@ -330,7 +330,7 @@ class FunkinLua implements IScriptHost {
 			if(luaPath != null)
 			{
 				for (luaInstance in game.luaArray)
-					if(luaInstance.scriptName == luaPath)
+					if(backend.Paths.sameScript(luaInstance.scriptName, luaPath))
 						return true;
 			}
 
@@ -339,7 +339,7 @@ class FunkinLua implements IScriptHost {
 			if(hscriptPath != null)
 			{
 				for (hscriptInstance in game.hscriptArray)
-					if(hscriptInstance.origin == hscriptPath)
+					if(backend.Paths.sameScript(hscriptInstance.origin, hscriptPath))
 						return true;
 			}
 			#end
@@ -360,7 +360,7 @@ class FunkinLua implements IScriptHost {
 			{
 				if(!ignoreAlreadyRunning)
 					for (luaInstance in game.luaArray)
-						if(luaInstance.scriptName == luaPath)
+						if(backend.Paths.sameScript(luaInstance.scriptName, luaPath))
 						{
 							luaTrace('addLuaScript: The script "' + luaPath + '" is already running!');
 							return;
@@ -378,7 +378,7 @@ class FunkinLua implements IScriptHost {
 			{
 				if(!ignoreAlreadyRunning)
 					for (script in game.hscriptArray)
-						if(script.origin == scriptPath)
+						if(backend.Paths.sameScript(script.origin, scriptPath))
 						{
 							luaTrace('addHScript: The script "' + scriptPath + '" is already running!');
 							return;
@@ -399,7 +399,7 @@ class FunkinLua implements IScriptHost {
 				var foundAny:Bool = false;
 				for (luaInstance in game.luaArray)
 				{
-					if(luaInstance.scriptName == luaPath)
+					if(backend.Paths.sameScript(luaInstance.scriptName, luaPath))
 					{
 						trace('Closing lua script $luaPath');
 						luaInstance.stop();
@@ -418,15 +418,20 @@ class FunkinLua implements IScriptHost {
 			if(scriptPath != null)
 			{
 				var foundAny:Bool = false;
+				// destroy() 只是把实例废掉，数组里的引用得自己摘 —— 以前留在那儿，
+				// 每次分发都要靠 exists() 兜一次，看着像脚本还在。
+				var dead:Array<HScript> = [];
 				for (script in game.hscriptArray)
 				{
-					if(script.origin == scriptPath)
+					if(backend.Paths.sameScript(script.origin, scriptPath))
 					{
 						trace('Closing hscript $scriptPath');
 						script.destroy();
+						dead.push(script);
 						foundAny = true;
 					}
 				}
+				for (script in dead) game.hscriptArray.remove(script);
 				if(foundAny) return true;
 			}
 
@@ -1978,24 +1983,19 @@ class FunkinLua implements IScriptHost {
 
 	function findScript(scriptFile:String, ext:String = '.lua')
 	{
-		if(!scriptFile.endsWith(ext)) scriptFile += ext;
-		var path:String = Paths.getPath(scriptFile, TEXT);
+		// 扩展名判断不能区分大小写：'X.LUA' 会被拼成 'X.LUA.lua'，然后报"脚本不存在"
+		if(!scriptFile.toLowerCase().endsWith(ext)) scriptFile += ext;
+
+		// 和 startLuasNamed / startHScriptsNamed / .js 走同一条链。
+		// 以前这里单独用 Paths.getPath()：少了 assets/<ver>/ 根兜底（0.6.x 扁平布局就靠那一级），
+		// 于是 isRunning 判不出来、addHScript 找不到脚本，脚本被判成"没在跑"又加载一份。
+		var path:String = Paths.findScriptFile(scriptFile);
+		if(path != null) return path;
+
+		// 绝对路径，或者脚本自己算出来的 CWD 相对路径 —— findScriptFile 不猜这种
 		#if MODS_ALLOWED
-		if(FileSystem.exists(path))
-		#else
-		if(Assets.exists(path, TEXT))
+		if(FileSystem.exists(scriptFile)) return scriptFile;
 		#end
-		{
-			return path;
-		}
-		#if MODS_ALLOWED
-		else if(FileSystem.exists(scriptFile))
-		#else
-		else if(Assets.exists(scriptFile, TEXT))
-		#end
-		{
-			return scriptFile;
-		}
 		return null;
 	}
 

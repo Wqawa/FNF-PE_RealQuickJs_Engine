@@ -200,13 +200,17 @@ class Paths
 	}
 
 	/**
-	 * 脚本文件的统一查找：mods → assets/shared → assets 根。
+	 * 脚本文件的统一查找：mods → 关卡目录 → assets/shared → assets 根。
 	 *
 	 * 0.6.x 的基础资源直接挂在 assets/ 根下（shared 这一层是 0.7 才有的），
 	 * 所以最后还要兜一次根目录。以前 startLuasNamed、.js 兜底、startHScriptsNamed
 	 * 三处各抄一遍这个顺序，改一处忘两处，现在都走这里。
 	 *
-	 * 前三级是相对路径，依赖进程 CWD 恰好是 bin 目录（整个 Paths 都是这个前提，
+	 * 关卡目录这一级是后补的：`getPath()` 一直认它（`assets/<ver>/<level>/`），
+	 * 这里以前不认，于是同一首歌里 `scripts/` 目录扫到的东西按名字找不回来，
+	 * 名字查找和目录扫描各命中一套文件。
+	 *
+	 * 前四级是相对路径，依赖进程 CWD 恰好是 bin 目录（整个 Paths 都是这个前提，
 	 * modFolders / getSharedPath 同款）。从快捷方式或别的程序拉起游戏时 CWD 可能不对，
 	 * 所以 sys 目标上再按 exe 所在目录锚定重试一遍，找到就返回绝对路径。
 	 */
@@ -216,6 +220,12 @@ class Paths
 		var modded:String = modFolders(file);
 		if(FileSystem.exists(modded)) return modded;
 		#end
+
+		if(currentLevel != null && currentLevel != 'shared')
+		{
+			var levelPath:String = getFolderPath(file, currentLevel);
+			if(existsOnDiskOrManifest(levelPath)) return levelPath;
+		}
 
 		var shared:String = getSharedPath(file);
 		if(existsOnDiskOrManifest(shared)) return shared;
@@ -609,6 +619,23 @@ class Paths
 		if(name == Mods.currentModDirectory) return name;
 		return null;
 	}
+
+	/**
+	 * 脚本路径的判重键：统一斜杠、转小写。
+	 *
+	 * Windows 的 FileSystem.exists 不区分大小写，但它返回的是**你传进去的那个字符串**。
+	 * 所以 `Scripts/Hud.lua` 和 `scripts/hud.lua` 都能过 exists，
+	 * 直接拿字符串比就会当成两个脚本各加载一份。三条通道（Lua / HScript / JS）统一走这里。
+	 */
+	public static function scriptKey(path:String):String
+	{
+		if(path == null) return null;
+		return path.replace('\\', '/').toLowerCase();
+	}
+
+	/** 两个脚本路径是不是同一个文件（判重统一用它，别再直比字符串） */
+	inline public static function sameScript(a:String, b:String):Bool
+		return a != null && b != null && scriptKey(a) == scriptKey(b);
 
 	#if flxanimate
 	public static function loadAnimateAtlas(spr:FlxAnimate, folderOrImg:Dynamic, spriteJson:Dynamic = null, animationJson:Dynamic = null)

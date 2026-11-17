@@ -62,9 +62,9 @@ class JSPlayer
 	public static function loadFile(path:String):Bool
 	{
 		if (!active) return false;
-		// 精确路径判重（handleOf 是模糊匹配，这里不能拿来用）
+		// 路径判重走 Paths.sameScript（大小写 + 斜杠），和 Lua/HScript 两条通道同口径
 		for (s in scripts)
-			if (s.path == path) return true;
+			if (backend.Paths.sameScript(s.path, path)) return true;
 
 		// 256MB 是整个 runtime 的上限，所有 context 共用；单个 context 不会吃这么多
 		var h:Int = QuickJSHandler.newContext(256);
@@ -280,7 +280,7 @@ class JSPlayer
 	{
 		if (path == null) return false;
 		for (s in scripts)
-			if (s.path.toLowerCase() == path.toLowerCase()) return true;
+			if (backend.Paths.sameScript(s.path, path)) return true;
 		return false;
 	}
 

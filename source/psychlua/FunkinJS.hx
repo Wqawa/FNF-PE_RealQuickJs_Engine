@@ -967,7 +967,7 @@ class FunkinJS
 		}
 
 		for (script in states.PlayState.instance.luaArray)
-			if(script.scriptName == jsPath) return null;
+			if(backend.Paths.sameScript(script.scriptName, jsPath)) return null;
 
 		var raw:String = File.getContent(jsPath);
 		var luaSource:String = transpile(raw);
