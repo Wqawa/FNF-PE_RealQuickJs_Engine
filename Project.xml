@@ -68,7 +68,11 @@
 	<set name="BUILD_DIR" value="export/release" unless="debug" />
 	<set name="BUILD_DIR" value="export/32bit" if="32bits" />
 
+	<!-- 公共层：只放三棵树共用、且不依赖任何一棵树私有类的代码
+	     （入口 Main、engine.txt 读写、崩溃拦截 / 崩溃屏）。只许依赖 flixel / lime / std -->
 	<classpath name="source" />
+	<!-- 改版 1.0.4（本仓 fork），包名不加前缀 -->
+	<classpath name="source_body" />
 	<!-- 原版 Psych Engine 1.0.4 源码，整体放在 vanilla.* 命名空间；engine.txt=vanilla 时使用 -->
 	<classpath name="source_vanilla" />
 	<classpath name="source_063" />

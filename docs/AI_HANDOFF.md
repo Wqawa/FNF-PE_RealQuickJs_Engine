@@ -13,9 +13,24 @@
 >   `Std.parseInt` 颜色饱和和窗口缩放两个坑。看那份之前先看这份了解本体。
 > - `docs/JS_QUICKJS.md`（2026-11-16）：`.js` 两条路（Troll 转译 / 真 QuickJS-NG）的分流、
 >   桥的协议、加宿主函数的步骤、停止哨兵、脚本装卸、已知限制、验证方法。
->   **动 `source/jsruntime/` 之前先看这份。**
+>   **动 `source_body/jsruntime/` 之前先看这份。**
 
 ---
+
+## 目录约定（2026-11-17 拆分后）
+
+| 目录 | 是什么 | 规矩 |
+|---|---|---|
+| `source/` | **公共层**：入口 `Main`、`Engine`（读 engine.txt）、`backend.EngineCrash`、`backend.CrashState` | 只许依赖 flixel / lime / std。**不许** import `backend.*` / `states.*` / `objects.*` —— 一 import 就等于把本体的代码带进另外两棵树，资源路径也跟着跑到 `assets/body` |
+| `source_body/` | 改版 1.0.4（原来整个 `source/` 挪过来），包名不加前缀 | 随便用，它就是本体 |
+| `source_vanilla/vanilla/` | 原版 1.0.4，全部 `vanilla.` 前缀 | 原版代码，别往里面塞兼容逻辑 |
+| `source_063/pe063/` | 0.6.3，全部 `pe063.` 前缀 | 同上 |
+
+判断一段代码该放哪：**它依赖不依赖某棵树私有的类**。依赖就放那棵树，不依赖才进 `source/`。
+目前公共层只有上面四个文件 —— 崩溃屏能共用，是因为它只用 flixel 原生控件（交接坑 #12）。
+`ScriptClassAliases` 这类"兼容件"仍在 body 侧，它要读 body 的类；别的树是按名字用的。
+
+新增公共文件之前先想清楚：它一旦读 `Paths` / `ClientPrefs`，切树之后读的就是 body 的那份。
 
 ## 0. 当前状态与未解决的问题
 
@@ -27,7 +42,7 @@
 
 | engine.txt | 走哪棵 | 源码目录 | 资产目录 |
 |---|---|---|---|
-| `body`（默认） | 本仓 fork | `source/` | `assets/body/` |
+| `body`（默认） | 本仓 fork | `source_body/` | `assets/body/` |
 | `vanilla` | 原版 PE 1.0.4 | `source_vanilla/vanilla/` | `assets/1.0.4/` |
 | `pe063` | Psych Engine 0.6.3 | `source_063/pe063/` | `assets/0.6.3/` |
 
@@ -104,6 +119,24 @@ vanilla 分支没有自动入口，只能人工开机验；pe063 有探针（只
 `construct`（98 帧），`images/` 没拼两遍。真正原因是图集格式 —— 0.6.3 的 `AtlasFrameMaker`
 只认 Animate 2018 的单个 `spritemap.json`，0.7+ 的 mod 用 `spritemap1.json`，在真 0.6.3 上
 也不可见。详见审计表。
+
+### 0.0.3 2026-11-17 目录拆分
+
+`source/` 一刀切成两层：
+
+- `source/` **只留公共层**：`Main.hx`（入口：装崩溃拦截 → 读 engine.txt → 分叉）、
+  `Engine.hx`、`backend/EngineCrash.hx`、`backend/CrashState.hx`。没有 `import.hx`，
+  公共文件自己写 import，`Engine.hx` 补了 `using StringTools`。
+- `source_body/` 收原 `source/` 的全部内容；`Main.hx` 改名 `BodyMain.hx`（类名同步），
+  去掉 `main()`，`FunkinJS.verifyUtilsIntegrity()` 挪进构造函数。
+  `ClientPrefs` / `VisualsSettingsSubState` / `Native` 里 6 处 `Main.fpsVar` / `Main.game`
+  改成 `BodyMain.`。
+- `Project.xml` 加一条 `<classpath name="source_body" />`；`<app main="Main">` 不变，
+  指向公共入口。
+- `.workbuddy/harness/apply_hook.py` 的注入点跟着走（`source_body/BodyMain.hx` +
+  `source_body/AutoTestState.hx`）；`manage.sh` 里 QuickJS 的路径同步。
+
+回归照旧全绿：Lua 10/37/58/32/1/1/1/10、QuickJS 26/27/2、0.6.3 探针 98 帧 ×2。
 
 ### 0.1 未解决（2026-11-13 记录，之后没复核）：0.6.3 的 Options → Switch Engine 打不开
 
@@ -200,7 +233,7 @@ if (controls.ACCEPT && subState == null) {
 
 Psych Engine 1.0.4 的源码 fork，目标是让 0.6.3 / 0.7.3 时代的老 mod（Lua + HScript）不改一行就能跑。
 `.js` 有两条路：默认 Troll（把 JS 转译成 Lua 塞回 LuaJIT，兼容优先），
-切到 QuickJS 后走真的 QuickJS-NG 运行时（`source/jsruntime/`，见 `docs/JS_QUICKJS.md`）。
+切到 QuickJS 后走真的 QuickJS-NG 运行时（`source_body/jsruntime/`，见 `docs/JS_QUICKJS.md`）。
 
 同一个 exe 里并了三棵树（本体 / 原版 1.0.4 / 0.6.3），靠 `bin/engine.txt` 选。
 
@@ -248,7 +281,7 @@ PE_BUILD=debug bash .workbuddy/run_test.sh
 NOPATCH=1 bash .workbuddy/run_test.sh     # 不给谱面打补丁
 ```
 
-- 测试入口 `AutoTestState.hx` 由 `harness/apply_hook.py on/off` 临时拷进 `source/`，跑完自动撤
+- 测试入口 `AutoTestState.hx` 由 `harness/apply_hook.py on/off` 临时拷进 `source_body/`，跑完自动撤
 - 脚本放 `bin/mods/body/scripts/` —— **按版本分目录**，`bin/mods/scripts` 是扫不到的
 - 结果写 `.workbuddy/testout/*.txt`，格式 `PASS|名字` / `FAIL|名字` / `ERR|...`
 - 两个 runner 都会把 `engine.txt` 强制成 `body`、跑完还原：不强制的话 `Main.main()`
@@ -270,7 +303,7 @@ QuickJS 冒烟 26 项（run_qjs_test.sh）
 分五层，改之前先确认改的是哪一层（详见 `docs/LUA_COMPAT.md` 第一节）：
 
 > `.js` 那条是另算的：默认走 Troll 转译（转成 Lua 塞进 FunkinLua，所以上面五层全部继承），
-> 切成 QuickJS 之后走 `source/jsruntime/`，那套桥的规则在 `docs/JS_QUICKJS.md`。
+> 切成 QuickJS 之后走 `source_body/jsruntime/`，那套桥的规则在 `docs/JS_QUICKJS.md`。
 
 | 层 | 位置 | 管什么 |
 |---|---|---|
@@ -284,7 +317,7 @@ QuickJS 冒烟 26 项（run_qjs_test.sh）
 
 - **Lua / HScript 兼容**（1~19 条，见 LUA_COMPAT.md）：`debugPrint` 双签名、三类脚本的路径兜底、
   `Paths.findScriptFile()` 收敛、`ClientPrefs` 32 个转发、HScript 全局补全（Reflect/Lambda/FlxObject…）
-- **PlayState 拆分**：3745 → 2821 行，25 个函数搬到 `source/states/play/`（Events / Camera / Judge），
+- **PlayState 拆分**：3745 → 2821 行，25 个函数搬到 `source_body/states/play/`（Events / Camera / Judge），
   静态 helper 接 `ps:PlayState`，类上挂 `@:access`，PlayState 保留同名转发 —— 外部和脚本调用完全不变
 - **Freeplay / 资源查找**：`Paths.existsOnDiskOrManifest()`（先磁盘后清单），修掉图标全 face、关卡图 404
 - **NovaFlare 移植**：PhillyGlow 两条正确的映射、`Section` 数据壳、相机 shader 三件套、33 条模块路径别名

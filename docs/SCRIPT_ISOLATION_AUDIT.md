@@ -3,7 +3,7 @@
 > 2026-11-17。谁改 `Paths` / `ScriptClassAliases` / `IsolatedImports` / `Paths.findScriptFile`
 > 之前先扫一遍这张表；改完把状态那一列更新掉。
 
-三棵树（`body` / `vanilla` / `pe063`）编在同一个 exe 里，类名、资源路径、脚本名都长一个样，
+三棵树（`source_body` / `source_vanilla` / `source_063`，`source/` 是公共层）编在同一个 exe 里，类名、资源路径、脚本名都长一个样，
 只有 `Paths.VERSION_DIR` 和源码目录不同。所以「隔离」不是靠命名空间，是靠**每一处查找都自己
 记得加树前缀**——少加一处就串，串了还往往不报错（`assets/body` 里装的就是 1.0.4 官方素材）。
 

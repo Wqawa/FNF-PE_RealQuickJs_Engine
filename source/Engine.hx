@@ -5,6 +5,8 @@ import sys.FileSystem;
 import sys.io.File;
 #end
 
+using StringTools;
+
 /**
  * 启动引擎选择。
  *
