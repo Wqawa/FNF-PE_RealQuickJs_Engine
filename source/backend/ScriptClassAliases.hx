@@ -223,6 +223,29 @@ class ScriptClassAliases
 
 		// vanilla 模式下整张表改指向原版引擎的同名类
 		if(Engine.isVanilla()) remapToVanilla();
+		else sweepForeignImports();
+	}
+
+	/**
+	 * body 模式下把 proxyImports 里指到别的树的条目扫掉。
+	 *
+	 * 这张表是进程级的，Iris 解析 `import` 时先查它、查不到才落 Type.resolveClass。
+	 * 有一笔别的树留下的条目，就等于那个名字在脚本里永远拿到错误的类 ——
+	 * 而且和注册先后有关，属于最难复现的那种。
+	 */
+	static function sweepForeignImports():Void
+	{
+		#if HSCRIPT_ALLOWED
+		var stale:Array<String> = [];
+		for (key in Iris.proxyImports.keys())
+		{
+			var fqn:String = Type.getClassName(Iris.proxyImports.get(key));
+			if (fqn == null) continue;
+			if (StringTools.startsWith(fqn, 'vanilla.') || StringTools.startsWith(fqn, 'pe063.')) stale.push(key);
+		}
+		for (key in stale)
+			Iris.proxyImports.remove(key);
+		#end
 	}
 
 	static function bind(name:String, cl:Dynamic):Void
@@ -270,6 +293,35 @@ class ScriptClassAliases
 	static var remapped:Bool = false;
 
 	/**
+	 * 别把另一棵树的类交出去。
+	 *
+	 * 三棵树编在同一个 exe 里：`objects.Character`（本体）和 `vanilla.objects.Character`
+	 * （原版）同时存在，脚本里写的却是同一串字符。一旦解析到另一棵树，那个类内部
+	 * 写死的 `Paths.VERSION_DIR` 会把贴图/音频带到它的 assets 目录去 —— 而
+	 * `assets/body` 里装的正是 1.0.4 官方素材，于是找得到、不报错，只是拿错了图。
+	 * 这类问题只能靠「解析时拒绝」来防，事后查日志看不出来。
+	 */
+	public static function isForeignTree(cl:Dynamic):Bool
+	{
+		if (cl == null) return false;
+		var fqn:String = Type.getClassName(cl);
+		if (fqn == null) return false;
+
+		if (Engine.isVanilla())
+			return isEngineClass(fqn) && !StringTools.startsWith(fqn, 'vanilla.');
+
+		return StringTools.startsWith(fqn, 'vanilla.') || StringTools.startsWith(fqn, 'pe063.');
+	}
+
+	/** 引擎自己的类（各树同名前缀的那批）。flixel / openfl 不算。 */
+	static function isEngineClass(fqn:String):Bool
+	{
+		for (pkg in SEARCH_PACKAGES)
+			if (pkg.length > 0 && StringTools.startsWith(fqn, pkg)) return true;
+		return false;
+	}
+
+	/**
 	 * Resolve a class by name. Old bare names win, everything else falls through to the
 	 * normal haxe class lookup so modern scripts keep working.
 	 */
@@ -278,7 +330,11 @@ class ScriptClassAliases
 		if(className == null || className.length < 1) return null;
 		init();
 
-		if(table.exists(className)) return table.get(className);
+		if(table.exists(className))
+		{
+			var bound:Dynamic = table.get(className);
+			if(!isForeignTree(bound)) return bound;
+		}
 
 		// vanilla 模式下，脚本要的是原版引擎的类，不是本体的同名类
 		if(Engine.isVanilla() && !className.startsWith('vanilla.'))
@@ -289,8 +345,8 @@ class ScriptClassAliases
 
 		// 带点的全名直接查；裸名再按包列表猜一遍。
 		// （addHaxeLibrary / getPropertyFromClass 都走这里，裸名要能猜出来）
-		if(className.indexOf('.') > -1) return Type.resolveClass(className);
-		return resolveDeep(className);
+		var cls:Dynamic = (className.indexOf('.') > -1) ? Type.resolveClass(className) : resolveDeep(className);
+		return isForeignTree(cls) ? null : cls;
 	}
 
 	/**
@@ -351,14 +407,22 @@ class ScriptClassAliases
 		init();
 
 		// 显式表优先：改过名的那批只在这里能拿到
-		if(table.exists(className)) return table.get(className);
+		if(table.exists(className))
+		{
+			var bound:Dynamic = table.get(className);
+			if(!isForeignTree(bound)) return bound;
+		}
 
 		if(misses.exists(className)) return null;
 
+		// vanilla 模式下只认 vanilla. 前缀：本体那棵树的同名类不能拿来凑数，
+		// 否则它的 Paths 会把资源带到 assets/body。
+		var prefix:String = Engine.isVanilla() ? 'vanilla.' : '';
+
 		for(pkg in SEARCH_PACKAGES)
 		{
-			var cl:Dynamic = Type.resolveClass(pkg + className);
-			if(cl != null) return cl;
+			var cl:Dynamic = Type.resolveClass(prefix + pkg + className);
+			if(cl != null && !isForeignTree(cl)) return cl;
 		}
 
 		misses.set(className, true);

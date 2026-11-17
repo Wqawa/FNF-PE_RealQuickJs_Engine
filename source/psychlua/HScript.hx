@@ -159,6 +159,17 @@ class HScript extends Iris implements IScriptHost
 	#end
 
 	public var origin:String;
+
+	// 文件名里的版本标记，形如 `xxx(%run_v_0.7.3).hx`。规则和 FunkinLua.VERSION_TAG 一致。
+	static final VERSION_TAG:EReg = ~/\(%run_v_([^)]+)\)/;
+
+	/** 从脚本路径里抠出版本标记，没有就 null。 */
+	public static function parseVersionTag(path:String):String
+	{
+		if (path == null) return null;
+		return VERSION_TAG.match(path) ? VERSION_TAG.matched(1).trim() : null;
+	}
+
 	override public function new(?parent:Dynamic, ?file:String, ?varsToBring:Any = null, ?manualRun:Bool = false)
 	{
 		// old 0.6.3 bare class names must be registered in Iris.proxyImports before the
@@ -221,6 +232,10 @@ class HScript extends Iris implements IScriptHost
 
 	var varsToBring(default, set):Any = null;
 	override function preset() {
+		// 文件名里的 `(%run_v_x.x.x)`：和 FunkinLua.parseVersionTag 同一条规则。
+		// 0.7.3 的 .hx 脚本会按版本分支，没有这个全局它们永远看到真实版本。
+		var vTag:String = parseVersionTag(origin);
+		set('version', vTag != null ? vTag : states.MainMenuState.psychEngineVersion.trim());
 		super.preset();
 
 		// Some very commonly used classes
@@ -741,6 +756,21 @@ class CustomInterp extends crowplexus.hscript.Interp
 		}
 
 		return Reflect.callMethod(o, f, args);
+	}
+
+	/**
+	 * import 的落点：默认 `proxyImports` 查不到就 `Type.resolveClass`。
+	 * 三棵树里同名类的全限定名一字不差（`objects.Character` 本体那份、
+	 * `vanilla.objects.Character` 原版那份），body 模式下不该拿到带前缀的那些 ——
+	 * 那个类内部写死的 `Paths.VERSION_DIR` 会把资源带到另一棵树去。
+	 */
+	override function getOrImportClass(name:String):Dynamic
+	{
+		var cls:Dynamic = super.getOrImportClass(name);
+		if (cls == null || !backend.ScriptClassAliases.isForeignTree(cls)) return cls;
+
+		// 别棵树的：让别名表按本树的规则再指一次，指不到就 null
+		return backend.ScriptClassAliases.resolve(name);
 	}
 
 	override function resolve(id: String): Dynamic {

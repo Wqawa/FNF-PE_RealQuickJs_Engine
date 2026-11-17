@@ -567,6 +567,28 @@ class CustomInterp extends crowplexus.hscript.Interp
 		return Reflect.callMethod(o, f, args);
 	}
 
+	/**
+	 * import 的落点。
+	 *
+	 * 默认实现是 `proxyImports` 查不到就 `Tools.getClass` → `Type.resolveClass(name)`，
+	 * 而三棵树里同名类的全限定名一字不差，于是会命中**本体**那一份。
+	 * `IsolatedImports` 那张表是扫目录生成的静态快照，漏一个名字就露这个洞。
+	 *
+	 * 这里不再依赖表是否新鲜：解析结果只要是别棵树的引擎类，就交给
+	 * `LuaUtils.resolveClass` 重新按 `vanilla.*` 指一遍；指不到就返回 null，
+	 * 宁可不给，也不给一个 Paths 指向 assets/body 的类。
+	 */
+	override function getOrImportClass(name:String):Dynamic
+	{
+		var cls:Dynamic = super.getOrImportClass(name);
+		if (cls != null && !LuaUtils.isOtherTreeClass(cls)) return cls;
+
+		var van:Dynamic = LuaUtils.resolveClass(name);
+		if (van != null) return van;
+
+		return null;
+	}
+
 	override function resolve(id: String): Dynamic {
 		if (locals.exists(id)) {
 			var l = locals.get(id);
@@ -586,6 +608,16 @@ class CustomInterp extends crowplexus.hscript.Interp
 		if(parentInstance != null && _instanceFields.contains(id)) {
 			var v = Reflect.getProperty(parentInstance, id);
 			return v;
+		}
+
+		// 未知标识符：和 lua 的 getPropertyFromClass 走同一条守卫链（只认 vanilla.*，
+		// 落到本体那棵树的引擎类一律拒掉）。以前这里直接报 EUnknownVariable，
+		// 而 import 那条路一旦 IsolatedImports 的表漏了名字就会静默拿到本体类 ——
+		// 那个类的 Paths 指向 assets/body，贴图就从另一棵树里出来了。
+		var cls:Dynamic = LuaUtils.resolveClass(id);
+		if(cls != null) {
+			variables.set(id, cls);
+			return cls;
 		}
 
 		error(EUnknownVariable(id));

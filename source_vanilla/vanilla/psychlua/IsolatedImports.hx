@@ -259,10 +259,37 @@ class IsolatedImports
 
 	static var registered:Bool = false;
 
+	/** 引擎自己的类（各树同名前缀的那批）。flixel / openfl 不算，不能扫掉。 */
+	static final ENGINE_PACKAGES:Array<String> = [
+		'backend.', 'states.', 'objects.', 'options.', 'substates.', 'psychlua.',
+		'shaders.', 'cutscenes.', 'flxanimate.', 'debug.', 'unused.'
+	];
+
+	static function isEngineClass(fqn:String):Bool
+	{
+		for (pkg in ENGINE_PACKAGES)
+			if (fqn.indexOf(pkg) == 0) return true;
+		return false;
+	}
+
 	public static function register():Void
 	{
 		if (registered) return;
 		registered = true;
+
+		// proxyImports 是进程级静态表，谁先注册谁占坑，而 import 走的就是它。
+		// 先清掉指到本体那棵树的条目：表里没覆盖到的名字一旦命中，脚本拿到的就是
+		// 本体的类，它内部写死的 Paths 会把贴图/音频带到 assets/body 去 ——
+		// 而那边装的正是 1.0.4 官方素材，于是找得到、不报错，只是拿错了图。
+		var stale:Array<String> = [];
+		for (key in Iris.proxyImports.keys())
+		{
+			var fqn:String = Type.getClassName(Iris.proxyImports.get(key));
+			if (fqn == null || fqn.indexOf('vanilla.') == 0) continue;
+			if (isEngineClass(fqn)) stale.push(key);
+		}
+		for (key in stale)
+			Iris.proxyImports.remove(key);
 
 		var simpleCount:Map<String, Int> = [];
 

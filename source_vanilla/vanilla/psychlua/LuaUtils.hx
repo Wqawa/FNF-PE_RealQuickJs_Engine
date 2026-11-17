@@ -64,7 +64,7 @@ class LuaUtils
 		'shaders.', 'cutscenes.', 'flxanimate.', 'debug.'
 	];
 
-	static function isOtherTreeClass(cl:Dynamic):Bool
+	public static function isOtherTreeClass(cl:Dynamic):Bool
 	{
 		if (cl == null) return false;
 		var clsName:String = Type.getClassName(cl);

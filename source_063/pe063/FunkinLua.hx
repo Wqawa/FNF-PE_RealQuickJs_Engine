@@ -103,13 +103,21 @@ class FunkinLua {
 		if (name == null || name.length == 0) return null;
 
 		var cls:Dynamic = Type.resolveClass(name);
-		if (cls != null) return isOtherTreeClass(cls) ? null : cls;
+		// 命中本体的引擎类不能直接 return null —— 0.6.3 那边往往有同名扁平类
+		// （objects.Note → pe063.Note），以前这里一撞树就放弃，脚本拿到 nil。
+		if (cls != null && !isOtherTreeClass(cls)) return cls;
 
-		if (name.indexOf('pe063.') != 0)
-		{
-			var prefixed:Dynamic = Type.resolveClass('pe063.' + name);
-			if (prefixed != null) return prefixed;
-		}
+		if (name.indexOf('pe063.') == 0) return Type.resolveClass(name);
+
+		// 现代全名 → 0.6.3 的扁平类：backend.ClientPrefs → pe063.ClientPrefs
+		var flat:String = (name.indexOf('.') > -1) ? name.split('.').pop() : name;
+		var prefixed:Dynamic = Type.resolveClass('pe063.' + flat);
+		if (prefixed != null) return prefixed;
+
+		// 0.6.3 原来也认带包的名字（pe063.states.PlayState 这种写法）
+		prefixed = Type.resolveClass('pe063.' + name);
+		if (prefixed != null) return prefixed;
+
 		return null;
 	}
 
