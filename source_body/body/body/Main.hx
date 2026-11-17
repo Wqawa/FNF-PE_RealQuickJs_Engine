@@ -1,4 +1,4 @@
-package;
+package body;
 
 #if android
 import android.content.Context;
@@ -62,7 +62,8 @@ class Main extends Sprite
 	
 	// You can pretty much ignore everything from here on - your code should go in your states.
 
-	// 入口在公共层 source/EngineBoot.hx：装崩溃拦截、读 engine.txt、分叉。
+	// 入口在公共层 source/Main.hx：装崩溃拦截、读 engine.txt、分叉。
+	// 本类挂在 body.* 下，三棵树的启动类命名就对称了（body.Main / vanilla.Main / pe063.Main）。
 	// 这里只负责本体这棵树启动（窗口、存档、脚本桥自检）。
 
 	public function new()

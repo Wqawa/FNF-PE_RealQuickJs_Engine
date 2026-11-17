@@ -1,5 +1,6 @@
 package options;
 
+import body.Main;
 import objects.Note;
 import objects.StrumNote;
 import objects.NoteSplash;

@@ -22,7 +22,7 @@
 | 目录 | 是什么 | 规矩 |
 |---|---|---|
 | `source/` | **公共层**：入口 `Main`、`Engine`（读 engine.txt）、`backend.EngineCrash`、`backend.CrashState` | 只许依赖 flixel / lime / std。**不许** import `backend.*` / `states.*` / `objects.*` —— 一 import 就等于把本体的代码带进另外两棵树，资源路径也跟着跑到 `assets/body` |
-| `source_body/body/` | 改版 1.0.4（原来整个 `source/` 挪过来），包名不加前缀 | 随便用，它就是本体 |
+| `source_body/body/` | 改版 1.0.4（原来整个 `source/` 挪过来）。classpath 根，多数类不加前缀；启动类在 `body/` 子包里（`body.Main`） | 随便用，它就是本体 |
 | `source_vanilla/vanilla/` | 原版 1.0.4，全部 `vanilla.` 前缀 | 原版代码，别往里面塞兼容逻辑 |
 | `source_063/pe063/` | 0.6.3，全部 `pe063.` 前缀 | 同上 |
 
@@ -128,14 +128,15 @@ vanilla 分支没有自动入口，只能人工开机验；pe063 有探针（只
 
 `source/` 一刀切成两层：
 
-- `source/` **只留公共层**：`EngineBoot.hx`（入口：装崩溃拦截 → 读 engine.txt → 分叉）、
+- `source/` **只留公共层**：`Main.hx`（入口：装崩溃拦截 → 读 engine.txt → 分叉）、
   `Engine.hx`、`backend/EngineCrash.hx`、`backend/CrashState.hx`。没有 `import.hx`，
   公共文件自己写 import，`Engine.hx` 补了 `using StringTools`。
 - `source_body/body/` 收原 `source/` 的全部内容，**body 的类还叫 `Main`**：
-  公共入口改名 `EngineBoot`（`<app main="EngineBoot">`），所以 `Main.fpsVar` / `Main.game`
-  那些引用一个字都不用改。body 的 `main()` 去掉，`FunkinJS.verifyUtilsIntegrity()`
-  挪进构造函数。
-- `Project.xml` 加一条 `<classpath name="source_body/body" />`；`<app main>` 指向 `EngineBoot`。
+  启动类挪进子包 `source_body/body/body/Main.hx`（`package body;` → `body.Main`），
+  和 `vanilla.Main` / `pe063.Main` 对称；`<app main="Main">` 指着公共入口，两者不再抢名字。
+  引用它的三个文件加 `import body.Main;`，`Main.fpsVar` / `Main.game` 写法不变。
+  body 的 `main()` 去掉，`FunkinJS.verifyUtilsIntegrity()` 挪进构造函数。
+- `Project.xml` 加一条 `<classpath name="source_body/body" />`；`<app main="Main">` 指向公共入口。
 - `.workbuddy/harness/apply_hook.py` 的注入点跟着走（`source_body/body/Main.hx` +
   `source_body/body/AutoTestState.hx`）；`manage.sh` 里 QuickJS 的路径同步。
 
