@@ -299,7 +299,7 @@ cmd_build() {
 
 	# QuickJS.hx 的 @:buildXml 里是硬编码绝对路径（hxcpp 的 -I 拆不开带空格的路径），
 	# 仓库搬过就对不上了，编译前静默对齐到当前根目录
-	local qjs_hx="$ROOT/source_body/jsruntime/QuickJS.hx"
+	local qjs_hx="$ROOT/source_body/body/jsruntime/QuickJS.hx"
 	if [ -f "$qjs_hx" ]; then
 		local winroot
 		winroot="$(cygpath -m "$ROOT" 2>/dev/null || printf '%s' "$ROOT")"
@@ -577,7 +577,7 @@ EOF
 # JS 运行时。源码在 third_party/quickjs-ng（自己 clone 进来的，不自动下载）。
 # 只需要三个 .c：这个 fork 把 cutils.c 并进 quickjs.c 了，没有独立的 cutils.c。
 # QuickJS-NG：源码已入库（third_party/quickjs-ng），只需要在本机编成静态库。
-# 引擎（source_body/jsruntime/QuickJSHandler.hx）通过 @:buildXml 链 build/quickjs-ng.lib。
+# 引擎（source_body/body/jsruntime/QuickJSHandler.hx）通过 @:buildXml 链 build/quickjs-ng.lib。
 QJS_SRC="$ROOT/third_party/quickjs-ng"
 QJS_LIB="$QJS_SRC/build/quickjs-ng.lib"
 QJS_SOURCES="quickjs.c libregexp.c libunicode.c dtoa.c"

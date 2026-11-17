@@ -13,7 +13,7 @@
 >   `Std.parseInt` 颜色饱和和窗口缩放两个坑。看那份之前先看这份了解本体。
 > - `docs/JS_QUICKJS.md`（2026-11-16）：`.js` 两条路（Troll 转译 / 真 QuickJS-NG）的分流、
 >   桥的协议、加宿主函数的步骤、停止哨兵、脚本装卸、已知限制、验证方法。
->   **动 `source_body/jsruntime/` 之前先看这份。**
+>   **动 `source_body/body/jsruntime/` 之前先看这份。**
 
 ---
 
@@ -22,9 +22,13 @@
 | 目录 | 是什么 | 规矩 |
 |---|---|---|
 | `source/` | **公共层**：入口 `Main`、`Engine`（读 engine.txt）、`backend.EngineCrash`、`backend.CrashState` | 只许依赖 flixel / lime / std。**不许** import `backend.*` / `states.*` / `objects.*` —— 一 import 就等于把本体的代码带进另外两棵树，资源路径也跟着跑到 `assets/body` |
-| `source_body/` | 改版 1.0.4（原来整个 `source/` 挪过来），包名不加前缀 | 随便用，它就是本体 |
+| `source_body/body/` | 改版 1.0.4（原来整个 `source/` 挪过来），包名不加前缀 | 随便用，它就是本体 |
 | `source_vanilla/vanilla/` | 原版 1.0.4，全部 `vanilla.` 前缀 | 原版代码，别往里面塞兼容逻辑 |
 | `source_063/pe063/` | 0.6.3，全部 `pe063.` 前缀 | 同上 |
+
+三棵树的 classpath 根各是 `source/`、`source_body/body`、`source_vanilla`、`source_063`，
+**包名都不带版本前缀的只有 body 那棵** —— 目录多一层只是为了和另外两棵树长得一样，
+包里还是 `backend.*` / `states.*`。所以加文件时看包名，不看目录层数。
 
 判断一段代码该放哪：**它依赖不依赖某棵树私有的类**。依赖就放那棵树，不依赖才进 `source/`。
 目前公共层只有上面四个文件 —— 崩溃屏能共用，是因为它只用 flixel 原生控件（交接坑 #12）。
@@ -42,7 +46,7 @@
 
 | engine.txt | 走哪棵 | 源码目录 | 资产目录 |
 |---|---|---|---|
-| `body`（默认） | 本仓 fork | `source_body/` | `assets/body/` |
+| `body`（默认） | 本仓 fork | `source_body/body/` | `assets/body/` |
 | `vanilla` | 原版 PE 1.0.4 | `source_vanilla/vanilla/` | `assets/1.0.4/` |
 | `pe063` | Psych Engine 0.6.3 | `source_063/pe063/` | `assets/0.6.3/` |
 
@@ -127,16 +131,39 @@ vanilla 分支没有自动入口，只能人工开机验；pe063 有探针（只
 - `source/` **只留公共层**：`Main.hx`（入口：装崩溃拦截 → 读 engine.txt → 分叉）、
   `Engine.hx`、`backend/EngineCrash.hx`、`backend/CrashState.hx`。没有 `import.hx`，
   公共文件自己写 import，`Engine.hx` 补了 `using StringTools`。
-- `source_body/` 收原 `source/` 的全部内容；`Main.hx` 改名 `BodyMain.hx`（类名同步），
+- `source_body/body/` 收原 `source/` 的全部内容；`Main.hx` 改名 `BodyMain.hx`（类名同步），
   去掉 `main()`，`FunkinJS.verifyUtilsIntegrity()` 挪进构造函数。
   `ClientPrefs` / `VisualsSettingsSubState` / `Native` 里 6 处 `Main.fpsVar` / `Main.game`
   改成 `BodyMain.`。
 - `Project.xml` 加一条 `<classpath name="source_body" />`；`<app main="Main">` 不变，
   指向公共入口。
-- `.workbuddy/harness/apply_hook.py` 的注入点跟着走（`source_body/BodyMain.hx` +
-  `source_body/AutoTestState.hx`）；`manage.sh` 里 QuickJS 的路径同步。
+- `.workbuddy/harness/apply_hook.py` 的注入点跟着走（`source_body/body/BodyMain.hx` +
+  `source_body/body/AutoTestState.hx`）；`manage.sh` 里 QuickJS 的路径同步。
 
 回归照旧全绿：Lua 10/37/58/32/1/1/1/10、QuickJS 26/27/2、0.6.3 探针 98 帧 ×2。
+
+### 0.0.4 2026-11-17 第二轮：body 也套一层目录
+
+`source_body/*` → `source_body/body/*`，classpath 改成 `source_body/body`，包名不动。
+目的只是让三棵树结构对称（`source_vanilla/vanilla`、`source_063/pe063`、`source_body/body`）。
+
+**顺手抓到并修掉一个真会坏的运行时路径**：
+
+`FunkinJS.UTILS_REL` 是 `verifyUtilsIntegrity()` 按 CWD 去找源码文件用的（从 bin 往上
+`../../../../` 拼）。它写死的是 `source/psychlua/JavaScriptUtils.hx`，目录一搬就永远找不到 ——
+而找不到时函数是**静默放行**（"发行版本来就没有源码"），从日志上完全看不出来。
+已改成 `source_body/body/psychlua/JavaScriptUtils.hx`，跑测试能在 game.log 里看到
+`[integrity] JavaScriptUtils.hx ok`，改之前是 `not found, skip`。
+
+编译期的路径不受影响，逐个核对过：
+
+| 位置 | 基准 | 是否受影响 |
+|---|---|---|
+| `jsruntime/QuickJSHandler.hx` 的 `@:buildXml` libpath | 相对 obj 目录（`export/<mode>/windows/obj`） | 否，包名没变 → 生成路径还是 `obj/src/jsruntime/` |
+| 同文件 `@:cppFileCode` 的 `#include "../../../.."` | 相对生成的 cpp（`obj/src/jsruntime/`） | 否，同上 |
+| `BodyMain.hx` 的 `@:cppInclude('./external/gamemode_client.h')` | 相对源文件 | 否，`external/` 跟目录树一起搬了；而且只在 linux 分支生效 |
+| `manage.sh` 的 QuickJS 源码检查 | 绝对路径 | 已同步 |
+| `harness/apply_hook.py` 注入点 | 绝对路径 | 已同步 |
 
 ### 0.1 未解决（2026-11-13 记录，之后没复核）：0.6.3 的 Options → Switch Engine 打不开
 
@@ -233,7 +260,7 @@ if (controls.ACCEPT && subState == null) {
 
 Psych Engine 1.0.4 的源码 fork，目标是让 0.6.3 / 0.7.3 时代的老 mod（Lua + HScript）不改一行就能跑。
 `.js` 有两条路：默认 Troll（把 JS 转译成 Lua 塞回 LuaJIT，兼容优先），
-切到 QuickJS 后走真的 QuickJS-NG 运行时（`source_body/jsruntime/`，见 `docs/JS_QUICKJS.md`）。
+切到 QuickJS 后走真的 QuickJS-NG 运行时（`source_body/body/jsruntime/`，见 `docs/JS_QUICKJS.md`）。
 
 同一个 exe 里并了三棵树（本体 / 原版 1.0.4 / 0.6.3），靠 `bin/engine.txt` 选。
 
@@ -281,7 +308,7 @@ PE_BUILD=debug bash .workbuddy/run_test.sh
 NOPATCH=1 bash .workbuddy/run_test.sh     # 不给谱面打补丁
 ```
 
-- 测试入口 `AutoTestState.hx` 由 `harness/apply_hook.py on/off` 临时拷进 `source_body/`，跑完自动撤
+- 测试入口 `AutoTestState.hx` 由 `harness/apply_hook.py on/off` 临时拷进 `source_body/body/`，跑完自动撤
 - 脚本放 `bin/mods/body/scripts/` —— **按版本分目录**，`bin/mods/scripts` 是扫不到的
 - 结果写 `.workbuddy/testout/*.txt`，格式 `PASS|名字` / `FAIL|名字` / `ERR|...`
 - 两个 runner 都会把 `engine.txt` 强制成 `body`、跑完还原：不强制的话 `Main.main()`
@@ -303,7 +330,7 @@ QuickJS 冒烟 26 项（run_qjs_test.sh）
 分五层，改之前先确认改的是哪一层（详见 `docs/LUA_COMPAT.md` 第一节）：
 
 > `.js` 那条是另算的：默认走 Troll 转译（转成 Lua 塞进 FunkinLua，所以上面五层全部继承），
-> 切成 QuickJS 之后走 `source_body/jsruntime/`，那套桥的规则在 `docs/JS_QUICKJS.md`。
+> 切成 QuickJS 之后走 `source_body/body/jsruntime/`，那套桥的规则在 `docs/JS_QUICKJS.md`。
 
 | 层 | 位置 | 管什么 |
 |---|---|---|
@@ -317,7 +344,7 @@ QuickJS 冒烟 26 项（run_qjs_test.sh）
 
 - **Lua / HScript 兼容**（1~19 条，见 LUA_COMPAT.md）：`debugPrint` 双签名、三类脚本的路径兜底、
   `Paths.findScriptFile()` 收敛、`ClientPrefs` 32 个转发、HScript 全局补全（Reflect/Lambda/FlxObject…）
-- **PlayState 拆分**：3745 → 2821 行，25 个函数搬到 `source_body/states/play/`（Events / Camera / Judge），
+- **PlayState 拆分**：3745 → 2821 行，25 个函数搬到 `source_body/body/states/play/`（Events / Camera / Judge），
   静态 helper 接 `ps:PlayState`，类上挂 `@:access`，PlayState 保留同名转发 —— 外部和脚本调用完全不变
 - **Freeplay / 资源查找**：`Paths.existsOnDiskOrManifest()`（先磁盘后清单），修掉图标全 face、关卡图 404
 - **NovaFlare 移植**：PhillyGlow 两条正确的映射、`Section` 数据壳、相机 shader 三件套、33 条模块路径别名

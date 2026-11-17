@@ -214,7 +214,7 @@ class ScriptClassAliases
 
 		// ------------------------------------------------------------------ video
 		// 1.0 把 hxcodec 换成了 hxvlc，老 mod 里 `import hxcodec.flixel.FlxVideo;`
-		// 和 `import hxcodec.VideoHandler;` 都还能解析（实现在 source/hxcodec/）
+		// 和 `import hxcodec.VideoHandler;` 都还能解析（实现在 source_body/body/hxcodec/）
 		#if VIDEOS_ALLOWED
 		bind('hxcodec.flixel.FlxVideo', hxcodec.flixel.FlxVideo);
 		bind('hxcodec.VideoHandler', hxcodec.VideoHandler);

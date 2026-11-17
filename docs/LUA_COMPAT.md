@@ -215,7 +215,7 @@ Iris 的 `preset()` 只塞了 `Std` / `Math` / `StringTools`，0.6.x 脚本里�
 （`Type.getClassName(Boyfriend)`、`GitarooPause.instance`）仍然是 `Unknown variable`。
 新增 `applyToHScript()`，在 `HScript.preset()` 里把整张表倒进变量表。
 
-**15. 视频类名整条线没了** — `Project.xml` + `source_body/hxcodec/`
+**15. 视频类名整条线没了** — `Project.xml` + `source_body/body/hxcodec/`
 
 两个问题叠在一起：
 
@@ -224,7 +224,7 @@ Iris 的 `preset()` 只塞了 `Std` / `Math` / `StringTools`，0.6.x 脚本里�
 - 1.0 用 hxvlc，老 mod 写的是 `import hxcodec.flixel.FlxVideo;`（3.x）或
   `hxcodec.VideoHandler`（2.6），名字对不上。
 
-修：把 `VIDEOS_ALLOWED` 移出 `officialBuild` 段；新增 `source_body/hxcodec/flixel/FlxVideo.hx`
+修：把 `VIDEOS_ALLOWED` 移出 `officialBuild` 段；新增 `source_body/body/hxcodec/flixel/FlxVideo.hx`
 （hxvlc 的 `Video` 做底，保留 `play/pause/resume/stop/dispose/onEndReached/bitmapData`），
 `hxcodec.VideoHandler` 和 `vlc.MP4Handler` 作为老名字的壳，并在别名表里挂上。
 

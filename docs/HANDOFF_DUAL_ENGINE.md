@@ -89,9 +89,9 @@ git config --local http.sslcainfo "C:/Users/S062PT/.git-ca-steamtools.pem"
 ```
 新增  source_vanilla/vanilla/…            157 个 .hx，原版 pe104 整体加 vanilla. 前缀
 新增  source/Engine.hx（2026-11-17 起在公共层）                    读 bin/engine.txt，默认 body
-新增  source_body/options/EngineSelectSubState.hx   NF 那套：选中→写文件→Sys.exit(0)
-改    source/Main.hx:68（拆分后入口在 source/Main.hx、FlxGame 在 source_body/BodyMain.hx）                   main() 按 Engine.isVanilla() 分叉
-改    source_body/options/OptionsState.hx      'Switch Engine' 菜单项
+新增  source_body/body/options/EngineSelectSubState.hx   NF 那套：选中→写文件→Sys.exit(0)
+改    source/Main.hx:68（拆分后入口在 source/Main.hx、FlxGame 在 source_body/body/BodyMain.hx）                   main() 按 Engine.isVanilla() 分叉
+改    source_body/body/options/OptionsState.hx      'Switch Engine' 菜单项
 改    Project.xml                         classpath + --macro include('vanilla', true, ['vanilla.unused'])
 改    building/build.sh                   SDK bin 进 PATH（rc.exe）；生成 返回本体.bat
 ```
@@ -192,7 +192,7 @@ mods/
 只有一个开关：`Paths.VERSION_DIR`。
 
 ```haxe
-// source_body/backend/Paths.hx
+// source_body/body/backend/Paths.hx
 public static var VERSION_DIR:String = 'body';
 
 // source_vanilla/vanilla/backend/Paths.hx
@@ -239,7 +239,7 @@ public static var VERSION_DIR:String = '1.0.4';
 
 | engine.txt | 走哪棵 | 源码 |
 |---|---|---|
-| `body`（默认） | 本仓 fork | `source_body/` |
+| `body`（默认） | 本仓 fork | `source_body/body/` |
 | `vanilla` | 原版 PE 1.0.4 | `source_vanilla/vanilla/` |
 | `pe063` | 0.6.3 | `source_063/pe063/` |
 

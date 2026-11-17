@@ -23,7 +23,9 @@ class FunkinJS
 	//  否则下次启动就是黑屏 + 崩溃报告，别怪没人提醒。
 	// ───────────────────────────────────────────────────────────────────────────
 	static inline var UTILS_FNV:Int = 0x692816E4;
-	static inline var UTILS_REL:String = 'source/psychlua/JavaScriptUtils.hx';
+	// 源码目录搬过一次（source/ → source_body/body/），这个路径是运行时按 CWD 找文件的，
+	// 改目录不改它 → 启动时找不到源文件会静默放行；哪天路径又对了反而会误判被篡改。
+	static inline var UTILS_REL:String = 'source_body/body/psychlua/JavaScriptUtils.hx';
 
 	/**
 	 * 校验 JavaScriptUtils.hx 有没有被动过。
