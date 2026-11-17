@@ -39,14 +39,11 @@ class CreditsState extends MusicBeatState
 
 		var defaultList:Array<Array<String>> = [ //Name - Icon name - Description - Link - BG Color
 			["RealQJS_Engine"],
-			["DeepSeek",			"deepseek",		"Main Developer",									"",								"1F6FEB"],
-			["WQ",				"wq",				"Supervision",										"",								"F0A500"],
-			["Maopou",			"maopou",				"Special Thanks",									"",								"9B59B6"],
+			["DeepSeek",		"deepseek",	"Main Developer",			"",	"1F6FEB"],
+			["WQ",				"wq",		"Supervision",				"",	"F0A500"],
 			[""],
 			["Thanks"],
-			["Psych Engine",		"shadowmario",	"Upstream engine",					"https://github.com/ShadowMario/FNF-PsychEngine",	"444444"],
-			["NovaFlare Engine",	"",				"Compatibility layer ideas",					"",								"14967B"],
-			["Lanli",			"",				"Programmer card art (drawn for Maopou)",	"",								"D21C11"],
+			["Maopou",			"maopou",	"NovaFlare Engine representative",	"",	"9B59B6"],
 			[""],
 			["Funkin' Crew"],
 			["ninjamuffin99",	"ninjamuffin99",	"Programmer of Friday Night Funkin'",	"https://x.com/ninja_muffin99",	"CF2D2D"],
