@@ -70,7 +70,7 @@ class JSPlayer
 		var h:Int = QuickJSHandler.newContext(256);
 		if (h < 0)
 		{
-			QuickJSHandler.log('[error] could not create a context (more than 32 scripts?): ' + path);
+			QuickJSHandler.log('[error] could not create a context (more than 64 scripts?): ' + path);
 			return false;
 		}
 
@@ -153,7 +153,11 @@ class JSPlayer
 	}
 
 	/**
-	 * Sends to a single script. Arguments are dispatched as zero args / number / string.
+	 * Sends to a single script. The bridge carries strings and numbers only, so arguments
+	 * are dispatched in the shapes it supports: zero args, (number), (string), (string,
+	 * number), (string, number, number) and (string, string). Anything past the third
+	 * argument is dropped; objects never cross.
+	 *
 	 * The return value is whatever the script returned: sentinels come back as strings,
 	 * true/false/numbers are coerced back, and no return means null.
 	 */
@@ -161,18 +165,41 @@ class JSPlayer
 	{
 		if (!active || host == null || host.closed || !QuickJSHandler.isReady(host.handle)) return null;
 
-		var hasArg:Bool = (args != null && args.length > 0 && args[0] != null);
-		var a:Dynamic = hasArg ? args[0] : null;
-		var isNum:Bool = hasArg && (Std.isOfType(a, Int) || Std.isOfType(a, Float));
-
-		if (!hasArg) QuickJSHandler.callGlobal(host.handle, name);
-		else if (isNum) QuickJSHandler.callGlobalNum(host.handle, name, cast a);
-		else QuickJSHandler.callGlobalStr(host.handle, name, Std.string(a));
+		var n:Int = (args == null) ? 0 : args.length;
+		if (n == 0 || args[0] == null)
+		{
+			QuickJSHandler.callGlobal(host.handle, name);
+		}
+		else if (n >= 2 && isNumArg(args[1]))
+		{
+			if (n >= 3 && isNumArg(args[2]))
+				QuickJSHandler.callGlobalStrNumNum(host.handle, name, Std.string(args[0]), numArg(args[1]), numArg(args[2]));
+			else
+				QuickJSHandler.callGlobalStrNum(host.handle, name, Std.string(args[0]), numArg(args[1]));
+		}
+		else if (n >= 2)
+		{
+			QuickJSHandler.callGlobalStrStr(host.handle, name, Std.string(args[0]), Std.string(args[1]));
+		}
+		else if (isNumArg(args[0]))
+		{
+			QuickJSHandler.callGlobalNum(host.handle, name, numArg(args[0]));
+		}
+		else
+		{
+			QuickJSHandler.callGlobalStr(host.handle, name, Std.string(args[0]));
+		}
 
 		var ret:String = QuickJSHandler.lastReturn();
 		if (ret == null || ret.length == 0) return null;
 		return QuickJSHandler.coerce(ret);
 	}
+
+	static inline function isNumArg(v:Dynamic):Bool
+		return v != null && (Std.isOfType(v, Int) || Std.isOfType(v, Float));
+
+	static inline function numArg(v:Dynamic):Float
+		return cast v;
 
 	/** runTimer callback: only to the script that created it, or everyone if unknown. */
 	public static function onTimerCompleted(tag:String, loops:Int, loopsLeft:Int):Void

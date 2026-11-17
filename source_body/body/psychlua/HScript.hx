@@ -160,6 +160,9 @@ class HScript extends Iris implements IScriptHost
 
 	public var origin:String;
 
+	/** Version claimed by a (%run_v_x.x.x) tag in the file name, null when untagged. */
+	public var versionOverride:String = null;
+
 	// Version tag in the file name, e.g. xxx(%run_v_0.7.3).hx. Same rule as FunkinLua.VERSION_TAG.
 	static final VERSION_TAG:EReg = ~/\(%run_v_([^)]+)\)/;
 
@@ -183,6 +186,7 @@ class HScript extends Iris implements IScriptHost
 		if (filePath != null && filePath.length > 0)
 		{
 			this.origin = filePath;
+			this.versionOverride = parseVersionTag(filePath);
 			#if MODS_ALLOWED
 			// Same reason as above: the mods/<version>/<mod>/ layout breaks the old split check
 			this.modFolder = Paths.modFromScriptPath(filePath);
@@ -234,8 +238,13 @@ class HScript extends Iris implements IScriptHost
 	override function preset() {
 		// (%run_v_x.x.x) in the file name, same rule as FunkinLua.parseVersionTag.
 		// 0.7.3 .hx scripts branch on the version; without this global they always see the real one.
-		var vTag:String = parseVersionTag(origin);
-		set('version', vTag != null ? vTag : states.MainMenuState.psychEngineVersion.trim());
+		var vTag:String = versionOverride;
+		var realVersion:String = states.MainMenuState.psychEngineVersion.trim();
+		set('version', vTag != null ? vTag : realVersion);
+		// Same value under the name scripts actually reach for. Reading the static
+		// MainMenuState.psychEngineVersion cannot be faked per script: Interp.get is
+		// module-private, so there is no hook to intercept a static field read.
+		set('psychEngineVersion', vTag != null ? vTag : realVersion);
 		super.preset();
 
 		// Some very commonly used classes

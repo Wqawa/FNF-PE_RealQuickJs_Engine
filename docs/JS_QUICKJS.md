@@ -39,7 +39,7 @@ psychlua/FunkinJS.hx        .js 入口分流 + Troll 转译器
 ## 3. 运行时形状
 
 - **进程一个 `JSRuntime`**，内存上限 256MB，所有 context 共同吃这个额度（`JS_SetMemoryLimit`）。
-- **每个 `.js` 一个 `JSContext`**，上限 `QJS_MAX_CTX = 32`（`g_ctxs[]` 数组，句柄就是下标）。
+- **每个 `.js` 一个 `JSContext`**，上限 `QJS_MAX_CTX = 64`（`g_ctxs[]` 数组，句柄就是下标）。
   跟 Lua「一个文件一个 `lua_State`」对齐，同名回调不会互相顶掉。
 - **一首歌一个世代**：`PlayState.create()` 调 `JSPlayer.beginSong()`，把上一首的 context 全
   dispose，脚本里的全局变量不会跨歌残留。
@@ -222,10 +222,11 @@ Lua 那边是同一个两层结构（`FunkinLua.getVar` 走 `get(name)`，脚本
 
 ## 11. 已知限制
 
-- **最多 32 个 `.js`**。超了 `newContext` 返回 `-1`，日志里有 `建不出新 context（超过 32 个脚本？）`。
-- **事件只传第一个参数**。`onCountdownTick(swagCounter)` 的 `tick`、`onSpawnNote` 的五个参数
-  JS 拿不到（Lua / HScript 有）。要补就在 `emitTo` 里扩模式，`js_invoke` 现在支持到 3 个参数。
-- **回调参数只有三种形态**：零参、单数字、单字符串。两个以上参数的调用走不通。
+- **最多 64 个 `.js`**。超了 `newContext` 返回 `-1`，日志里有 `could not create a context (more than 64 scripts?)`。
+- **事件最多带三个参数**。`emitTo` 按桥支持的形态转发：零参、`(number)`、`(string)`、
+  `(string, number)`、`(string, number, number)`、`(string, string)`。`onSpawnNote` 那种五个参数
+  的只到前三个；第四个起 JS 拿不到（Lua / HScript 有）。
+- **参数只有字符串和数字**。对象 / 数组过不了桥，`readJson` 返回的是 JSON 文本，脚本自己 `JSON.parse`。
 - **对象过不了桥**。`instanceArg` 只能传 tag，脚本自己 `getVar` 取回来。
 - **默认引擎是 Troll**。想真跑 QuickJS 得在 Gameplay Settings 里切。
 - 每首歌重建 context，脚本里攒的状态不跨歌（跟 Lua 一致，但和「全局变量」的直觉不一样）。

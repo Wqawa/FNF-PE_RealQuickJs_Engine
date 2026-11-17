@@ -180,7 +180,7 @@ class ExtraFunctions
 		{
 			try {
 				var lePath:String = path;
-				if(!absolute) lePath = Paths.getPath(path, TEXT, !ignoreModFolders);
+				if(!absolute) lePath = Paths.getPath(path, TEXT, null, !ignoreModFolders);
 				if(FileSystem.exists(lePath))
 				{
 					FileSystem.deleteFile(lePath);

@@ -61,6 +61,20 @@
 
 ---
 
+## 第三轮：README「已知限制」清账（2026-11-17 晚）
+
+| # | 位置 | 问题 | 状态 |
+|---|---|---|---|
+| 2.10 | vanilla `FunkinLua` 构造 | 仍用上游 `split('/')[0] + '/' == Paths.mods()` 推 modFolder，撞上 `mods/1.0.4/` 这层目录永远不成立，vanilla 树所有脚本 `modFolder` 恒 null | 已修（`vanilla.backend.Paths` 补 `modFromScriptPath`，构造改调它） |
+| 3.6 | `QuickJSHandler` 128 / 129 / 219 | `getTextFromFile` / `readJson` 直接查 CWD，`saveFile` 走 `Paths.mods`，`deleteFile` 走 `Paths.getPath` —— 同一通道三套口径，写进去的文件读不回来 | 已修（全走 `Paths`；`readJson` 补 `.json` 后缀回退，返回文本由脚本 `JSON.parse`） |
+| 3.7 | `QuickJS.hx` 的 `@:buildXml` / `@:cppFileCode` | 写死 `D:/FNF/...` 绝对路径，靠 `manage.sh` 用 `sed` 对齐，换机器/挪仓库必炸 | 已修（改成相对 hxcpp 构建目录，和 `QuickJSHandler` 同款；`manage.sh` 的 sed 段已删） |
+| 4.5 | `QJS_MAX_CTX` | 32 个 context 上限 | 已提到 64 |
+| 4.6 | `JSPlayer.emitTo` | 事件只转发第一个参数 | 已修（按桥支持的六种形态转发最多三个参数） |
+| 2.11 | HScript `psychEngineVersion` | 直读静态字段拿不到 `(%run_v_)` 伪装值 | 部分修（补 `version` / `psychEngineVersion` 两个全局；静态字段读没法拦，`Interp.get` 是模块私有） |
+
+还开着的（设计 / 需大改）：`modFolders` 静默兜底、`modFromScriptPath` 只认当前 mod、
+Animate 2019+ 图集、对象过桥、每首歌重建 context、vanilla 无自动测试。
+
 ## 本轮改了什么（2026-11-17）
 
 **第一轮：查找链 + 类解析**

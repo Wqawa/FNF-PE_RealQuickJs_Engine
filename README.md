@@ -204,25 +204,28 @@ python -c "from functools import reduce; s=open('source_body/body/psychlua/JavaS
 
 ---
 
-## 四、已知限制（没修的）
+## 四、已知限制
 
 更完整的问题表见 `docs/SCRIPT_ISOLATION_AUDIT.md` 和 `docs/JS_QUICKJS.md`。
 
-**路径 / 脚本隔离**
+**2026-11-17 修掉的**
 
-- `Paths.modFolders` 在当前 mod 里找不到文件时静默退到 `mods/<版本>/`，而那个目录同时是共享目录和兜底目录 → 可能命中同名错文件且不报错
-- `Paths.modFromScriptPath` 只认 `currentModDirectory`，非当前 mod 的脚本 `modFolder` 恒 null（`getModSetting` 会出错）
-- vanilla 树的 `modFolder` 推导还是上游的 `split('/')[0]` 旧写法，配上 `mods/1.0.4/` 这层结构，永远推不出来 —— 本体已经换成 `modFromScriptPath()`，vanilla 没动
-- HScript 直读 `MainMenuState.psychEngineVersion` 拿不到 `(%run_v_)` 伪装值
-- Animate 2019+ 图集未支持
+- vanilla 树的 `modFolder` 一直推不出来（上游 `split('/')[0]` 撞上 `mods/1.0.4/` 这层目录）→ 改用 `Paths.modFromScriptPath()`
+- QuickJS 读写文件路径口径不统一 → `getTextFromFile` / `readJson` / `saveFile` / `deleteFile` 全走 `Paths`
+- `QuickJS.hx` 嵌死绝对路径、靠 `manage.sh` 用 `sed` 对齐 → 改成相对 hxcpp 构建目录的路径，挪仓库不用再改
+- `.js` 最多 32 个 → 64 个
+- 事件只传第一个参数 → 按桥支持的类型转发最多三个
+- HScript 拿不到 `(%run_v_)` 伪装值 → 补 `version` 和 `psychEngineVersion` 两个全局
 
-**QuickJS**
+**仍然是限制的**
 
-- `getTextFromFile` / `readJson` 直接用脚本传的字符串查 CWD，绕过 `Paths`，没有版本前缀和 mod 回退；`saveFile` / `deleteFile` 又走 `Paths.mods()` —— 同一条通道里路径口径不统一
-- 最多 32 个 `.js`；事件只传第一个参数；回调只有零参 / 单数字 / 单字符串三种形态；对象过不了桥；每首歌重建 context，状态不跨歌
-- `QuickJS.hx` 里嵌了绝对路径（`D:/FNF/FNF-PE_RealQuickJs_Engine/...`），因为 hxcpp 的 `-I` 拆不开带空格的路径；`manage.sh` 每次编译前用 `sed` 对齐到当前仓库根目录。换机器 / 挪仓库时这是主要雷区
-
-**测试覆盖**：vanilla 分支没有自动测试入口，只能人工开机验。
+- `Paths.modFolders` 在当前 mod 里找不到文件时静默退到 `mods/<版本>/`，而那个目录同时是共享目录和兜底目录 → 可能命中同名错文件且不报错（设计如此，改了会破坏大量老 mod）
+- `Paths.modFromScriptPath` 只认 `currentModDirectory`，非当前 mod 的脚本 `modFolder` 恒 null（多 mod 同时启用时才会碰到，要动 `Mods` 的当前-mod 模型）
+- HScript 直读静态字段 `MainMenuState.psychEngineVersion` 仍是真实版本 —— hscript 的 `Interp.get` 是模块私有，没有钩子能按脚本拦静态字段读；带标记的脚本请读 `psychEngineVersion` 全局
+- Animate 2019+ 图集未支持（0.6.3 只认 2018 单 spritemap；移植 0.7+ 的 `AtlasFrameMaker` 属于加功能）
+- 对象过不了桥（JS 侧只有字符串桥，`readJson` 返回文本，需要自己 `JSON.parse`）
+- 每首歌重建 context，脚本状态不跨歌（设计）
+- 测试覆盖：vanilla 分支没有自动测试入口，只能人工开机验
 
 ---
 

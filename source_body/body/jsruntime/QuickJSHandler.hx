@@ -50,7 +50,7 @@ import backend.MusicBeatState;
 #include <cstring>
 #include <haxe/Log.h>
 
-#define QJS_MAX_CTX 32
+#define QJS_MAX_CTX 64
 static JSRuntime *g_js_rt = nullptr;
 static JSContext *g_ctxs[QJS_MAX_CTX];
 static int g_cur = -1;			// for the trampoline: which context is running
@@ -1472,8 +1472,16 @@ class QuickJSHandler
 				PlayState.instance.addTextToDebug(a, col126);
 				return '1';
 			case 127: return sys.FileSystem.exists(a) ? '1' : '0';
-			case 128: return sys.FileSystem.exists(a) ? sys.io.File.getContent(a) : '';
-			case 129: return sys.FileSystem.exists(a) ? sys.io.File.getContent(a) : '';
+			// getTextFromFile(path): same lookup as Lua - mod, level, shared, assets root.
+			case 128: return Paths.getTextFromFile(a) ?? '';
+			// readJson(path): resolved through Paths, .json suffix optional. Returns the text
+			// because the bridge carries strings only; JSON.parse it on the JS side.
+			case 129:
+			{
+				var p129:String = Paths.getPath(a, openfl.utils.AssetType.TEXT);
+				if (!sys.FileSystem.exists(p129) && sys.FileSystem.exists(p129 + '.json')) p129 += '.json';
+				return sys.FileSystem.exists(p129) ? sys.io.File.getContent(p129) : '';
+			}
 
 			// ---- 130..132 song control
 			case 130:
@@ -2004,7 +2012,7 @@ class QuickJSHandler
 
 			case 219: // deleteFile(path, ignoreModFolders, absolute)
 				try {
-					var p219:String = truthy(c) ? a : Paths.getPath(a);
+					var p219:String = truthy(c) ? a : Paths.getPath(a, openfl.utils.AssetType.TEXT, null, !truthy(b));
 					if (sys.FileSystem.exists(p219))
 					{
 						sys.FileSystem.deleteFile(p219);

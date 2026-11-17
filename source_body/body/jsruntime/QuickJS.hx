@@ -6,18 +6,19 @@ package jsruntime;
  * The static library is built by manage.sh into third_party/quickjs-ng/build/quickjs-ng.lib.
  * Only quickjs.c / libregexp.c / libunicode.c are needed (cutils is folded into quickjs.c here).
  *
- * The path below is absolute; manage.sh realigns it before building when the repo moves (cmd_build).
+ * Paths are relative to hxcpp's build dirs (see QuickJSHandler.hx), so moving the repo needs no edits.
  */
+// libpath is relative to the obj dir and #include relative to the generated cpp:
+//   export/<mode>/windows/obj  and  obj/src/jsruntime/. Same trick as QuickJSHandler.hx,
+//   which avoids absolute paths entirely (the repo path contains spaces and hxcpp splits -I).
 @:buildXml('
 <target id="haxe">
-	<include name="D:/FNF/FNF-PE_RealQuickJs_Engine/third_party/quickjs-ng" />
-	<libpath name="D:/FNF/FNF-PE_RealQuickJs_Engine/third_party/quickjs-ng/build" />
+	<libpath name="../../../../third_party/quickjs-ng/build" />
 	<lib name="quickjs-ng.lib" />
 </target>
 ')
 @:cppFileCode('
-// Absolute include on purpose: the project path has spaces and hxcpp splits -I.
-#include "D:/FNF/FNF-PE_RealQuickJs_Engine/third_party/quickjs-ng/quickjs.h"
+#include "../../../../../../third_party/quickjs-ng/quickjs.h"
 ')
 class QuickJS
 {

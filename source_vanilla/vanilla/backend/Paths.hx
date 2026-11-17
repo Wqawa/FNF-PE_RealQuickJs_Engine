@@ -504,6 +504,45 @@ class Paths
 	inline static public function modsImagesJson(key:String)
 		return modFolders('images/' + key + '.json');
 
+	/**
+	 * Works out which mod a script path belongs to, null when unknown.
+	 *
+	 * Upstream checks `path.split('/')[0] + '/' == Paths.mods()`, which assumes a flat
+	 * mods/<mod>/ layout. This build has mods/<version>/<mod>/, so 'mods/' never equals
+	 * 'mods/1.0.4/' and modFolder stayed null for every script: modFolder, getModSetting
+	 * and any relative path built from it were broken in the vanilla tree.
+	 *
+	 * Also handles the absolute paths findScriptFile returns via applicationDirectory.
+	 */
+	public static function modFromScriptPath(path:String):String
+	{
+		if(path == null || path.length == 0) return null;
+
+		var p:String = path.replace('\\', '/');
+
+		// absolute paths keep only the part after mods/
+		var idx:Int = p.indexOf('/mods/');
+		if(idx >= 0) p = p.substr(idx + 1);
+		else if(!StringTools.startsWith(p, 'mods/')) return null;
+
+		var rest:String = null;
+		var versionPrefix:String = 'mods/$VERSION_DIR/';
+
+		if(StringTools.startsWith(p, versionPrefix)) rest = p.substr(versionPrefix.length);
+		else if(StringTools.startsWith(p, 'mods/')) rest = p.substr(5); // old layout: mods/<mod>/...
+
+		if(rest == null) return null;
+
+		var slash:Int = rest.indexOf('/');
+		if(slash <= 0) return null;
+
+		// mods/1.0.4/scripts/ is the global script folder, not a mod
+		var name:String = rest.substr(0, slash);
+		if(Mods.ignoreModFolders.contains(name.toLowerCase())) return null;
+		if(name == Mods.currentModDirectory) return name;
+		return null;
+	}
+
 	static public function modFolders(key:String)
 	{
 		if(Mods.currentModDirectory != null && Mods.currentModDirectory.length > 0)

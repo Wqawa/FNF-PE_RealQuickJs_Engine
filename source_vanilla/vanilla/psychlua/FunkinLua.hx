@@ -64,10 +64,9 @@ class FunkinLua {
 		var game:PlayState = PlayState.instance;
 		if(game != null) game.luaArray.push(this);
 
-		var myFolder:Array<String> = this.scriptName.split('/');
 		#if MODS_ALLOWED
-		if(myFolder[0] + '/' == Paths.mods() && (Mods.currentModDirectory == myFolder[1])) //is inside mods folder
-			this.modFolder = myFolder[1];
+		// mods/<version>/<mod>/ breaks the old split-based check; Paths knows the layout.
+		this.modFolder = Paths.modFromScriptPath(this.scriptName);
 		#end
 
 		// Lua shit

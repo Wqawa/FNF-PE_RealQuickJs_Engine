@@ -297,18 +297,8 @@ cmd_build() {
 	check_libs || { say "依赖不齐，先跑 1 号环境体检（会自动补库）" "dependencies missing, run item 1 (auto-repairs libs)"; return 1; }
 	setup_msvc || return 1
 
-	# QuickJS.hx 的 @:buildXml 里是硬编码绝对路径（hxcpp 的 -I 拆不开带空格的路径），
-	# 仓库搬过就对不上了，编译前静默对齐到当前根目录
-	local qjs_hx="$ROOT/source_body/body/jsruntime/QuickJS.hx"
-	if [ -f "$qjs_hx" ]; then
-		local winroot
-		winroot="$(cygpath -m "$ROOT" 2>/dev/null || printf '%s' "$ROOT")"
-		if ! grep -q "$winroot/third_party/quickjs-ng" "$qjs_hx"; then
-			sed -i "s|\(name=\"\)[A-Za-z]:/[^\"]*/third_party/quickjs-ng|\1$winroot/third_party/quickjs-ng|g" "$qjs_hx"
-			sed -i "s|\(#include \"\)[A-Za-z]:/[^\"]*/third_party/quickjs-ng/quickjs.h|\1$winroot/third_party/quickjs-ng/quickjs.h|g" "$qjs_hx"
-			say "  QuickJS 路径已对齐到 $winroot" "  aligned QuickJS paths to $winroot"
-		fi
-	fi
+	# QuickJS.hx 的 libpath / #include 都是相对 hxcpp 构建目录的，仓库搬到哪都不用改。
+	# （以前这里用 sed 把绝对路径对齐到当前根目录，2026-11-17 改成相对路径后不再需要。）
 
 	if tasklist //FI "IMAGENAME eq PsychEngine.exe" 2>/dev/null | grep -qi psychengine; then
 		say "  游戏在跑，先关掉" "  game is running, closing it"

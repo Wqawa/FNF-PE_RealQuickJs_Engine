@@ -188,6 +188,32 @@ body 树 41 个文件、1388 行中文注释，逐条改成英文，风格照上
 
 改完编译 + 三条回归全绿。
 
+### 0.0.6 2026-11-17 第四轮：README「已知限制」清账
+
+按 README 第四节逐条核对后修掉的：
+
+- **vanilla 的 modFolder**：`FunkinLua` 构造还在用上游的 `split('/')[0] + '/' == Paths.mods()`，
+  撞上 `mods/1.0.4/` 这层版本目录永远不成立，vanilla 树所有脚本的 `modFolder` 恒 null。
+  给 `vanilla.backend.Paths` 补了 `modFromScriptPath()`（和 body 同一份逻辑），构造改调它。
+- **QuickJS 文件路径**：`getTextFromFile` / `readJson` 以前直接拿脚本字符串查 CWD，
+  `saveFile` 走 `Paths.mods`、`deleteFile` 走 `Paths.getPath` —— 写进去的文件读不回来。
+  现在四个全走 `Paths`；`readJson` 补 `.json` 后缀回退，返回文本由脚本 `JSON.parse`
+  （桥只传字符串）。QJS 回归里新增 `file-roundtrip` / `file-delete` 两条。
+- **QuickJS.hx 绝对路径**：`@:buildXml` / `@:cppFileCode` 改成相对 hxcpp 构建目录
+  （`../../../../third_party/...`），和 `QuickJSHandler.hx` 同款；`manage.sh` 里那段 sed 删了。
+  已验证生成的 `obj/Build.xml` 和 `obj/src/jsruntime/QuickJS.cpp` 都是相对路径且链接通过。
+- **context 上限** 32 → 64。
+- **事件参数**：`emitTo` 现在按桥支持的形态转发最多三个参数（零参 / 数字 / 字符串 /
+  (str,num) / (str,num,num) / (str,str)），以前只用第一个。
+- **HScript 版本**：补 `psychEngineVersion` 全局（和 `version` 一样受 `(%run_v_)` 影响）。
+  直读静态字段 `MainMenuState.psychEngineVersion` 仍然拿不到伪装值 —— `Interp.get` 是
+  模块私有方法，没有钩子能按脚本拦静态字段读。
+
+仍然不修的（写进 README「仍然是限制的」）：`modFolders` 静默兜底、多 mod 的 `modFolder`、
+Animate 2019+ 图集、对象过桥、每首歌重建 context、vanilla 无自动测试。
+
+回归：Lua isolation 12 条、QuickJS smoke 28 / selfremove 29 / child 2，全绿。
+
 ### 0.1 未解决（2026-11-13 记录，之后没复核）：0.6.3 的 Options → Switch Engine 打不开
 
 **现象**：0.6.3 里选中 Switch Engine，界面不出现（卡住 / 一闪即回）。
