@@ -76,6 +76,15 @@ class Main extends Sprite
 		}
 		if (Engine.isPe063())
 		{
+			#if desktop
+			// 0.6.3 树的路径探针：不进游戏、不建 state，跑完直接退。用法见 pe063/debug/Probe.hx
+			var probe:Null<String> = Sys.getEnv('PE_063_PROBE');
+			if (probe != null && probe == '1')
+			{
+				pe063.debug.Probe.run();
+				return;
+			}
+			#end
 			Lib.current.addChild(new pe063.Main());
 			return;
 		}

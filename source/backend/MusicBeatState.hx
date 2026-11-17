@@ -139,6 +139,11 @@ class MusicBeatState extends FlxState
 			return;
 		}
 
+		// 离开 PlayState 时把关卡目录挂回 shared。story / freeplay / 谱面编辑器都是
+		// 直接 switchState，不经过 LoadingState，于是 currentLevel 一直停在上一首歌的
+		// week 目录，菜单里的图会先去 `assets/<ver>/<week>/` 找一遍 —— 有同名文件就显示错的。
+		if(!Std.isOfType(nextState, states.PlayState)) Paths.setCurrentLevel('shared');
+
 		if(FlxTransitionableState.skipNextTransIn) FlxG.switchState(nextState);
 		else startTransition(nextState);
 		FlxTransitionableState.skipNextTransIn = false;
