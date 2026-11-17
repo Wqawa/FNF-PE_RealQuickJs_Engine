@@ -7,9 +7,9 @@ import openfl.filters.ShaderFilter;
 
 class ShaderFunctions
 {
-	// 相机上挂过的 shader，按 tag 记，removeCamShader 靠它找回来。
-	// public 是给 jsruntime.QJSShaders 用的：JS 和 Lua 共用这一张表，
-	// 不然同一个 tag 在两个通道里互相看不见，谁摘谁都不对。
+	// Shaders attached to cameras, keyed by tag; removeCamShader looks them up here.
+	// Public for jsruntime.QJSShaders: JS and Lua share this one table, otherwise the same
+	// tag is invisible across channels and removing it removes the wrong thing.
 	public static var storedFilters:Map<String, ShaderFilter> = [];
 
 	public static function getCam(obj:String):Dynamic
@@ -33,7 +33,7 @@ class ShaderFunctions
 			return false;
 		});
 
-		// 以下三个抄自 NovaFlare：lua 侧自己编译的 shader 挂到相机上（之前只能挂 sprite）
+		// The three below come from NovaFlare: lua-compiled shaders can attach to cameras, not just sprites
 		funk.addLocalCallback("addShaderToCam", function(cam:String, shader:String, ?index:String) {
 			if(!ClientPrefs.data.shaders) return false;
 
@@ -54,9 +54,9 @@ class ShaderFunctions
 				return false;
 			}
 
-			// flixel 5.6 把 _filters 改成了 deprecated 的 get/set 属性，真实字段是 filters。
-			// 老写法 camera._filters 在 Dynamic 上会抛 Invalid field:_filters —— 这条以前是坏的，
-			// 和 jsruntime.QJSShaders 一起改成走公开的 filters / setFilters。
+			// flixel 5.6 turned _filters into a deprecated get/set pair; the real field is filters.
+			// The old camera._filters threw Invalid field:_filters through Dynamic and was broken;
+			// both here and jsruntime.QJSShaders now use filters / setFilters.
 			var cur:Array<openfl.filters.BitmapFilter> = camera.filters;
 			if(cur == null) cur = [];
 			var filter = new ShaderFilter(new FlxRuntimeShader(arr[0], arr[1]));

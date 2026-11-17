@@ -77,8 +77,8 @@ class Main extends Sprite
 			var ratioX:Float = stageWidth / gameWidth;
 			var ratioY:Float = stageHeight / gameHeight;
 			zoom = Math.min(ratioX, ratioY);
-			// flixel 5.6 的 FlxGame 不再接收 zoom 参数，窗口缩放由 FlxG.scaleMode（默认 RatioScaleMode）负责。
-			// 这里只算出缩放比备用，不要再反算 gameWidth/gameHeight，否则 HUD 会按放大后的尺寸布局，画面整体偏左。
+			// flixel 5.6's FlxGame no longer takes a zoom; FlxG.scaleMode (RatioScaleMode) handles it.
+			// The ratio is computed for reference only; do not derive gameWidth/gameHeight or the HUD
 		}
 	
 		ClientPrefs.loadDefaultKeys();

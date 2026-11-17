@@ -71,11 +71,11 @@ class FPSCounter extends TextField
 	}
 
 	/**
-	 * 现在在哪：<版本>/<状态类名>，进 PlayState 之后再带歌名。
+	 * Where you are: <version>/<state class>, plus the song name inside PlayState.
 	 *
-	 * 直接拼进 FPS 同一个 TextField，字号/颜色/更新节奏天然和 FPS 那两行一致；
-	 * 单独做一个 TextField 会跟 Memory 挤在一起，低帧率变红时也不会有反应。
-	 * 读歌名走 Reflect，不 import PlayState，避免状态类互相依赖。
+	 * Rendered into the same TextField as FPS so size, colour and update rate match;
+	 * a separate TextField would crowd Memory and miss the low-fps red tint.
+	 * The song name is read through Reflect to avoid importing PlayState.
 	 */
 	static function whereAmI():String
 	{

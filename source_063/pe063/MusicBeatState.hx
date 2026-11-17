@@ -146,12 +146,12 @@ class MusicBeatState extends FlxUIState
 	}
 
 	/**
-	 * 从子界面里切状态用这个。
+	 * Use this to switch states from inside a substate.
 	 *
-	 * flixel 5 的 switchState 会先把当前 state destroy 掉，而子界面还在它的 update 里跑，
-	 * 于是抛「Attempting to resetState while the current state is destroyed」。
-	 * 0.6.3 当年的 flixel 没这层保护，所以原代码到处都是直接切。
-	 * 做法：先关掉子界面，下一帧再切。
+	 * flixel 5's switchState destroys the current state while the substate is still in its
+	 * update, throwing "Attempting to resetState while the current state is destroyed".
+	 * 0.6.3's flixel had no such guard, so the original code switches directly everywhere.
+	 * Fix: close the substate first, switch next frame.
 	 */
 	public static function safeSwitch(?next:FlxState):Void
 	{

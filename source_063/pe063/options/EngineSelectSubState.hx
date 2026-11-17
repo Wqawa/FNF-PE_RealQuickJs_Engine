@@ -9,13 +9,13 @@ import flixel.text.FlxText.FlxTextBorderStyle;
 import flixel.util.FlxColor;
 
 /**
- * 0.6.3 侧的引擎切换界面。
+ * Engine switch screen for the 0.6.3 side.
  *
- * 逻辑和本体、原版那两个 pe063.options.EngineSelectSubState 一样：选中后把 engine.txt 写到
- * bin 根目录，然后退出进程，下次启动由 Main.main() 按 engine.txt 决定加载哪一棵树。
+ * Same logic as the body and vanilla screens: selecting writes engine.txt into the bin
+ * root and exits; the next launch picks a tree from that file.
  *
- * 单独一份是因为三棵树的 ClientPrefs / Paths / Alphabet 各是各的 —— 0.6.3 的 ClientPrefs
- * 还是静态字段（ClientPrefs.globalAntialiasing），不是 1.0.4 那套 data 结构。
+ * A separate copy exists because each tree has its own ClientPrefs / Paths / Alphabet:
+ * 0.6.3's ClientPrefs is still static fields, not 1.0.4's data structure.
  */
 class EngineSelectSubState extends MusicBeatSubstate
 {
@@ -32,11 +32,11 @@ class EngineSelectSubState extends MusicBeatSubstate
 	var curSelected:Int = 0;
 	var errorText:FlxText;
 
-	// 0.6.3 的 controls.ACCEPT 是「按住」语义（FlxActionDigital.check()，按住期间恒为 true），
-	// 而这个界面正是用 ACCEPT 打开的 —— 打开的同一帧和之后每一帧它都还是 true。
-	// 不挡一下的话，第一帧就 confirmSelection()，curSelected 又默认指向当前引擎，
-	// 于是立刻 close()；父菜单看到按键没松又开一次 → 界面一闪就回去、create 日志刷屏。
-	// 等到 ACCEPT 真正松手才算数。
+	// 0.6.3's controls.ACCEPT means "held" (FlxActionDigital.check() stays true while down),
+	// and this screen is opened with ACCEPT, so it is true on that frame and every frame after.
+	// Without a latch, confirmSelection() fires on frame one, curSelected still points at the
+	// current engine, it closes, the parent reopens on the held key: a flash and a spam of
+	// create logs. Only act after ACCEPT is actually released.
 	var acceptLatch:Bool = true;
 
 	override function create()
@@ -147,8 +147,8 @@ class EngineSelectSubState extends MusicBeatSubstate
 
 		if (chosen == Engine.current())
 		{
-			// 不 close()：现在按键还按着，父菜单下一帧就会再开一次，白闪一下。
-			// 留在原地，按 BACK 退出。
+			// Do not close(): the key is still held and the parent would reopen next frame.
+			// Stay here; BACK leaves.
 			var snd = Paths.sound('cancelMenu');
 			if (snd != null) FlxG.sound.play(snd);
 			return;

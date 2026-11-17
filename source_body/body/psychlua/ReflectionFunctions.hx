@@ -32,9 +32,9 @@ class ReflectionFunctions
 			return value;
 		});
 		Lua_helper.add_callback(lua, "getPropertyFromClass", function(classVar:String, variable:String, ?allowMaps:Bool = false):Dynamic {
-			// 文件名带了版本标记（xxx(%run_v_0.7.3).lua）的脚本，查版本拿到的就是它要的那个版本。
-			// 注意这里必须显式 :Dynamic —— 只写 return funk.versionOverride 的话，Haxe 会把整个回调的
-			// 返回类型推断成 String，Float / Array / 对象全部被 toString，脚本侧全废。
+			// A script tagged xxx(%run_v_0.7.3).lua reports the version it asked for.
+			// The explicit :Dynamic matters: with just `return funk.versionOverride` Haxe infers the
+			// callback's return type as String, so Floats / Arrays / objects get toString'd.
 			if(funk.versionOverride != null && variable == 'psychEngineVersion') return funk.versionOverride;
 
 			var myClass:Dynamic = backend.ScriptClassAliases.resolve(classVar);
@@ -169,7 +169,7 @@ class ReflectionFunctions
 		Lua_helper.add_callback(lua, "removeFromGroup", function(group:String, ?index:Int = -1, ?tagOrDontDestroy:Dynamic = null, ?destroy:Bool = true) {
 			// 0.6.3: removeFromGroup(group, index, dontDestroy)
 			// 1.0.4: removeFromGroup(group, index, tag, destroy)
-			// 第三个参数是布尔就按老语义走，否则当成 tag
+			// A boolean third argument keeps the old meaning; anything else is a tag
 			var tag:String = null;
 			if(tagOrDontDestroy != null)
 			{

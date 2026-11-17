@@ -84,8 +84,8 @@ class HScript extends Iris
 	public var origin:String;
 	override public function new(?parent:Dynamic, ?file:String, ?varsToBring:Any = null, ?manualRun:Bool = false)
 	{
-		// 跑脚本之前先把「现代全名 → vanilla.*」灌进 Iris.proxyImports，
-		// 否则 import backend.Xxx 会解析到本体的类上（三棵树共用一个 exe）
+		// Before running scripts, load modern FQN -> vanilla.* into Iris.proxyImports,
+		// otherwise import backend.Xxx resolves to the body class (one exe, three trees)
 		IsolatedImports.register();
 
 		if (file == null)
@@ -568,15 +568,15 @@ class CustomInterp extends crowplexus.hscript.Interp
 	}
 
 	/**
-	 * import 的落点。
+	 * Where `import` lands.
 	 *
-	 * 默认实现是 `proxyImports` 查不到就 `Tools.getClass` → `Type.resolveClass(name)`，
-	 * 而三棵树里同名类的全限定名一字不差，于是会命中**本体**那一份。
-	 * `IsolatedImports` 那张表是扫目录生成的静态快照，漏一个名字就露这个洞。
+	 * The default is proxyImports, then Tools.getClass -> Type.resolveClass(name), and the
+	 * three trees share identical FQNs, so it hits the body copy.
+	 * IsolatedImports is a generated static snapshot: miss one name and this hole opens.
 	 *
-	 * 这里不再依赖表是否新鲜：解析结果只要是别棵树的引擎类，就交给
-	 * `LuaUtils.resolveClass` 重新按 `vanilla.*` 指一遍；指不到就返回 null，
-	 * 宁可不给，也不给一个 Paths 指向 assets/body 的类。
+	 * This no longer trusts the table: if the result belongs to another tree's engine
+	 * classes, LuaUtils.resolveClass re-resolves it under vanilla.*, and null is returned
+	 * rather than a class whose Paths points at assets/body.
 	 */
 	override function getOrImportClass(name:String):Dynamic
 	{
@@ -610,10 +610,10 @@ class CustomInterp extends crowplexus.hscript.Interp
 			return v;
 		}
 
-		// 未知标识符：和 lua 的 getPropertyFromClass 走同一条守卫链（只认 vanilla.*，
-		// 落到本体那棵树的引擎类一律拒掉）。以前这里直接报 EUnknownVariable，
-		// 而 import 那条路一旦 IsolatedImports 的表漏了名字就会静默拿到本体类 ——
-		// 那个类的 Paths 指向 assets/body，贴图就从另一棵树里出来了。
+		// Unknown identifier: same guard chain as lua's getPropertyFromClass (vanilla.* only,
+		// body engine classes refused). This used to report EUnknownVariable outright, while the
+		// import path silently took a body class whenever IsolatedImports missed a name - and
+		// that class's Paths points at assets/body, so textures came from the other tree.
 		var cls:Dynamic = LuaUtils.resolveClass(id);
 		if(cls != null) {
 			variables.set(id, cls);

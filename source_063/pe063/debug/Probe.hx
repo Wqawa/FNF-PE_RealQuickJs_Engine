@@ -7,14 +7,14 @@ import sys.FileSystem;
 import sys.io.File;
 
 /**
- * 0.6.3 树的路径探针。
+ * Path probe for the 0.6.3 tree.
  *
- * `PE_063_PROBE=1` 时 `Main.main()` 不进游戏，只跑这里：把 lua `texture` 模式
- * （AtlasFrameMaker）用到的几组路径算出来、真的构造一次图集，结果写到
- * `.workbuddy/testout/pe063_probe.txt` 然后退出。
+ * With PE_063_PROBE=1, Main.main() skips the game and runs this: resolve the paths lua
+ * texture mode (AtlasFrameMaker) uses, build the atlas for real, write the result to
+ * .workbuddy/testout/pe063_probe.txt and exit.
  *
- * 为什么要它：这棵树没有自动测试入口（测试补丁挂在 body 的 Main.main 分支上），
- * 改完 Paths / 图集之后没法验证，只能靠这个探针。它不建窗口、不出声。
+ * Why: this tree has no automated entry (the test hook lives on the body branch), so
+ * Paths or atlas changes could not be verified. It creates no window and makes no sound.
  */
 class Probe
 {
@@ -30,18 +30,18 @@ class Probe
 
 	public static function run():Void
 	{
-		// lime 的窗口在 main() 之前就建好了，先藏起来再干活，别在桌面上闪一下
+		// lime builds the window before main(); hide it first so nothing flashes on screen
 		try lime.app.Application.current.window.visible = false catch (e:Dynamic) {}
 
 		out = new StringBuf();
 		var oldLevel:String = Paths.currentLevel;
 		var oldMod:String = Paths.currentModDirectory;
 
-		// 1. 官方图集，靠 week 目录找（0.6.3 自己的调用方式）
+		// 1. official atlas found through the week folder (how 0.6.3 calls it)
 		Paths.setCurrentLevel('week7');
 		probeAtlas('cutscenes/stressPico');
 
-		// 2. mod 里的图集（lua texture 模式的实际用法）：复制一份到 mods/0.6.3/probe
+		// 2. atlas inside a mod (real lua texture usage): copy one into mods/0.6.3/probe
 		var src:String = 'assets/0.6.3/week7/images/cutscenes/stressPico';
 		var dst:String = 'mods/0.6.3/probe/images/characters/stressPico';
 		try
@@ -55,9 +55,9 @@ class Probe
 			probeAtlas('characters/stressPico');
 		}
 		catch (e:Dynamic)
-			log('mod 场景准备失败: ' + e);
+			log('could not prepare the mod case: ' + e);
 
-		// 3. 收尾：把探针造出来的 mod 删掉，别留在玩家的 mods 目录里
+		// 3. clean up: remove the probe mod from the player's mods folder
 		Paths.currentModDirectory = oldMod;
 		Paths.currentLevel = oldLevel;
 		try
@@ -70,7 +70,7 @@ class Probe
 			FileSystem.deleteDirectory('mods/0.6.3/probe');
 		}
 		catch (e:Dynamic)
-			log('清理失败（不影响结论）: ' + e);
+			log('cleanup failed (does not affect the result): ' + e);
 
 		File.saveContent(OUT_PATH, out.toString());
 		Sys.exit(0);

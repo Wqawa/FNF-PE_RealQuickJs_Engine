@@ -112,8 +112,8 @@ class OptionsState extends MusicBeatState
 			MusicBeatState.switchState(new MainMenuState());
 		}
 
-		// 子界面打开期间父状态不会 update（persistentUpdate 默认 false），这里不用再判 subState。
-		// 真正要挡的是子界面自己：0.6.3 的 ACCEPT 是「按住」语义，见 EngineSelectSubState 里的 acceptLatch。
+		// The parent does not update while a substate is open (persistentUpdate defaults to false).
+		// What needs guarding is the substate itself: 0.6.3's ACCEPT is a held key; see acceptLatch.
 		if (controls.ACCEPT) {
 			openSelectedSubstate(options[curSelected]);
 		}

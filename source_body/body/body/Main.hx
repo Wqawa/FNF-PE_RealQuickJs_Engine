@@ -62,15 +62,15 @@ class Main extends Sprite
 	
 	// You can pretty much ignore everything from here on - your code should go in your states.
 
-	// 入口在公共层 source/Main.hx：装崩溃拦截、读 engine.txt、分叉。
-	// 本类挂在 body.* 下，三棵树的启动类命名就对称了（body.Main / vanilla.Main / pe063.Main）。
-	// 这里只负责本体这棵树启动（窗口、存档、脚本桥自检）。
+	// Entry point lives in the shared layer, source/Main.hx: crash handler, engine.txt, fork.
+	// This class sits under body.* so the three trees name their boot classes alike
+	// (body.Main / vanilla.Main / pe063.Main). It boots body only: window, saves, script bridge.
 
 	public function new()
 	{
 		super();
 
-		// 以前在 Main.main() 的 body 分支里，跟着入口一起挪到了构造函数
+		// Used to live in Main.main()'s body branch; moved into the constructor with the entry split
 		#if sys
 		psychlua.FunkinJS.verifyUtilsIntegrity();
 		#end
@@ -158,13 +158,13 @@ class Main extends Sprite
 		ClientPrefs.loadDefaultKeys();
 		#if ACHIEVEMENTS_ALLOWED Achievements.load(); #end
 
-		// QuickJS-NG 链接自检（先只打印一次，确认静态库能链上）
+		// QuickJS-NG link self-test (prints once, just to confirm the static lib linked)
 		trace('[quickjs-ng] smoke: ' + jsruntime.QuickJS.smokeTest());
-		// 自检放到 PlayState 里跑：getProperty('health') 只有 PlayState 才有意义，
-		// 主菜单阶段 health 根本不存在（拿到的会是 null）。
+		// The probe runs in PlayState because getProperty('health') only means something there;
+		// during the menu health does not exist and would be null.
 		var jsProbed:Bool = false;
 		flixel.FlxG.signals.postUpdate.add(function() {
-			// 每帧驱动真实脚本（jsEngine=QuickJS 时才有内容）
+			// Drives real scripts every frame (only does anything with jsEngine=QuickJS)
 			jsruntime.JSPlayer.update();
 			if (jsProbed) return;
 			var st:Dynamic = flixel.FlxG.state;
@@ -172,11 +172,11 @@ class Main extends Sprite
 			var cn:Null<String> = Type.getClassName(Type.getClass(st));
 			if (cn == null || cn.indexOf('PlayState') < 0) return;
 			jsProbed = true;
-			// 有真脚本在跑时别再插手：这段探针会往同一个 context 里 eval、
-			// 还会把 camZooming 设成 false，混在业务脚本里只会让人以为脚本有毛病。
+			// Do not interfere while real scripts run: this probe evals into the same context and
+			// sets camZooming to false, which looks like a bug in the mod's own script.
 			if (jsruntime.JSPlayer.active) return;
 
-			// 桥接自检：用一次性的临时 context，跑完就扔，不碰业务脚本
+			// Bridge self-test: throwaway context, discarded afterwards, never touches real scripts
 			var hProbe:Int = jsruntime.QuickJSHandler.newContext(64);
 			if (hProbe < 0) return;
 			jsruntime.QuickJSHandler.installHostFunctions(hProbe);

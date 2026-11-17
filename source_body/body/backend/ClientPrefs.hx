@@ -82,21 +82,21 @@ import states.TitleState;
 	// true = every single occurrence gets printed, useful when debugging
 	public var moreLuaErrors:Bool = false;
 
-	/** HScript 报错上不上屏幕。关着就只写 testout/js_log.txt */
+	/** Whether HScript errors reach the screen. Off means testout/js_log.txt only. */
 	public var hscriptErrors:Bool = false;
 
-	/** .js 脚本用哪个引擎跑：'troll' = 原来那个玩笑解释器，'quickjs' = QuickJS-NG */
+	/** Which engine runs .js: 'troll' = the transpile-to-Lua joke, 'quickjs' = QuickJS-NG. */
 	public var jsEngine:String = 'Troll';
 
 	// ------------------------------------------------------------------
-	// 版本差异开关（只影响本仓的 body 树，原版树不受影响）
-	// 全部默认 false = 保持 1.0.4 原本行为；打开才回退成 0.6.3 那套。
+	// Version behaviour switches. Body tree only; the vanilla tree ignores them.
+	// All default to false (1.0.4 behaviour); turning one on restores the 0.6.3 way.
 	// ------------------------------------------------------------------
-	/** 0.6.3 式 HUD：把 uiGroup 展开成平铺 members（老脚本按索引排层级要靠它） */
+	/** 0.6.3 style HUD: flatten uiGroup into plain members (old scripts index into it). */
 	public var compatLegacyUI:Bool = false;
-	/** 0.6.3 式回血：命中音符 +0.023（1.0.4 调低了） */
+	/** 0.6.3 health gain: +0.023 per hit (1.0.4 lowered it). */
 	public var compatLegacyHealth:Bool = false;
-	/** 0.6.3 式小图标：换一套裁剪/缩放算法，修 1.0.4 上图标被裁边 */
+	/** 0.6.3 style icons: different crop/scale maths, fixes clipped icons on 1.0.4. */
 	public var compatLegacyIcons:Bool = false;
 }
 
@@ -215,7 +215,7 @@ class ClientPrefs {
 	static inline function get_safeFrames():Float return data.safeFrames;
 	static inline function set_safeFrames(v:Float):Float return data.safeFrames = v;
 
-	// 0.6.3 有、1.0 的 data 里也还有，只是当年是静态字段
+	// Present in 0.6.3 and still in 1.0's data, but used to be static fields
 	public static var comboStacking(get, set):Bool;
 	static inline function get_comboStacking():Bool return data.comboStacking;
 	static inline function set_comboStacking(v:Bool):Bool return data.comboStacking = v;

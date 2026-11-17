@@ -65,9 +65,9 @@ class FunkinLua {
 	public static var Function_StopLua:Dynamic = 2;
 
 	/**
-	 * 临时诊断：把舞台脚本的建对象 / 插入位置写进 testout/stage_dbg.txt。
-	 * body 侧有一份同格式的（前缀 [body]），跑完两边 diff 就能看出是哪个
-	 * sprite 没建出来、还是插错了层级。查完可以删。
+	 * Temporary diagnostic: writes stage script object creation / insert order to
+	 * testout/stage_dbg.txt. Body has a matching one prefixed [body]; diffing both shows
+	 * which sprite was never created or landed in the wrong layer. Safe to delete later.
 	 */
 	public static function stageDbg(msg:String):Void
 	{
@@ -90,38 +90,38 @@ class FunkinLua {
 	public var scriptName:String = '';
 
 	/**
-	 * 裸类名 → pe063.* 全名。
+	 * Bare class name -> full pe063.* name.
 	 *
-	 * 这棵树整体加了 pe063. 前缀，但脚本里写的还是 0.6.3 时代的裸名：
+	 * This tree is prefixed with pe063., but scripts still use the 0.6.3 bare names:
 	 *   getPropertyFromClass('ClientPrefs', 'healthBarAlpha')
-	 * Type.resolveClass('ClientPrefs') 在这棵树里永远是 null，属性读成 nil，
-	 * 于是 setProperty('xxx.alpha', nil) 把 alpha 写成 0 —— 表现是贴图根本不出现，
-	 * 连 flixel 的占位方块都没有（frames 其实是好的）。
+	 * Type.resolveClass('ClientPrefs') is always null here, so the property reads as nil and
+	 * setProperty('xxx.alpha', nil) writes 0 - the sprite never appears, not even flixel's
+	 * placeholder box, while frames are actually fine.
 	 */
 	static public function resolveClass(name:String):Dynamic
 	{
 		if (name == null || name.length == 0) return null;
 
 		var cls:Dynamic = Type.resolveClass(name);
-		// 命中本体的引擎类不能直接 return null —— 0.6.3 那边往往有同名扁平类
-		// （objects.Note → pe063.Note），以前这里一撞树就放弃，脚本拿到 nil。
+		// Hitting a body engine class must not return null right away: 0.6.3 usually has a
+		// flat class of the same name (objects.Note -> pe063.Note). This used to give up, so the
 		if (cls != null && !isOtherTreeClass(cls)) return cls;
 
 		if (name.indexOf('pe063.') == 0) return Type.resolveClass(name);
 
-		// 现代全名 → 0.6.3 的扁平类：backend.ClientPrefs → pe063.ClientPrefs
+		// script got nil. Modern FQN -> flat 0.6.3 class: backend.ClientPrefs -> pe063.ClientPrefs
 		var flat:String = (name.indexOf('.') > -1) ? name.split('.').pop() : name;
 		var prefixed:Dynamic = Type.resolveClass('pe063.' + flat);
 		if (prefixed != null) return prefixed;
 
-		// 0.6.3 原来也认带包的名字（pe063.states.PlayState 这种写法）
+		// 0.6.3 also accepted packaged names (pe063.states.PlayState)
 		prefixed = Type.resolveClass('pe063.' + name);
 		if (prefixed != null) return prefixed;
 
 		return null;
 	}
 
-	/** 本体/原版那两棵树的引擎类包 —— 解析到这些说明串树了 */
+	/** Engine packages of the other two trees: resolving into these means the wrong tree. */
 	static final ENGINE_PACKAGES:Array<String> = [
 		'backend.', 'states.', 'objects.', 'options.', 'substates.', 'psychlua.',
 		'shaders.', 'cutscenes.', 'flxanimate.', 'debug.'
@@ -2073,7 +2073,7 @@ class FunkinLua {
 		});
 
 		Lua_helper.add_callback(lua, "setHealthBarColors", function(leftHex:String, rightHex:String) {
-			// 空字符串表示"这一侧不上色"，返回透明；上游 Std.parseInt('') 得到的就是 0
+			// Empty means "no tint on this side"; return transparent. Std.parseInt('') gives 0.
 			var left:FlxColor = (leftHex == null || leftHex.length == 0) ? FlxColor.TRANSPARENT : parseHexColor(leftHex);
 			var right:FlxColor = (rightHex == null || rightHex.length == 0) ? FlxColor.TRANSPARENT : parseHexColor(rightHex);
 
@@ -2615,7 +2615,7 @@ class FunkinLua {
 			{
 				return true;
 			}
-			// getPath 自己会拼 assets/0.6.3/，这里再写一层 assets/ 就成了 assets/0.6.3/assets/…
+			// getPath already prefixes assets/0.6.3/, so another assets/ here would double it
 			return FileSystem.exists(Paths.getPath(filename, TEXT));
 			#else
 			if(absolute)
@@ -2936,10 +2936,10 @@ class FunkinLua {
 	}
 
 	/**
-	 * 解析 'RRGGBB' / 'AARRGGBB' / '0xAARRGGBB' 成 FlxColor。
+	 * Parses 'RRGGBB' / 'AARRGGBB' / '0xAARRGGBB' into a FlxColor.
 	 *
-	 * 不能用 Std.parseInt：cpp 目标上它溢出时饱和到 IntMax（0x7FFFFFFF），
-	 * 任何 8 位十六进制颜色都会被解析成白色。这里逐位累加，让 32 位整数自然环绕。
+	 * Std.parseInt cannot be used: on cpp it saturates to IntMax (0x7FFFFFFF) on overflow, so
+	 * any 8 digit hex colour parses to white. Accumulate per digit and let 32 bit ints wrap.
 	 */
 	public static function parseHexColor(hex:String):FlxColor
 	{
@@ -3541,12 +3541,12 @@ class HScript
 	}
 
 	/**
-	 * 碰到 Unknown variable 就自动补一个全局类再重跑。
+	 * On an Unknown variable error, add the global class and run again.
 	 *
-	 * 这份 globals 是 new() 里手写的一小串（FlxG / PlayState / ClientPrefs …），
-	 * 脚本用到表外的类直接报错，以前只能 addHaxeLibrary('类名', '包名') 手动塞 ——
-	 * 而且类名还得知道包路径。这里从报错里捞出类名，交给 resolveClass（带 pe063. 兜底）
-	 * 补进变量表，最多补 8 个。补不到才把原异常抛出去。
+	 * globals is a short hand-written list in new() (FlxG / PlayState / ClientPrefs ...), and
+	 * anything outside it errored, so mods had to addHaxeLibrary('Name', 'package') by hand,
+	 * package included. This pulls the name out of the error and hands it to resolveClass
+	 * (with its pe063. fallback), up to 8 per run, and only rethrows when that fails.
 	 */
 	public function executeAuto(codeToRun:String, resolver:String->Dynamic):Dynamic
 	{

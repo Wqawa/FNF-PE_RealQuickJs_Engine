@@ -8,13 +8,13 @@ import flixel.text.FlxText;
 import flixel.util.FlxColor;
 
 /**
- * 崩溃屏幕。
+ * Crash screen.
  *
- * 这里刻意**不用**引擎自己的 Button / Alphabet / PsychUI 那一套：崩溃意味着游戏已经
- * 处在 undefined 状态，最不该假设的就是「UI 还好使」。所以全是 flixel 原生色块 + FlxText，
- * 三棵树（本仓 fork / 原版 1.0.4 / 0.6.3）才能共用同一个界面。
+ * Deliberately does not use the engine's Button / Alphabet / PsychUI: a crash means the
+ * game is in an undefined state and "the UI still works" is the worst assumption. Plain
+ * flixel rects and FlxText let all three trees share one screen.
  *
- * 文案用英文：FlxText 的默认字体不保证带中文字形，崩在缺字体的地方很难看也没意义。
+ * Text is English: FlxText's default font has no CJK glyphs.
  */
 class CrashState extends FlxState
 {
@@ -22,7 +22,7 @@ class CrashState extends FlxState
 	static inline var BTN_H:Int = 40;
 	static inline var BTN_GAP:Int = 18;
 
-	/** 屏上最多显示这么多字符，再多就把中间截掉 —— 完整内容在剪贴板和 dump 里 */
+	/** Characters shown on screen; the middle is cut beyond this. Full text is copied/dumped. */
 	static inline var VISIBLE_MAX:Int = 1800;
 
 	var detail:String;
@@ -43,28 +43,28 @@ class CrashState extends FlxState
 		FlxG.mouse.visible = true;
 		#end
 
-		// 崩在 PlayState 里的时候，相机还挂着他那套 zoom / scroll / 分屏设置。
-		// 不换掉的话标题会被推出屏幕、底部按钮直接看不见（第一次自测就是这么翻车的）。
+		// Crashing inside PlayState leaves its zoom / scroll / split-screen settings on the camera.
+		// Without resetting them the title goes off screen and the buttons vanish.
 		FlxG.cameras.reset(new FlxCamera(0, 0, 1280, 720));
 
-		// 一律按相机实际尺寸摆版，不读 FlxG.width/height —— 崩的时候这两个值
-		// 可能还是上一个 state 留下的（实测 1920x1080），拿它算布局会整体偏出去。
+		// Lay out against the camera's real size, not FlxG.width/height: after a crash those can
+		// still hold the previous state's values (1920x1080 seen in practice) and shift everything.
 		var cw:Float = FlxG.camera.width;
 		var ch:Float = FlxG.camera.height;
 
-		trace('[crash] 屏幕 ' + cw + 'x' + ch + '  (FlxG ' + FlxG.width + 'x' + FlxG.height + ')');
+		trace('[crash] screen ' + cw + 'x' + ch + '  (FlxG ' + FlxG.width + 'x' + FlxG.height + ')');
 
 		var bg:FlxSprite = new FlxSprite().makeGraphic(Std.int(cw), Std.int(ch), 0xFF14100F);
 		add(bg);
 
-		// 顶部红条：一眼能看出这不是正常界面
+		// Red bar on top: obvious at a glance that this is not the normal UI
 		var bar:FlxSprite = new FlxSprite(0, 0).makeGraphic(Std.int(cw), 6, 0xFFD64545);
 		add(bar);
 
 		var title:FlxText = new FlxText(0, 20, cw, 'ENGINE CRASHED');
 		title.setFormat(null, 34, 0xFFD64545, CENTER, OUTLINE_FAST, FlxColor.BLACK);
-		// 注意别用「算了 width 再手动居中」的写法：FlxText.width 要等第一次 draw 才算出来，
-		// create 阶段读到的是 fieldWidth。老老实实交给 fieldWidth + alignment。
+		// Do not compute width and centre manually: FlxText.width is only valid after the first
+		// draw and reads as fieldWidth during create. Use fieldWidth plus alignment.
 		title.fieldWidth = cw;
 		title.alignment = CENTER;
 		title.x = 0;
@@ -149,14 +149,14 @@ class CrashState extends FlxState
 		try
 		{
 			if (cls == null) throw 'main menu class not found';
-			// 崩过之后声音/暂停状态都不可靠，先收拾一下再切
+			// Sound and pause state are unreliable after a crash; tidy up before switching
 			if (FlxG.sound != null && FlxG.sound.music != null) FlxG.sound.music.stop();
 			FlxG.switchState(cast Type.createInstance(cls, []));
 			return;
 		}
 		catch (e:Dynamic)
 		{
-			trace('[crash] 回主菜单失败: ' + Std.string(e));
+			trace('[crash] returning to the main menu failed: ' + Std.string(e));
 		}
 		doExit();
 	}
@@ -168,7 +168,7 @@ class CrashState extends FlxState
 		#end
 	}
 
-	/** 只截显示用的那份，别把整个栈塞进 FlxText */
+	/** Truncates for display only; the whole stack does not belong in a FlxText. */
 	static function clipText(text:String):String
 	{
 		if (text.length <= VISIBLE_MAX) return text;

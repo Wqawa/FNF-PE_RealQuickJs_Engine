@@ -78,10 +78,10 @@ class ScriptClassAliases
 		// 0.6.3 kept BF in his own class, 0.7 merged him into Character
 		bind('Boyfriend', objects.Character);
 
-		// 名字带 Flx 前缀的那几个附件类，1.0 去掉了前缀
+		// attachment classes that dropped their Flx prefix in 1.0
 		bind('AttachedFlxText', objects.AttachedText);
 
-		// 0.6.3 的 lua 文本是独立类，1.0 直接用 FlxText（makeLuaText 返回的就是它）
+		// 0.6.3 had a separate text class; 1.0 uses FlxText, which makeLuaText returns
 		bind('ModchartText', flixel.text.FlxText);
 
 		// -------------------------------------------------------------- cutscenes
@@ -115,8 +115,8 @@ class ScriptClassAliases
 		bind('RainShader', shaders.RainShader);
 		bind('WiggleEffect', shaders.WiggleEffect);
 
-		// PhillyGlow 在 0.6.3 的 PhillyGlow.hx 里只是模块名（下面那两个类在它里面），
-		// 裸名 PhillyGlow 从来不是类，别给它挂映射——之前错挂 BlendModeEffect 的那条已删。
+		// In 0.6.3 PhillyGlow.hx was a module name (the two classes below live in it),
+		// so the bare name PhillyGlow was never a class. Do not map it back.
 
 		// ----------------------------------------------------------------- states
 		bind('AchievementsMenuState', states.AchievementsMenuState);
@@ -140,15 +140,15 @@ class ScriptClassAliases
 		// 0.6.3 shipped a Gitaroo-Man style pause, 1.0 just uses the normal pause
 		bind('GitarooPause', substates.PauseSubState);
 
-		// 0.6.3 的这两个名字在 1.0 都改了：OutdatedState → OutdatedSubState，
+		// Both names changed in 1.0: OutdatedState -> OutdatedSubState,
 		// VisualsUISubState → VisualsSettingsSubState
 		bind('OutdatedState', substates.OutdatedSubState);
 		bind('VisualsUISubState', options.VisualsSettingsSubState);
 
-		// ---------------------------------------------------------------- 老模块路径
-		// 0.6.3 / 0.7.3 的 stages/、editors/ 是源码根目录下的包，1.0 挪进了 states/。
-		// 老 HScript 里的 `import stages.Spooky;`、`import editors.ChartingState;` 靠这些接回来。
-		// 等价于 NovaFlare 的 InitScriptData 里那套 Iris.proxyImports 路径映射。
+		// ---------------------------------------------------------------- legacy module paths
+		// 0.6.3 / 0.7.3 had stages/ and editors/ at the source root; 1.0 moved them under
+		// states/. Old `import stages.Spooky;` / `import editors.ChartingState;` is redirected
+		// here, same idea as NovaFlare's Iris.proxyImports mapping in InitScriptData.
 		bind('stages.Spooky', states.stages.Spooky);
 		bind('stages.School', states.stages.School);
 		bind('stages.SchoolEvil', states.stages.SchoolEvil);
@@ -168,7 +168,7 @@ class ScriptClassAliases
 		bind('stages.objects.PhillyGlowGradient', states.stages.objects.PhillyGlowGradient);
 		bind('stages.objects.PhillyGlowParticle', states.stages.objects.PhillyGlowParticle);
 		bind('stages.objects.PhillyTrain', states.stages.objects.PhillyTrain);
-		// 这几个 0.6.3 是裸名
+		// these were bare names in 0.6.3
 		bind('TankmenBG', states.stages.objects.TankmenBG);
 		bind('BackgroundDancer', states.stages.objects.BackgroundDancer);
 		bind('BackgroundGirls', states.stages.objects.BackgroundGirls);
@@ -183,12 +183,12 @@ class ScriptClassAliases
 		bind('editors.NoteSplashEditorState', states.editors.NoteSplashEditorState);
 		bind('editors.WeekEditorState', states.editors.WeekEditorState);
 
-		// 0.6.3 的选项子状态现在在 options/ 下
+		// 0.6.3 option substates now live under options/
 		bind('substates.GameplayChangersSubstate', options.GameplayChangersSubstate);
 
-		// 0.6.3 的 Section 是个独立类，1.0 只剩 SwagSection typedef（壳子在 backend/Song.hx 里）
+		// Section was a class in 0.6.3; 1.0 only has the SwagSection typedef (shell in backend/Song.hx)
 		bind('Section', backend.Section);
-		// PhillyGlow 的两个 sprite，0.6.3 是裸名
+		// PhillyGlow's two sprites, bare names in 0.6.3
 		bind('PhillyGlowParticle', states.stages.objects.PhillyGlowParticle);
 		bind('PhillyGlowGradient', states.stages.objects.PhillyGlowGradient);
 
@@ -213,25 +213,25 @@ class ScriptClassAliases
 		bind('CustomSubstate', psychlua.CustomSubstate);
 
 		// ------------------------------------------------------------------ video
-		// 1.0 把 hxcodec 换成了 hxvlc，老 mod 里 `import hxcodec.flixel.FlxVideo;`
-		// 和 `import hxcodec.VideoHandler;` 都还能解析（实现在 source_body/body/hxcodec/）
+		// 1.0 replaced hxcodec with hxvlc; old mods' `import hxcodec.flixel.FlxVideo;`
+		// and `import hxcodec.VideoHandler;` still resolve (implemented in source_body/body/hxcodec/)
 		#if VIDEOS_ALLOWED
 		bind('hxcodec.flixel.FlxVideo', hxcodec.flixel.FlxVideo);
 		bind('hxcodec.VideoHandler', hxcodec.VideoHandler);
 		bind('vlc.MP4Handler', vlc.MP4Handler);
 		#end
 
-		// vanilla 模式下整张表改指向原版引擎的同名类
+		// in vanilla mode the whole table points at the original engine's classes
 		if(Engine.isVanilla()) remapToVanilla();
 		else sweepForeignImports();
 	}
 
 	/**
-	 * body 模式下把 proxyImports 里指到别的树的条目扫掉。
+	 * Drops proxyImports entries that point at another tree, in body mode.
 	 *
-	 * 这张表是进程级的，Iris 解析 `import` 时先查它、查不到才落 Type.resolveClass。
-	 * 有一笔别的树留下的条目，就等于那个名字在脚本里永远拿到错误的类 ——
-	 * 而且和注册先后有关，属于最难复现的那种。
+	 * The table is process wide: Iris checks it first for `import`, then falls back to
+	 * Type.resolveClass. One stale entry means that name always resolves to the wrong
+	 * class, depending on registration order - the hardest kind to reproduce.
 	 */
 	static function sweepForeignImports():Void
 	{
@@ -259,10 +259,10 @@ class ScriptClassAliases
 	}
 
 	/**
-	 * vanilla 模式下把整张表换成 `vanilla.*` 的同名类。
-	 * 同时把本体类的全限定名也注册进 proxyImports —— hscript 的
-	 * `import states.PlayState` 走 Interp.getOrImportClass，那里先查 proxyImports，
-	 * 不注册的话就会拿到本体那一份。
+	 * In vanilla mode, swaps the whole table for the `vanilla.*` classes.
+	 * Also registers the body FQNs in proxyImports: hscript's `import states.PlayState`
+	 * goes through Interp.getOrImportClass, which checks proxyImports first; without
+	 * that entry it would get the body class.
 	 */
 	static function remapToVanilla():Void
 	{
@@ -293,13 +293,13 @@ class ScriptClassAliases
 	static var remapped:Bool = false;
 
 	/**
-	 * 别把另一棵树的类交出去。
+	 * Never hand out a class from another tree.
 	 *
-	 * 三棵树编在同一个 exe 里：`objects.Character`（本体）和 `vanilla.objects.Character`
-	 * （原版）同时存在，脚本里写的却是同一串字符。一旦解析到另一棵树，那个类内部
-	 * 写死的 `Paths.VERSION_DIR` 会把贴图/音频带到它的 assets 目录去 —— 而
-	 * `assets/body` 里装的正是 1.0.4 官方素材，于是找得到、不报错，只是拿错了图。
-	 * 这类问题只能靠「解析时拒绝」来防，事后查日志看不出来。
+	 * Three trees ship in one exe: objects.Character (body) and vanilla.objects.Character
+	 * (original) both exist while scripts write the same string. Resolving the wrong one
+	 * means that class's hardcoded Paths.VERSION_DIR pulls assets from the other tree's
+	 * directory - and assets/body holds the 1.0.4 official assets, so it loads fine and
+	 * just returns the wrong image. Only refusing at resolve time catches this.
 	 */
 	public static function isForeignTree(cl:Dynamic):Bool
 	{
@@ -313,7 +313,7 @@ class ScriptClassAliases
 		return StringTools.startsWith(fqn, 'vanilla.') || StringTools.startsWith(fqn, 'pe063.');
 	}
 
-	/** 引擎自己的类（各树同名前缀的那批）。flixel / openfl 不算。 */
+	/** Engine classes (the per-tree prefixed families). flixel / openfl do not count. */
 	static function isEngineClass(fqn:String):Bool
 	{
 		for (pkg in SEARCH_PACKAGES)
@@ -336,26 +336,26 @@ class ScriptClassAliases
 			if(!isForeignTree(bound)) return bound;
 		}
 
-		// vanilla 模式下，脚本要的是原版引擎的类，不是本体的同名类
+		// in vanilla mode scripts want the original engine's classes, not the body ones
 		if(Engine.isVanilla() && !className.startsWith('vanilla.'))
 		{
 			var van:Dynamic = Type.resolveClass('vanilla.' + className);
 			if(van != null) return van;
 		}
 
-		// 带点的全名直接查；裸名再按包列表猜一遍。
-		// （addHaxeLibrary / getPropertyFromClass 都走这里，裸名要能猜出来）
+		// Dotted names resolve directly; bare names are guessed over the package list.
+		// (addHaxeLibrary / getPropertyFromClass come through here, so bare names must resolve)
 		var cls:Dynamic = (className.indexOf('.') > -1) ? Type.resolveClass(className) : resolveDeep(className);
 		return isForeignTree(cls) ? null : cls;
 	}
 
 	/**
-	 * 把整张表倒进 HScript 的变量表。
-	 * `import` 只能让类型引用生效，但 0.6.x 的脚本还会把类名当值用
-	 * （`Type.getClassName(Boyfriend)`、`GitarooPause.instance`），那种得是变量。
+	 * Copies the whole table into an HScript's variable scope.
+	 * `import` only makes types usable, but 0.6.x scripts also use class names as values
+	 * (`Type.getClassName(Boyfriend)`, `GitarooPause.instance`), which need variables.
 	 *
-	 * 带点的 key（`stages.Spooky` 这种）是模块路径，hscript 里按字段路径表达式解析，
-	 * 根本不会来查变量表，倒进去也取不出来，跳过。
+	 * Dotted keys (stages.Spooky) are module paths resolved as field expressions and never
+	 * hit the variable scope, so they are skipped.
 	 */
 	public static function applyToHScript(interp:Dynamic):Void
 	{
@@ -371,14 +371,14 @@ class ScriptClassAliases
 		return resolve(className) != null;
 
 	/**
-	 * 0.6.3 的 runHaxeCode 走的是 `executeAuto(code, resolveClass)`，碰到没定义的
-	 * 标识符就交给 resolveClass 去猜：先 `Type.resolveClass(name)`，再
-	 * `Type.resolveClass('pe063.' + name)` —— 因为那时候源码树是扁平的，只有一个
-	 * 前缀可猜。1.0 的类是分包的，没有唯一前缀，这里改成按包列表挨个试。
+	 * 0.6.3's runHaxeCode used executeAuto(code, resolveClass), handing unknown
+	 * identifiers to resolveClass: Type.resolveClass(name) first, then
+	 * Type.resolveClass('pe063.' + name) - the tree was flat, so there was one prefix.
+	 * 1.0 classes are packaged with no single prefix, so try the package list instead.
 	 *
-	 * 只给「未知标识符」兜底用（HScript 的 CustomInterp.resolve 里调），不要拿它
-	 * 替代上面那张显式表 —— 表里有一部分是改过名的（Boyfriend → Character、
-	 * GitarooPause → PauseSubState），靠猜是猜不出来的。
+	 * Only a fallback for unknown identifiers (from CustomInterp.resolve). It is not a
+	 * replacement for the explicit table: some entries are renamed
+	 * (Boyfriend -> Character, GitarooPause -> PauseSubState) and cannot be guessed.
 	 */
 	static final SEARCH_PACKAGES:Array<String> = [
 		'',
@@ -398,7 +398,7 @@ class ScriptClassAliases
 		'vlc.'
 	];
 
-	/** 已经确认不存在的名字，避免每帧重复扫一遍包 */
+	/** Names known to be missing, so the package list is not scanned every frame. */
 	static var misses:Map<String, Bool> = new Map<String, Bool>();
 
 	public static function resolveDeep(className:String):Dynamic
@@ -406,7 +406,7 @@ class ScriptClassAliases
 		if(className == null || className.length == 0) return null;
 		init();
 
-		// 显式表优先：改过名的那批只在这里能拿到
+		// explicit table first: renamed entries only exist there
 		if(table.exists(className))
 		{
 			var bound:Dynamic = table.get(className);
@@ -415,8 +415,8 @@ class ScriptClassAliases
 
 		if(misses.exists(className)) return null;
 
-		// vanilla 模式下只认 vanilla. 前缀：本体那棵树的同名类不能拿来凑数，
-		// 否则它的 Paths 会把资源带到 assets/body。
+		// vanilla mode only accepts the vanilla. prefix: the body tree's classes must not
+		// stand in, or their Paths pull assets from assets/body.
 		var prefix:String = Engine.isVanilla() ? 'vanilla.' : '';
 
 		for(pkg in SEARCH_PACKAGES)
@@ -429,7 +429,7 @@ class ScriptClassAliases
 		return null;
 	}
 
-	/** 换歌时清一次，别让上一首歌的解析结果漏过来 */
+	/** Cleared on song change so last song's resolutions do not leak in. */
 	public static function resetMissCache():Void
 		misses = new Map<String, Bool>();
 }

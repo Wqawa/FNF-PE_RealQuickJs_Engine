@@ -9,11 +9,11 @@ import lime.app.Event;
 import openfl.display.BitmapData;
 
 /**
- * hxcodec 3.x 的 FlxVideo 兼容壳。
+ * Compatibility shell for hxcodec 3.x's FlxVideo.
  *
- * 1.0 把播放器换成了 hxvlc，老 mod 在 HScript 里写的还是
+ * 1.0 switched the player to hxvlc, while old mods still write
  * `new FlxVideo()` + `play(path, loop)` + `video.bitmapData`，
- * 这里用 hxvlc 的 Video 接住同一套调用，脚本不用改。
+ * hxvlc's Video takes the same calls here, so scripts need no changes.
  */
 @:keep
 class FlxVideo extends FlxSprite
@@ -21,9 +21,9 @@ class FlxVideo extends FlxSprite
 	public var bitmap(default, null):Video;
 	public var finishCallback:Void->Void = null;
 
-	/** hxcodec 的结束回调，转发到 hxvlc 的 event */
+	/** hxcodec's end callback, forwarded to hxvlc's event */
 	public var onEndReached(get, never):Event<Void->Void>;
-	/** 当前视频帧，0.6/0.7 的 mod 常拿它 loadGraphic 到自己的 sprite 上 */
+	/** Current video frame; 0.6/0.7 mods often loadGraphic it onto their own sprite */
 	public var bitmapData(get, never):BitmapData;
 
 	private var disposed:Bool = false;
@@ -34,7 +34,7 @@ class FlxVideo extends FlxSprite
 
 		bitmap = new Video();
 		bitmap.forceRendering = true;
-		// 先不上屏，等自己真的被 add 进 state 再挂（见 draw）
+		// Not attached yet: wait until this object is actually added to a state (see draw)
 		bitmap.visible = false;
 
 		bitmap.onEndReached.add(function() {
@@ -49,7 +49,7 @@ class FlxVideo extends FlxSprite
 	inline function get_volume():Int return bitmap.volume;
 	inline function set_volume(value:Int):Int return bitmap.volume = value;
 
-	/** hxcodec 3 的入口；不传路径就当成继续播放 */
+	/** hxcodec 3 entry point; no path means resume */
 	public function play(path:String, ?shouldLoop:Bool = false):Void
 	{
 		if (disposed || bitmap == null) return;
@@ -64,12 +64,12 @@ class FlxVideo extends FlxSprite
 			new FlxTimer().start(0.001, function(tmr:FlxTimer) if (!disposed) bitmap.play());
 	}
 
-	/** hxcodec 2.6 / VideoHandler 的入口 */
+	/** hxcodec 2.6 / VideoHandler entry point */
 	public function playVideo(path:String):Void play(path, false);
 
 	public function stop():Void if (bitmap != null) bitmap.stop();
 
-	/** hxcodec 2.6 的退出入口，停下来并释放 */
+	/** hxcodec 2.6 exit entry: stop and release */
 	public function stopVideo():Void
 	{
 		stop();
@@ -95,8 +95,8 @@ class FlxVideo extends FlxSprite
 	{
 		if (bitmap != null && !disposed)
 		{
-			// 只有自己进了 state 才把视频挂到舞台上，
-			// 免得 mod 光 new 一个（只取 bitmapData）就把画面糊满
+			// Only attach the video to the stage once this object is in a state,
+			// so a mod that just news one up (for bitmapData) does not cover the screen
 			if (bitmap.parent == null) FlxG.game.addChild(bitmap);
 
 			bitmap.x = x;

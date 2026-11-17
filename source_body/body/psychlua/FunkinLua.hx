@@ -57,8 +57,8 @@ class FunkinLua implements IScriptHost {
 	public var callbacks:Map<String, Dynamic> = new Map<String, Dynamic>();
 	public static var customFunctions:Map<String, Dynamic> = new Map<String, Dynamic>();
 
-	// 文件名里的版本标记，形如 `xxx(%run_v_0.7.3).lua`。命中后这个脚本查到的引擎版本就是标记里的值，
-	// 引擎自己（标题界面 / Discord RPC / 日志）仍然用真正的 MainMenuState.psychEngineVersion。
+	// Version tag in the file name, e.g. xxx(%run_v_0.7.3).lua. The script then reports the
+	// tagged version while the engine (title, Discord RPC, logs) keeps the real one.
 	public var versionOverride:String = null;
 	static final VERSION_TAG:EReg = ~/\(%run_v_([^)]+)\)/;
 
@@ -67,8 +67,8 @@ class FunkinLua implements IScriptHost {
 	public var rawCode:String = null;
 
 	/**
-	 * 从脚本路径里抠出 `(%run_v_x.x.x)` 的版本号，没有就返回 null。
-	 * 只认这一种写法，文件名别的括号不影响 —— 前缀 `%run_v_` 是硬要求。
+	 * Extracts (%run_v_x.x.x) from a script path, null when absent.
+	 * Only this form is recognised; other parentheses in the name do not matter.
 	 */
 	public static function parseVersionTag(path:String):String
 	{
@@ -92,8 +92,8 @@ class FunkinLua implements IScriptHost {
 		if(game != null) game.luaArray.push(this);
 
 		#if MODS_ALLOWED
-		// 别再用 path.split('/')[0] + '/' == Paths.mods() 那套了：这版 path 里多了
-		// mods/<版本>/ 一层，那个判断永远不成立，modFolder 会一直是 null。
+		// Do not use path.split('/')[0] + '/' == Paths.mods() here: this build adds a
+		// mods/<version>/ level, so that check never matches and modFolder stays null.
 		this.modFolder = Paths.modFromScriptPath(this.scriptName);
 		#end
 
@@ -123,10 +123,10 @@ class FunkinLua implements IScriptHost {
 		set('startedCountdown', false);
 		set('curStage', PlayState.SONG.stage);
 
-		// 0.6.x/0.7.x 一直在给脚本塞这两个，老 mod 拿来做视差；PlayState.update 里每帧刷
+		// 0.6.x/0.7.x always gave scripts these two for parallax; PlayState.update refreshes them
 		set('cameraX', 0);
 		set('cameraY', 0);
-		// 1.0 的谱面编辑器不再跑 lua，永远是 false，但老脚本会读它做分支
+		// 1.0's chart editor does not run lua, so this is always false, but old scripts branch on it
 		set('inChartEditor', false);
 
 		set('isStoryMode', PlayState.isStoryMode);
@@ -418,8 +418,8 @@ class FunkinLua implements IScriptHost {
 			if(scriptPath != null)
 			{
 				var foundAny:Bool = false;
-				// destroy() 只是把实例废掉，数组里的引用得自己摘 —— 以前留在那儿，
-				// 每次分发都要靠 exists() 兜一次，看着像脚本还在。
+				// destroy() only kills the instance; the array reference must be removed here.
+				// It used to stay in the array and every dispatch leaned on exists().
 				var dead:Array<HScript> = [];
 				for (script in game.hscriptArray)
 				{
@@ -706,7 +706,7 @@ class FunkinLua implements IScriptHost {
 		Lua_helper.add_callback(lua, "noteTweenDirection", function(tag:String, note:Int, value:Dynamic, duration:Float, ?ease:String = 'linear') {
 			return noteTweenFunction(tag, note, {direction: value}, duration, ease);
 		});
-		// 抄自 NovaFlare：一次补 x/y 两个分量，effect 上跟 noteTweenX/Y 串联起来用
+		// From NovaFlare: sets x and y together, chained after noteTweenX/Y through effect
 		Lua_helper.add_callback(lua, "noteTweenScale", function(tag:String, note:Int, value:Dynamic, duration:Float, ?ease:String = 'linear') {
 			if(PlayState.instance == null) return null;
 			var strumNote:StrumNote = PlayState.instance.strumLineNotes.members[note % PlayState.instance.strumLineNotes.length];
@@ -1416,8 +1416,8 @@ class FunkinLua implements IScriptHost {
 			#end
 		});
 
-		// 2P Engine（Lua++）的接口。hxvlc 没有"解码一次存着"的预缓存机制，
-		// 这里只把路径验一遍，至少让老 mod 不会因为函数不存在直接报 nil。
+		// 2P Engine (Lua++) API. hxvlc has no decode-once cache, so this only validates the
+		// path, at least so old mods do not hit a nil function.
 		Lua_helper.add_callback(lua, "precacheVideo", function(videoFile:String, ?tag:String = null) {
 			#if VIDEOS_ALLOWED
 			if(videoFile == null || videoFile.length < 1) return false;
@@ -1701,8 +1701,8 @@ class FunkinLua implements IScriptHost {
 
 			var resultStr:String = Lua.tostring(lua, result);
 			if(resultStr != null && result != 0) {
-				// 这里原本在 Windows 上是 window.alert：脚本里一个语法错误就弹模态框，
-				// 整个游戏卡在那儿等人点确定。改成日志 + 屏幕红字，错误照样看得见，但不拦人。
+				// This used to be window.alert on Windows: one syntax error popped a modal dialog and
+				// froze the game. Now it logs and shows red text: still visible, no blocking.
 				var errText:String = '$scriptName\n$resultStr';
 				trace('ERROR on lua script: ' + errText);
 				if(PlayState.instance != null)
@@ -1718,7 +1718,7 @@ class FunkinLua implements IScriptHost {
 			return;
 		}
 		trace('lua file loaded succesfully:' + scriptName);
-		// rawCode 不为 null 说明这脚本本来是 .js，被 FunkinJS 转译后塞进 Lua 解释器
+		// rawCode != null means this was a .js file, transpiled by FunkinJS and fed to Lua
 		LuaUtils.logScriptSource(rawCode != null ? 'js->lua' : 'lua', scriptName, modFolder);
 
 		call('onCreate', []);
@@ -1819,7 +1819,7 @@ class FunkinLua implements IScriptHost {
 	}
 
 	// ------------------------------------------------------------- IScriptHost
-	// PlayState 分发只认这套方法，不再直接摸 lua_State。
+	// Dispatch only uses this interface, no direct lua_State poking.
 	public function scriptId():String return scriptName;
 	public function scriptMod():String return modFolder;
 	public function isClosed():Bool return closed;
@@ -1868,7 +1868,7 @@ class FunkinLua implements IScriptHost {
 		var strumNote:StrumNote = PlayState.instance.strumLineNotes.members[note % PlayState.instance.strumLineNotes.length];
 		if(strumNote == null) return null;
 
-		// 大部分补间打的是 StrumNote 本身，noteTweenScale 要打它的 scale（FlxPoint）
+		// Most tweens target the StrumNote itself; noteTweenScale targets its scale (FlxPoint)
 		var target:Dynamic = (tweenTarget != null) ? tweenTarget : strumNote;
 
 		if(tag != null)
@@ -1897,11 +1897,11 @@ class FunkinLua implements IScriptHost {
 	 * directly in PlayState.members. Resolve the container an object really lives in first.
 	 */
 	/**
-	 * 取容器里的成员数组。
+	 * Returns a container's member array.
 	 *
-	 * FlxTypedSpriteGroup.members 是个 getter（内部转发 group.members），
-	 * 用 Dynamic 取会直接拿到 null —— hxcpp 的反射不会调 getter。0.7.3 的
-	 * getObjectOrder 在 HUD 元素上必抛 Null Object Reference 就是栽在这。
+	 * FlxTypedSpriteGroup.members is a getter forwarding to group.members, and reading it
+	 * through Dynamic gives null because hxcpp reflection does not call getters. That is
+	 * what made 0.7.3's getObjectOrder throw Null Object Reference on HUD elements.
 	 */
 	public static function memberArray(container:Dynamic):Array<Dynamic>
 	{
@@ -1929,9 +1929,9 @@ class FunkinLua implements IScriptHost {
 	static var reportedTrace:Map<String, Bool> = new Map<String, Bool>();
 
 	/**
-	 * 临时诊断：把舞台脚本的建对象 / 插入位置写进 testout/stage_dbg.txt。
-	 * pe063 侧有一份同样格式的（前缀 [063]），跑完两边 diff 就能看出
-	 * 是哪个 sprite 没建出来、还是插到了错误的层级。查完可以删。
+	 * Temporary diagnostic: writes stage script object creation / insert order to
+	 * testout/stage_dbg.txt. pe063 has a matching one prefixed [063]; diffing both shows
+	 * which sprite was never created or landed in the wrong layer. Safe to delete later.
 	 */
 	public static function stageDbg(msg:String):Void
 	{
@@ -1983,16 +1983,16 @@ class FunkinLua implements IScriptHost {
 
 	function findScript(scriptFile:String, ext:String = '.lua')
 	{
-		// 扩展名判断不能区分大小写：'X.LUA' 会被拼成 'X.LUA.lua'，然后报"脚本不存在"
+		// Extension check must ignore case: 'X.LUA' became 'X.LUA.lua' and reported missing
 		if(!scriptFile.toLowerCase().endsWith(ext)) scriptFile += ext;
 
-		// 和 startLuasNamed / startHScriptsNamed / .js 走同一条链。
-		// 以前这里单独用 Paths.getPath()：少了 assets/<ver>/ 根兜底（0.6.x 扁平布局就靠那一级），
-		// 于是 isRunning 判不出来、addHScript 找不到脚本，脚本被判成"没在跑"又加载一份。
+		// Same chain as startLuasNamed / startHScriptsNamed / .js.
+		// This used Paths.getPath(): no assets/<ver>/ root fallback (the 0.6.x flat layout
+		// relies on it), so isRunning missed and addHScript loaded a second copy.
 		var path:String = Paths.findScriptFile(scriptFile);
 		if(path != null) return path;
 
-		// 绝对路径，或者脚本自己算出来的 CWD 相对路径 —— findScriptFile 不猜这种
+		// Absolute paths or CWD-relative ones the script computed itself; findScriptFile does not guess those
 		#if MODS_ALLOWED
 		if(FileSystem.exists(scriptFile)) return scriptFile;
 		#end

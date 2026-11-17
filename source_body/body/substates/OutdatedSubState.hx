@@ -10,8 +10,8 @@ class OutdatedSubState extends MusicBeatSubstate
 {
 	public static var updateVersion(get, never):String;
 	static var _updateVersion:String = null;
-	// 静态初始化会被 hxcpp 在进程启动时无条件执行，两棵树各发一次网络请求。
-	// 改成首次访问才查，只有真正用到的地方（主菜单）才会触发。
+	// Static init runs unconditionally at process start under hxcpp: two trees, two requests.
+	// Now it checks on first access, so only the main menu triggers it.
 	static function get_updateVersion():String
 	{
 		if(_updateVersion == null) _updateVersion = CoolUtil.checkForUpdates();

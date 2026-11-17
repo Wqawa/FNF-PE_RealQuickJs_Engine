@@ -3,12 +3,12 @@ package jsruntime;
 import psychlua.IScriptHost;
 
 /**
- * 一个 .js 文件在 QuickJS 里的落脚点。
+ * Where a .js file lives inside QuickJS.
  *
- * 原来 JSPlayer 把 handle 和 path 存成两个平行数组，取归属、判重、发事件
- * 全靠下标对位 —— 加一个脚本就得同步推三个数组，删一个要三处 remove。
- * 改成对象之后每个脚本自己带着 handle / 路径 / 归属 mod，和 Lua 那条
- * 「一个文件一个 lua_State」的结构对齐。
+ * JSPlayer used to keep handle and path in two parallel arrays, with ownership,
+ * dedupe and dispatch all index-aligned: adding a script meant touching three arrays.
+ * As an object each script carries its own handle, path and owning mod, matching
+ * the one-file-one-lua_State shape on the Lua side.
  */
 class JSScriptHost implements IScriptHost
 {
@@ -38,9 +38,9 @@ class JSScriptHost implements IScriptHost
 	}
 
 	/**
-	 * 读脚本自己的全局变量。数字 / 布尔 / 字符串带回原类型，没定义返回 null。
-	 * 跟 Lua 那边一样是「这个脚本内部」的量，不是 MusicBeatState.variables
-	 * （那个是跨脚本共享的 setVar/getVar 宿主函数管的东西）。
+	 * Reads a global of this script. Numbers/booleans/strings come back typed; undefined is null.
+	 * Like Lua, this is script-local state, not MusicBeatState.variables
+	 * (that is the shared setVar/getVar space the host functions use).
 	 */
 	public function getVar(name:String):Dynamic
 	{

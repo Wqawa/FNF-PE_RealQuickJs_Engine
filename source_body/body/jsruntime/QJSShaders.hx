@@ -11,20 +11,20 @@ import flixel.addons.display.FlxRuntimeShader;
 import openfl.filters.ShaderFilter;
 
 /**
- * JS 通道的 runtime shader 表。
+ * Runtime shader table for the JS channel.
  *
- * 逻辑照 FunkinLua.initLuaShader / ShaderFunctions 抄：路径优先级一样（当前 mod → 全局 mod →
- * mods/body → 共享目录）、.frag 和 .vert 各读各的、只要有一个存在就算找到。
- * 区别只是不挂在 lua_State 上 —— QuickJS 这边一个 context 对一个文件，没有现成的实例字段可放。
+ * Mirrors FunkinLua.initLuaShader / ShaderFunctions: same path order (current mod ->
+ * mods/body -> shared), .frag and .vert read separately, either one counts as found.
+ * The only difference is nothing hangs off a lua_State: a context is per file.
  *
- * 相机上的 filter 故意和 Lua 共用 ShaderFunctions.storedFilters：这样 JS 能摘掉 Lua 挂上去的，
- * 反过来也一样。各存一份的话，同一个 tag 在两个通道里会互相看不见。
+ * Camera filters deliberately share ShaderFunctions.storedFilters with Lua, so JS can drop
+ * what Lua added and vice versa. Separate tables make a tag invisible across channels.
  */
 class QJSShaders
 {
 	public static var runtimeShaders:Map<String, Array<String>> = new Map();
 
-	/** 名字 → 找到并缓存了没有。缓存住就不再读盘（和 Lua 那边一样）。 */
+	/** Name -> whether it was found and cached. Once cached, no more disk reads (same as Lua). */
 	public static function init(name:String):Bool
 	{
 		if (name == null || name.length == 0) return false;
@@ -65,11 +65,11 @@ class QJSShaders
 			}
 		}
 
-		QuickJSHandler.log('[warn] initLuaShader: 找不到 ' + name + '.frag / .vert');
+		QuickJSHandler.log('[warn] initLuaShader: ' + name + '.frag / .vert not found');
 		return false;
 	}
 
-	/** 拿 [frag, vert]，没缓存就先 init 一次 */
+	/** Returns [frag, vert], initialising once if needed. */
 	public static function data(name:String):Array<String>
 	{
 		if (!runtimeShaders.exists(name) && !init(name)) return null;
@@ -102,8 +102,8 @@ class QJSShaders
 		if (camera == null) return false;
 		if (index == null || index.length == 0) index = shaderName;
 
-		// 别碰 _filters：flixel 5.6 里那是被 deprecated 的 get/set 属性，Dynamic 上取不到
-		// （报 Invalid field:_filters，ShaderFunctions 的老写法就栽在这）。真字段是 filters。
+		// Do not touch _filters: it is a deprecated get/set pair in flixel 5.6 and reads null
+		// through Dynamic (Invalid field:_filters - the old ShaderFunctions code died on it).
 		var cur:Array<openfl.filters.BitmapFilter> = null;
 		try cur = camera.filters catch (e:Dynamic) return false;
 

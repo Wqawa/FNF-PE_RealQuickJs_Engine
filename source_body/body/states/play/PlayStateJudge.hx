@@ -13,9 +13,9 @@ import psychlua.LuaUtils;
 import crowplexus.hscript.Expr.Error as IrisError;
 
 /**
- * 从 PlayState.hx 搬出来的判定与输入（按键、命中、miss、评分弹字）。逻辑是逐行原样搬的，只把对 PlayState 成员的引用改成 ps.xxx，
- * 需要私有访问所以加了 @:access。
- * PlayState 里保留了同名转发，外部调用和子类 override 都不受影响。
+ * Judgement and input (keys, hits, misses, rating popups), moved out of PlayState.hx.
+ * Logic is copied line for line; only PlayState member references became ps.xxx. Needs
+ * @:access for private fields, and PlayState keeps same-named forwards so callers and
  */
 @:access(states.PlayState)
 @:access(backend.MusicBeatState)
@@ -403,8 +403,8 @@ class PlayStateJudge
 			if (ps.guitarHeroSustains && note.isSustainNote) gainHealth = false;
 			if (gainHealth)
 			{
-				// 0.6.3 每次命中 0.023，乘上 Gameplay 里的 Health Gain Multiplier；
-				// 1.0.4 是 note.hitHealth * healthGain，基数本来就更小
+				// 0.6.3 adds 0.023 per hit times the Health Gain Multiplier from Gameplay;
+				// 1.0.4 uses note.hitHealth * healthGain, a smaller base
 				if (ClientPrefs.data.compatLegacyHealth) ps.health += 0.023 * ps.healthGain;
 				else ps.health += note.hitHealth * ps.healthGain;
 			}

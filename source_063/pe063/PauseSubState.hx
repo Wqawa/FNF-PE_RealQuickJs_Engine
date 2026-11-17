@@ -200,9 +200,9 @@ class PauseSubState extends MusicBeatSubstate
 					var poop = Highscore.formatSong(name, curSelected);
 					PlayState.SONG = Song.loadFromJson(poop, name);
 					PlayState.storyDifficulty = curSelected;
-					// 不能在这个子界面的 update 里直接 switchState：
-					// flixel 会先 destroy 当前 state，子界面还在跑 → "Attempting to resetState
-					// while the current state is destroyed"。先关子界面，下一帧再切。
+					// Do not switchState from this substate's update:
+					// flixel destroys the current state while the substate is still running, giving
+					// "Attempting to resetState while the current state is destroyed". Close then switch.
 					PlayState.instance.paused = true;
 					close();
 					FlxG.sound.music.volume = 0;

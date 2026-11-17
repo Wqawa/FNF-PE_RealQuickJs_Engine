@@ -197,8 +197,8 @@ class Mods
 			fileStr += values[0] + '|' + (values[1] ? '1' : '0');
 		}
 
-		// 版本目录可能是第一次跑（比如刚切到原版），mods/<ver>/ 还不存在，
-		// 直接 saveContent 会抛 file_open。先建目录，写失败也不要连累启动。
+		// The version folder may not exist on first run (just switched to vanilla), and
+		// saveContent would throw file_open. Create it first; a failed write must not break boot.
 		var listPath:String = Paths.modsListPath();
 		var listDir:String = haxe.io.Path.directory(listPath);
 		if(listDir != null && listDir.length > 0 && !FileSystem.exists(listDir))

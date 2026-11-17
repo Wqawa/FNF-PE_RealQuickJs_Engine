@@ -1,14 +1,14 @@
 package vanilla.options;
 
 /**
- * 原版侧的引擎切换界面。
+ * Engine switch screen for the vanilla side.
  *
- * 逻辑和本体那个 options.EngineSelectSubState 一样：选中后把 engine.txt 写到 bin 根目录，
- * 然后退出进程，下次启动由 Main.main() 按 engine.txt 决定加载本体还是原版 1.0.4。
+ * Same logic as the body screen: selecting writes engine.txt into the bin root and
+ * exits; the next launch picks body or 1.0.4 from that file.
  *
- * 单独放一份而不再复用本体那个，是因为两边 ClientPrefs / Paths 是两套。
- * 原版模式下跑起来时本体的 ClientPrefs 还没加载，data 是空表，拿去读 antialiasing 就是 null。
- * 放在 vanilla 包下，import.hx 会自动把 ClientPrefs / Paths / Alphabet 解析成原版那一套。
+ * A separate copy exists because ClientPrefs / Paths differ per tree.
+ * In vanilla mode body's ClientPrefs is not loaded and its data is empty, so reading
+ * antialiasing gives null. Living under vanilla/ lets import.hx pick the right classes.
  */
 class EngineSelectSubState extends MusicBeatSubstate
 {

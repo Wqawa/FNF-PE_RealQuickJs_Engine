@@ -35,11 +35,11 @@ class Paths
 	}
 
 	/**
-	 * 资产和模组的版本目录名。
+	 * Version directory for assets and mods.
 	 *
-	 * 运行时所有基础资源都走 assets/<VERSION_DIR>/...，模组走 mods/<VERSION_DIR>/...。
-	 * 本体是 body，原版那份在 vanilla.backend.Paths 里是 1.0.4，两边各写各的。
-	 * 目前有 body / 1.0.4，往后接 0.6.3 时再加一个目录就行。
+	 * Runtime assets come from assets/<VERSION_DIR>/..., mods from mods/<VERSION_DIR>/...
+	 * Body uses `body`; the original tree has its own copy in vanilla.backend.Paths with
+	 * `1.0.4`. Adding 0.6.3 later is just another directory.
 	 */
 	public static var VERSION_DIR:String = 'body';
 
@@ -182,14 +182,14 @@ class Paths
 	}
 
 	/**
-	 * 文件到底在不在。
+	 * Whether a file exists.
 	 *
-	 * 以前这里只看 OpenFlAssets.exists()，也就是编译时生成的资源清单。
-	 * 但素材是可以编译完再往 bin/assets 里丢的（本体的 base_game、临时放进去的图），
-	 * 那些文件在磁盘上有、清单里没有，于是被判成"不存在"：
-	 * 关卡目录里的图找不到 → 背景缺失；HealthIcon 查不到 icon-xxx → 全部退回 icon-face。
+	 * This used to check OpenFlAssets.exists() only, i.e. the compile-time manifest.
+	 * Assets can be dropped into bin/assets after building (base_game, quick tests), and
+	 * those exist on disk but not in the manifest, so they were reported missing:
+	 * level images gone means missing backgrounds; icon-xxx missing meant every icon fell
 	 *
-	 * 缓存图片的那条路（cacheBitmap）本来就是先看磁盘的，这里跟它保持一致。
+	 * back to icon-face. cacheBitmap already checked disk first; this matches it.
 	 */
 	public static function existsOnDiskOrManifest(path:String, ?type:AssetType = null):Bool
 	{
@@ -200,19 +200,19 @@ class Paths
 	}
 
 	/**
-	 * 脚本文件的统一查找：mods → 关卡目录 → assets/shared → assets 根。
+	 * Unified script lookup: mods -> level folder -> assets/shared -> assets root.
 	 *
-	 * 0.6.x 的基础资源直接挂在 assets/ 根下（shared 这一层是 0.7 才有的），
-	 * 所以最后还要兜一次根目录。以前 startLuasNamed、.js 兜底、startHScriptsNamed
-	 * 三处各抄一遍这个顺序，改一处忘两处，现在都走这里。
+	 * 0.6.x base assets sit directly under assets/ (shared/ arrived in 0.7), hence the
+	 * root fallback. startLuasNamed, the .js fallback and startHScriptsNamed each copied
+	 * this order before; changing one meant forgetting the other two.
 	 *
-	 * 关卡目录这一级是后补的：`getPath()` 一直认它（`assets/<ver>/<level>/`），
-	 * 这里以前不认，于是同一首歌里 `scripts/` 目录扫到的东西按名字找不回来，
-	 * 名字查找和目录扫描各命中一套文件。
+	 * The level folder was added later: getPath() always honoured assets/<ver>/<level>/,
+	 * this did not, so scripts scanned from scripts/ could not be found by name and the
+	 * two paths picked different files.
 	 *
-	 * 前四级是相对路径，依赖进程 CWD 恰好是 bin 目录（整个 Paths 都是这个前提，
-	 * modFolders / getSharedPath 同款）。从快捷方式或别的程序拉起游戏时 CWD 可能不对，
-	 * 所以 sys 目标上再按 exe 所在目录锚定重试一遍，找到就返回绝对路径。
+	 * The first four levels are relative and assume CWD is bin (all of Paths does).
+	 * Launched from a shortcut the CWD may differ, so sys targets retry anchored at the
+	 * exe directory and return an absolute path when that hits.
 	 */
 	public static function findScriptFile(file:String):String
 	{
@@ -445,11 +445,11 @@ class Paths
 	}
 
 	/**
-	 * 图集描述文件（.xml / .txt）优先读磁盘内容。
+	 * Atlas description files (.xml / .txt) are read from disk when possible.
 	 *
-	 * 原来是把**路径**直接丢给 FlxAtlasFrames，flixel 拿到字符串会当资源 id 去查
-	 * openfl 的清单 —— 编译后才拷进 bin/assets 的图集查不到，xml 变 null，
-	 * fromSparrow 里 xml.getXml() 直接空指针（weekend1 的 phillyStreets 就是这么崩的）。
+	 * Passing the path straight to FlxAtlasFrames made flixel treat it as an asset id and
+	 * look in the openfl manifest; atlases copied into bin/assets after building were not
+	 * found, xml became null, and xml.getXml() in fromSparrow dereferenced it (phillyStreets).
 	 */
 	static function readTextOrPath(path:String):String
 	{
@@ -542,7 +542,7 @@ class Paths
 	inline static public function mods(key:String = '')
 		return 'mods/$VERSION_DIR/$key';
 
-	/** 当前版本自己的 modsList.txt，各版本互不干扰。 */
+	/** This version's own modsList.txt; versions do not touch each other's. */
 	inline static public function modsListPath():String
 		return 'mods/$VERSION_DIR/modsList.txt';
 
@@ -581,15 +581,15 @@ class Paths
 	#end
 
 	/**
-	 * 从脚本路径反推它属于哪个 mod，推不出来就 null。
+	 * Works out which mod a script path belongs to, null when unknown.
 	 *
-	 * 上游 Psych 的写法是 `path.split('/')[0] + '/' == Paths.mods()`，前提是 mods
-	 * 目录扁平（mods/<mod>/）。这版在 mods/ 和 mod 名之间插了一层版本目录
-	 * （mods/body/<mod>/），于是 'mods/' 永远不等于
-	 * 'mods/body/'，Lua 和 HScript 两边的 modFolder 一直是 null —— 脚本里读到的
-	 * modFolder、getModSetting，以及所有拿 modFolder 去拼的相对路径全废。
+	 * Upstream does `path.split('/')[0] + '/' == Paths.mods()`, assuming flat mods/<mod>/.
+	 * This build inserts a version directory (mods/body/<mod>/), so 'mods/' never equals
+	 * 'mods/body/' and modFolder stayed null for both Lua and HScript - breaking modFolder,
+	 * getModSetting and every relative path built from it.
 	 *
-	 * 顺带处理 findScriptFile 走 applicationDirectory 兜底时给出的绝对路径。
+	 *
+	 * Also handles the absolute paths findScriptFile returns via applicationDirectory.
 	 */
 	public static function modFromScriptPath(path:String):String
 	{
@@ -597,7 +597,7 @@ class Paths
 
 		var p:String = path.replace('\\', '/');
 
-		// 绝对路径只留 mods/ 之后的部分
+		// absolute paths keep only the part after mods/
 		var idx:Int = p.indexOf('/mods/');
 		if(idx >= 0) p = p.substr(idx + 1);
 		else if(!StringTools.startsWith(p, 'mods/')) return null;
@@ -606,14 +606,14 @@ class Paths
 		var versionPrefix:String = 'mods/$VERSION_DIR/';
 
 		if(StringTools.startsWith(p, versionPrefix)) rest = p.substr(versionPrefix.length);
-		else if(StringTools.startsWith(p, 'mods/')) rest = p.substr(5); // 老结构：mods/<mod>/...
+		else if(StringTools.startsWith(p, 'mods/')) rest = p.substr(5); // old layout: mods/<mod>/...
 
 		if(rest == null) return null;
 
 		var slash:Int = rest.indexOf('/');
 		if(slash <= 0) return null;
 
-		// mods/body/scripts/ 这种是全局脚本目录，不是某个 mod
+		// mods/body/scripts/ is the global script folder, not a mod
 		var name:String = rest.substr(0, slash);
 		if(Mods.ignoreModFolders.contains(name.toLowerCase())) return null;
 		if(name == Mods.currentModDirectory) return name;
@@ -621,11 +621,11 @@ class Paths
 	}
 
 	/**
-	 * 脚本路径的判重键：统一斜杠、转小写。
+	 * Dedupe key for script paths: forward slashes, lower case.
 	 *
-	 * Windows 的 FileSystem.exists 不区分大小写，但它返回的是**你传进去的那个字符串**。
-	 * 所以 `Scripts/Hud.lua` 和 `scripts/hud.lua` 都能过 exists，
-	 * 直接拿字符串比就会当成两个脚本各加载一份。三条通道（Lua / HScript / JS）统一走这里。
+	 * Windows FileSystem.exists is case insensitive but returns the string you passed in.
+	 * So `Scripts/Hud.lua` and `scripts/hud.lua` both exist yet differ as strings, and a
+	 * direct compare loads the same script twice. Lua / HScript / JS all use this.
 	 */
 	public static function scriptKey(path:String):String
 	{
@@ -633,7 +633,7 @@ class Paths
 		return path.replace('\\', '/').toLowerCase();
 	}
 
-	/** 两个脚本路径是不是同一个文件（判重统一用它，别再直比字符串） */
+	/** Whether two script paths are the same file. Do not compare strings directly. */
 	inline public static function sameScript(a:String, b:String):Bool
 		return a != null && b != null && scriptKey(a) == scriptKey(b);
 

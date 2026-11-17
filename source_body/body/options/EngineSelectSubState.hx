@@ -1,12 +1,12 @@
 package options;
 
 /**
- * 引擎切换界面（本体侧）。
+ * Engine switch screen (body side).
  *
- * 选中后把 engine.txt 写到 bin 根目录，然后退出进程，
- * 下次启动由 Main.main() 按 engine.txt 决定加载本体还是原版 1.0.4。
- * 原版侧有一份同样逻辑的 vanilla.options.EngineSelectSubState，两边各自用自己那套
- * ClientPrefs / Paths（原版模式下本体的 ClientPrefs 还没加载）。
+ * Selecting writes engine.txt into the bin root and exits the process; the next launch
+ * lets Main.main() pick body or original 1.0.4 from that file.
+ * The vanilla side has its own vanilla.options.EngineSelectSubState using its own
+ * ClientPrefs / Paths (body's ClientPrefs is not loaded in vanilla mode).
  */
 class EngineSelectSubState extends MusicBeatSubstate
 {

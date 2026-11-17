@@ -615,7 +615,7 @@ class StageEditorState extends MusicBeatState implements PsychUIEventHandler.Psy
 
 		var folderList:Array<String> = [''];
 		#if sys
-		// assets/ 下面现在是按版本分的目录，直接扫会把 body/1.0.4/0.6.3 当成 stage 名列出来
+		// assets/ is split per version now; scanning it directly lists body/1.0.4/0.6.3 as stages
 		var assetsRoot:String = 'assets/${Paths.VERSION_DIR}/';
 		for (folder in FileSystem.readDirectory(assetsRoot))
 			if(FileSystem.isDirectory('$assetsRoot$folder') && folder != 'shared' && !Mods.ignoreModFolders.contains(folder))

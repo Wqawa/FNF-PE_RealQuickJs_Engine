@@ -26,14 +26,14 @@ class LuaUtils
 	public static final Function_StopAll:String = "##PSYCHLUA_FUNCTIONSTOPALL";
 
 	/**
-	 * 迁移到 vanilla.* 之后，Lua/HScript 仍然会用原包名反射（states.PlayState 等）。
-	 * 同一个 exe 里本体也有 states.PlayState，所以必须先尝试 vanilla.*，
-	 * 否则原版模组会悄悄操作到本体类上。
+	 * After the move to vanilla.*, Lua/HScript still reflect by the old package names
+	 * (states.PlayState and friends). The body tree has the same names in one exe, so try
+	 * vanilla.* first or vanilla mods quietly operate on body classes.
 	 *
-	 * 1.0.4 的类都在包目录里（backend. / states. / objects. …），而脚本写的是**裸名**：
-	 * getPropertyFromClass('ClientPrefs', 'healthBarAlpha') 这种。只试 'vanilla.' 前缀
-	 * 拼不出 vanilla.backend.ClientPrefs，返回 null → 属性读成 nil → 例如血条皮肤的
-	 * alpha 变 0，看着像贴图没加载出来（实际图集是好的）。
+	 * 1.0.4 classes live in packages (backend. / states. / objects. ...) while scripts use bare
+	 * names such as getPropertyFromClass('ClientPrefs', 'healthBarAlpha'). Prefixing only
+	 * 'vanilla.' cannot build vanilla.backend.ClientPrefs, so it returned null, the property read
+	 * as nil and e.g. the health bar skin's alpha became 0 (the atlas was fine).
 	 */
 	public static function resolveClass(name:String):Dynamic
 	{
@@ -44,7 +44,7 @@ class LuaUtils
 			var namespaced:Dynamic = Type.resolveClass('vanilla.' + name);
 			if (namespaced != null) return namespaced;
 
-			// 裸名补包：vanilla.<包>.<类>
+			// bare name: try vanilla.<package>.<class>
 			for (pkg in CLASS_PACKAGES)
 			{
 				var packed:Dynamic = Type.resolveClass('vanilla.' + pkg + '.' + name);
@@ -52,13 +52,13 @@ class LuaUtils
 			}
 		}
 
-		// 兜底解析到的如果是对应本体（backend.PlayState 之类）的类，宁可返回 null ——
-		// 三棵树共用一个 exe，落到别的树上比报错更难查。
+		// If the fallback resolves to the body equivalent (backend.PlayState etc), return null:
+		// one exe, three trees, and the wrong tree is harder to trace than an error.
 		var fallback:Dynamic = Type.resolveClass(name);
 		return isOtherTreeClass(fallback) ? null : fallback;
 	}
 
-	/** 本体那棵树的引擎类（没带 vanilla. 前缀的那些包） */
+	/** Engine classes of the body tree (packages without the vanilla. prefix). */
 	static final ENGINE_PACKAGES:Array<String> = [
 		'backend.', 'states.', 'objects.', 'options.', 'substates.', 'psychlua.',
 		'shaders.', 'cutscenes.', 'flxanimate.', 'debug.'

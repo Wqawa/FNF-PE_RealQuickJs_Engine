@@ -73,23 +73,23 @@ class Song
 	public static var chartEngineVersion:String = 'Pe-1.0.4';
 	public static var forceEngineVersion:Null<String> = null;
 
-	// --- 按谱面文件的创建时间判断该用哪套 lane 语义 ---
-	// Psych Engine 1.0.0 的正式发布时刻（GitHub tag "1.0"，2024-10-15 01:54:44 UTC），单位毫秒
-	// 以方便直接和 Date.getTime() 比。比它早写出来的谱面基本都是按 0.6.x / 0.7.x 的相对 lane 画的。
+	// --- pick the lane semantics from the chart file's creation time ---
+	// Psych Engine 1.0.0 release time (GitHub tag "1.0", 2024-10-15 01:54:44 UTC) in ms,
+	// so it compares directly with Date.getTime(). Older charts use 0.6.x/0.7.x relative lanes.
 	public static final PE_100_RELEASE:Float = 1728957284000.0;
-	// 当前谱面文件的创建时间（拿不到就是 null，比如谱面被打包进 assets）
+	// Creation time of the chart file (null when unavailable, e.g. packed into assets)
 	public static var chartCreated:Null<Date> = null;
-	// 这次版本判定是从哪来的：'manual' / 'file date' / 'chart format'，暂停界面右上角会显示
+	// Where this verdict came from: 'manual' / 'file date' / 'chart format'. Shown in pause
 	public static var chartVersionSource:String = 'chart format';
-	// getChart() 读到的文件时间，交给紧接着的那次 parseJSON 消费。
-	// 用一次性中转而不是直接读 chartCreated，是为了让编辑器直接调 parseJSON 时不会拿到上一首歌的残留值。
+	// File time read by getChart(), consumed by the parseJSON call that follows.
+	// A one-shot hand-off keeps the editor's direct parseJSON calls from seeing last song's value.
 	static var _pendingCreated:Null<Date> = null;
 
 	public static function isLegacyChart():Bool
 		return chartEngineVersion == 'Pe-0.7.3';
 
-	// 时间够老还不够，谱面形状也得对得上：没有 {"song": {...}} 包裹层的谱面不可能早于 1.0 那次格式变更，
-	// 这种文件的 lane 一定是绝对坐标，套 mustHitSection 只会把整首歌左右镜像。两者矛盾时按 format 走。
+	// Age alone is not enough, the shape must agree: a chart without the {"song": {...}}
+	// wrapper cannot predate the 1.0 format change, so its lanes are absolute and applying
 	static function isLegacyByFileDate(hasWrapper:Bool):Bool
 	{
 		if(!hasWrapper) return false;
@@ -98,7 +98,7 @@ class Song
 		return c.getTime() < PE_100_RELEASE;
 	}
 
-	// 读文件创建时间。拿不到就返回 null（走 format 判定），不影响载入。
+	// Reads the file creation time. Null when unavailable (falls back to format); loading continues.
 	static function readFileCreated(path:String):Null<Date>
 	{
 		#if sys
@@ -106,12 +106,12 @@ class Song
 		{
 			var stat = FileSystem.stat(path);
 			#if windows
-			return stat.ctime; // Windows 的 ctime 就是创建时间
+			return stat.ctime; // on Windows ctime is creation time
 			#else
-			return stat.mtime; // 其他系统 ctime 是 inode 变更时间，mtime 更接近"这文件什么时候来的"
+			return stat.mtime; // elsewhere ctime is inode change time; mtime is closer to "when did this arrive"
 			#end
 		}
-		catch(e:haxe.Exception) {} // 权限 / 文件被删之类，当没有时间处理
+		catch(e:haxe.Exception) {} // permissions or a deleted file: treat as no timestamp
 		#end
 		return null;
 	}
@@ -211,8 +211,8 @@ class Song
 		#end
 			rawData = Assets.getText(_lastPath);
 
-		// events.json / picospeaker.json 是 sidecar，它们的时间不是这首歌谱面的时间，
-		// 跟着记会把主谱面的判定冲掉。
+		// events.json / picospeaker.json are sidecars; their timestamps are not the chart's
+		// and recording them would overwrite the main chart's verdict.
 		var isSidecarFile:Bool = (jsonInput == 'events' || jsonInput == 'picospeaker');
 		if(!isSidecarFile)
 		{
@@ -250,12 +250,12 @@ class Song
 		// detected for the real chart, otherwise a wrapped events file flips the whole song.
 		var isSidecar:Bool = (nameForError == 'events' || nameForError == 'picospeaker');
 
-		// 只认 getChart() 刚读到的那个时间；编辑器直接调 parseJSON 时这里是 null，
-		// 不会拿上一首歌的文件时间去判。
+		// Only the time just read by getChart() counts; a direct parseJSON from the editor sees
+		// null instead of the previous song's timestamp.
 		var created:Null<Date> = _pendingCreated;
 		_pendingCreated = null;
 
-		// 手动切换（暂停菜单 Change Chart Ver）> 文件创建时间 > 谱面自身的 format
+		// manual switch (pause menu Change Chart Ver) > file creation time > chart format
 		var manual:String = forceEngineVersion;
 		var legacyMode:Bool = (manual == 'Pe-0.7.3');
 		if(manual == null && !isSidecar) legacyMode = isLegacyByFileDate(hasWrapper);
@@ -309,11 +309,11 @@ class Song
 		if(Reflect.field(songJson, 'player2') == null) Reflect.setField(songJson, 'player2', 'dad');
 		if(Reflect.field(songJson, 'gfVersion') == null) Reflect.setField(songJson, 'gfVersion', 'gf');
 
-		// 老谱面（0.6.x 那批本体的）根本没有 stage 字段。以前这里一律填 'stage'，
-		// 结果全部走 Week 1 的舞台：背景永远是 stageback，舞台事件（Philly Glow 之类）也没人接。
-		// 这里按曲名反推（spookeez→spooky、pico→philly…），推断不到才落回 'stage'。
-		// 注意必须在 StageData.loadDirectory 之前定下来，否则 forceNextDirectory 会是空的，
-		// LoadingState 就不会把 currentLevel 切到对应的 week 目录，图还是会找不到。
+		// Old charts (the 0.6.x base game) have no stage field. This used to default to 'stage',
+		// putting everything on the Week 1 stage: stageback forever, no stage events.
+		// Now it infers from the song name (spookeez -> spooky, pico -> philly, ...).
+		// This must happen before StageData.loadDirectory, otherwise forceNextDirectory stays
+		// empty, LoadingState will not switch currentLevel, and assets stay missing.
 		var stageField:String = cast Reflect.field(songJson, 'stage');
 		if(stageField == null || stageField.length < 1)
 		{

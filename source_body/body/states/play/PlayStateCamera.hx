@@ -9,9 +9,9 @@ import psychlua.*;
 import crowplexus.hscript.Expr.Error as IrisError;
 
 /**
- * 从 PlayState.hx 搬出来的镜头与背景跟随（段落切镜头、tween 拉近）。逻辑是逐行原样搬的，只把对 PlayState 成员的引用改成 ps.xxx，
- * 需要私有访问所以加了 @:access。
- * PlayState 里保留了同名转发，外部调用和子类 override 都不受影响。
+ * Camera and background follow (section camera moves, zoom tweens), moved out of PlayState.hx.
+ * Copied line for line; member references became ps.xxx. Needs @:access, and PlayState
+ * keeps same-named forwards so callers and overrides are unaffected.
  */
 @:access(states.PlayState)
 @:access(backend.MusicBeatState)

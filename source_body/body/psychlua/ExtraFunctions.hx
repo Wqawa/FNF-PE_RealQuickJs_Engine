@@ -194,8 +194,8 @@ class ExtraFunctions
 		Lua_helper.add_callback(lua, "getTextFromFile", function(path:String, ?ignoreModFolders:Bool = false) {
 			return Paths.getTextFromFile(path, ignoreModFolders);
 		});
-		// 抄自 NovaFlare：把 json 文件读成 lua 表。路径走 Paths.getPath，会先找 mod 目录，
-		// 后缀 .json 可写可不写。
+		// From NovaFlare: reads a json file into a lua table. Uses Paths.getPath, so mod folders
+		// come first; the .json suffix is optional.
 		Lua_helper.add_callback(lua, "readJson", function(jsonFile:String) {
 			try {
 				var path:String = Paths.getPath(jsonFile, TEXT);

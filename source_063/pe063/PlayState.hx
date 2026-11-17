@@ -1611,7 +1611,7 @@ class PlayState extends MusicBeatState
 			return;
 		}
 
-		// hxvlc 2.0.1 需要先等 libvlc 初始化完成，再 load + 延迟 play
+		// hxvlc 2.0.1 needs libvlc to finish initialising before load and a delayed play
 		hxvlc.util.Handle.initAsync(function(success:Bool)
 		{
 			if(!success)
@@ -1626,7 +1626,7 @@ class PlayState extends MusicBeatState
 			video.antialiasing = ClientPrefs.globalAntialiasing;
 			video.bitmap.onFormatSetup.add(function()
 			{
-				// 按窗口大小等比缩放并居中
+				// scale proportionally to the window and centre
 				if (video.bitmap != null && video.bitmap.bitmapData != null)
 				{
 					var scale:Float = Math.min(FlxG.width / video.bitmap.bitmapData.width, FlxG.height / video.bitmap.bitmapData.height);
@@ -5008,9 +5008,9 @@ class PlayState extends MusicBeatState
 		FlxG.animationTimeScale = 1;
 		FlxG.sound.music.pitch = 1;
 
-		// 脚本都销毁完之后再清 tween/timer：mod 的 onDestroy 里经常会新建 tween
-		// （estll 那种还原窗口尺寸的写法），这些回调活在已经死掉的脚本里，
-		// 0.5s 后触发就是空引用。flixel 5 的全局管理器正好能一起收掉。
+		// Clear tweens/timers after scripts are destroyed: mods often create tweens in
+		// onDestroy (estll restores the window size that way), and those callbacks belong to
+		// dead scripts, so they fire on null 0.5s later. flixel 5's global manager takes them.
 		if (modchartTweens != null) modchartTweens.clear();
 		if (modchartTimers != null) modchartTimers.clear();
 		FlxTween.globalManager.clear();

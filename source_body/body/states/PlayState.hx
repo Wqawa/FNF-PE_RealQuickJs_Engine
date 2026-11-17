@@ -459,20 +459,20 @@ class PlayState extends MusicBeatState
 		}
 		
 		#if (LUA_ALLOWED || HSCRIPT_ALLOWED)
-		// JS 运行时每首歌换一个干净的 context（上一首的回调不能带到这一首）。
-		// jsEngine 不是 QuickJS 时这一步什么都不做。
+		// The JS runtime gets a fresh context per song; last song's callbacks must not leak.
+		// No-op unless jsEngine is QuickJS.
 		jsruntime.JSPlayer.beginSong();
 
-		// 上一首歌的错误去重记录和类名解析缓存都别带过来
+		// Do not carry over last song's error dedupe or class resolution cache
 		#if HSCRIPT_ALLOWED
 		HScript.resetErrorLog();
 		backend.ScriptClassAliases.resetMissCache();
 		#end
 
 		// "SCRIPTS FOLDER" SCRIPTS
-		// 这条路拿到的是磁盘上的真实路径（readDirectory 返回的大小写），按名字加载那条路
-		// 拿到的是 exists() 回给你的字符串。两条路必须用同一个判重键（Paths.sameScript），
-		// 否则同一个脚本会进两份 —— 以前这里连判重都没有。
+		// This path yields the on-disk spelling (whatever readDirectory returns); loading
+		// by name yields whatever exists() echoes back. Both must use the same key
+		// (Paths.sameScript) or the same script loads twice. This had no check at all before.
 		for (folder in Mods.directoriesWithFile(Paths.getSharedPath(), 'scripts/'))
 			for (file in FileSystem.readDirectory(folder))
 			{
@@ -816,10 +816,10 @@ class PlayState extends MusicBeatState
 
 	function startCharacterScripts(name:String)
 	{
-		// 角色脚本也走和舞台/音符/事件同一条查找链（mod → 关卡 → shared → 根 → exe 锚定），
-		// 判重同样走 isLuaScriptRunning / isHScriptRunning。
-		// 以前这里是手写的两层 fallback + Iris.instances 判重：既找不到 assets 根
-		// 那一级，又会被上一首歌残留的 Iris 实例骗过去，脚本静默不跑。
+		// Character scripts use the same lookup as stage/note/event (mod -> level -> shared ->
+		// root -> exe anchor), and the same isLuaScriptRunning / isHScriptRunning dedupe.
+		// This was a hand-written two-level fallback plus Iris.instances: it missed the assets
+		// root level and was fooled by last song's Iris instances, so scripts silently did not run.
 		#if LUA_ALLOWED startLuasNamed('characters/$name.lua'); #end
 		#if HSCRIPT_ALLOWED startHScriptsNamed('characters/$name.hx'); #end
 	}
@@ -1665,7 +1665,7 @@ class PlayState extends MusicBeatState
 
 		setOnScripts('curDecStep', curDecStep);
 		setOnScripts('curDecBeat', curDecBeat);
-		// 0.7.x 一直在给脚本同步摄像机卷动位置，老 mod 拿它做视差
+		// 0.7.x always synced camera scroll to scripts; old mods use it for parallax
 		setOnScripts('cameraX', camFollow.x);
 		setOnScripts('cameraY', camFollow.y);
 
@@ -2253,9 +2253,9 @@ class PlayState extends MusicBeatState
 		}
 
 		#if (LUA_ALLOWED || HSCRIPT_ALLOWED)
-		// JS 脚本共用一个 context，onDestroy 发一次就行；放在 stop 之前，
-		// 让脚本还能调 setProperty 之类的收尾函数。
-		// 三条通道现在都走 IScriptHost，顺序和以前一致（JS → Lua → HScript）。
+		// Each JS script has its own context; onDestroy fires once, before stop, so the script
+		// can still call setProperty and other cleanup functions.
+		// All three channels go through IScriptHost, in the old order (JS -> Lua -> HScript).
 		for (host in allScripts())
 		{
 			if (host.isClosed()) continue;
@@ -2400,7 +2400,7 @@ class PlayState extends MusicBeatState
 	}
 
 	#if LUA_ALLOWED
-	/** 这条 lua 是不是已经在跑。判重键统一走 Paths.sameScript（大小写 + 斜杠）。 */
+	/** Whether this lua is already running. Keyed by Paths.sameScript (case and slashes). */
 	public function isLuaScriptRunning(path:String):Bool
 	{
 		if (luaArray == null || path == null) return false;
@@ -2423,8 +2423,8 @@ class PlayState extends MusicBeatState
 			{
 				var luaScript:FunkinLua = psychlua.FunkinJS.start(jsToLoad);
 				if(luaScript != null) return true;
-				// jsEngine=QuickJS 时 start() 按设计返回 null（脚本不进 Lua 解释器），
-				// 直接用它判成功会永远是 false，得回头问运行时到底加载了没。
+				// With jsEngine=QuickJS, start() returns null by design (no Lua interpreter involved),
+				// so treating that as failure would always be false; ask the runtime instead.
 				return jsruntime.JSPlayer.isLoaded(jsToLoad);
 			}
 		}
@@ -2441,7 +2441,7 @@ class PlayState extends MusicBeatState
 	#end
 
 	#if HSCRIPT_ALLOWED
-	/** 这条 hscript 是不是已经在跑。和 isLuaScriptRunning 同款，别再用 Iris.instances 判。 */
+	/** Whether this hscript is already running. Same as isLuaScriptRunning; do not use Iris.instances. */
 	public function isHScriptRunning(path:String):Bool
 	{
 		if (hscriptArray == null || path == null) return false;
@@ -2455,9 +2455,9 @@ class PlayState extends MusicBeatState
 		var scriptToLoad:String = Paths.findScriptFile(scriptFile);
 		if(scriptToLoad != null)
 		{
-			// 判重只看本 state 里还活着的脚本。Iris.instances 是进程级的静态表，
-			// 上一首歌残留的实例（或同路径的旧 key）会让新歌的同名脚本被当成
-			// "已存在"直接跳过，表现是脚本静默不执行，日志里还一片正常。
+			// Dedupe only looks at scripts alive in this state. Iris.instances is process wide, so a
+			// leftover from the last song (or a stale key for the same path) made the new song's
+			// script look loaded: it never ran and the log looked fine.
 			if(isHScriptRunning(scriptToLoad)) return false;
 
 			initHScript(scriptToLoad);
@@ -2470,17 +2470,17 @@ class PlayState extends MusicBeatState
 	{
 		var newScript:HScript = null;
 
-		// manualRun：先只建解释器。脚本本身跑挂时实例还能留住并进 hscriptArray，
-		// 不会像以前那样 —— 构造里 execute 抛出来，对象引用丢了，却在
-		// Iris.instances 里留一个没人管的僵尸（catch 里那句 get(file) 因为 Iris
-		// 会给重名实例加 _1 后缀，基本永远取不到）。
+		// manualRun: build the interpreter only. A failing script still keeps its instance in
+		// hscriptArray, instead of the old behaviour where execute threw in the constructor, the
+		// reference was lost, and Iris.instances kept a zombie (the get(file) in the catch never
+		// found it because Iris suffixes duplicate names with _1).
 		try
 		{
 			newScript = new HScript(null, file, null, true);
 		}
 		catch(e:IrisError)
 		{
-			// 连解释器都建不出来（preset 阶段就炸），这种确实没得救
+			// The interpreter itself failed to build (blown up in preset); unrecoverable
 			var pos:HScriptInfos = cast {fileName: file, showLine: false};
 			Iris.error(Printer.errorToString(e, false), pos);
 			return;
@@ -2497,18 +2497,18 @@ class PlayState extends MusicBeatState
 		}
 		catch(e:IrisError)
 		{
-			// 走实例自己的上报口，受 "Show HScript Errors" 开关和去重控制
+			// Through the instance's own reporting, subject to Show HScript Errors and dedupe
 			newScript.reportError(Printer.errorToString(e, false));
 		}
 	}
 	#end
 
 	/**
-	 * 当前 state 里所有活着的脚本，顺序就是分发顺序：JS → Lua → HScript，
-	 * 和原来 callOnScripts 里三段调用的先后一致。
+	 * Every script alive in this state, in dispatch order: JS -> Lua -> HScript,
+	 * matching the three blocks callOnScripts used to have.
 	 *
-	 * 以后再加一条脚本通道，只要实现 IScriptHost 并从这里出去，
-	 * PlayState 其余地方都不用跟着改。
+	 * A new script channel only needs to implement IScriptHost and be added here;
+	 * the rest of PlayState does not change.
 	 */
 	public function allScripts():Array<IScriptHost>
 	{
@@ -2536,20 +2536,20 @@ class PlayState extends MusicBeatState
 		if(exclusions == null) exclusions = [];
 		if(excludeValues == null) excludeValues = [LuaUtils.Function_Continue];
 
-		// 事件顺带转给 JS 脚本一份。放在这里而不是每处调用点，是因为
-		// onUpdate / onUpdatePost / onBeatHit / onStepHit / onSongStart … 全走这个入口，
-		// 一处转发就够，不会漏。jsEngine 不是 QuickJS 时是空转。
+		// Events are also forwarded to JS here. It lives here rather than at every call site
+		// because onUpdate / onUpdatePost / onBeatHit / onStepHit / onSongStart all pass through,
+		// so one forward covers them all. No-op unless jsEngine is QuickJS.
 		//
-		// JS 排在 Lua / HScript 前面，所以它喊停时后面两条这次就不发了 ——
-		// 和 Lua 里 break 掉剩下的 lua 脚本同一个意思。返回值也必须往上交：
-		// 调用方只认 LuaUtils.Function_Stop，吞掉就等于「JS 永远停不了引擎动作」。
+		// JS runs before Lua / HScript, so stopping there skips the other two for this call,
+		// same as breaking out of the Lua loop. The value must also be returned: callers only
+		// understand LuaUtils.Function_Stop, swallowing it means JS can never stop the engine.
 		var jsStopped:Dynamic = null;
 		#if LUA_ALLOWED
 		var jsRet:Dynamic = jsruntime.JSPlayer.forward(funcToCall, args);
 		if(jsRet != null && !excludeValues.contains(jsRet)
 			&& (jsRet == LuaUtils.Function_Stop || jsRet == LuaUtils.Function_StopLua || jsRet == LuaUtils.Function_StopAll))
 		{
-			// ignoreStops 挡的是「后面两条通道发不发」，不是「值往不往上交」
+			// ignoreStops controls whether the other channels run, not whether the value propagates
 			if(!ignoreStops) return jsRet;
 			jsStopped = jsRet;
 		}
@@ -2642,9 +2642,9 @@ class PlayState extends MusicBeatState
 	public function setOnScripts(variable:String, arg:Dynamic, exclusions:Array<String> = null) {
 		if(exclusions == null) exclusions = [];
 
-		// 走 IScriptHost 统一写入。这里不建 allScripts() 数组，因为
-		// RecalculateRating 每次命中都要调好几遍，没必要每秒分配几百个小数组。
-		// 顺带修了一个老问题：JS 那边原来不认 exclusions，是全量广播的。
+		// Written through IScriptHost. No allScripts() array here because RecalculateRating
+		// calls this several times per hit and allocating arrays every frame is wasteful.
+		// Also fixes an old bug: the JS channel ignored exclusions and broadcast to everyone.
 		#if LUA_ALLOWED
 		if (jsruntime.JSPlayer.active)
 			for (s in jsruntime.JSPlayer.hosts())

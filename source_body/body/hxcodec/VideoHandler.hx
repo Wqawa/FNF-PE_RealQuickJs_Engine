@@ -4,8 +4,8 @@ package hxcodec;
 import hxcodec.flixel.FlxVideo;
 
 /**
- * hxcodec 2.6 的类名。0.6/0.7 的 mod 里 `import hxcodec.VideoHandler;` 很常见，
- * 3.0 之后改叫 `hxcodec.flixel.FlxVideo`，这里给老名字留个壳。
+ * hxcodec 2.6's class name. 0.6/0.7 mods commonly `import hxcodec.VideoHandler;`,
+ * renamed to `hxcodec.flixel.FlxVideo` in 3.0. This keeps the old name working.
  */
 @:keep
 class VideoHandler extends FlxVideo

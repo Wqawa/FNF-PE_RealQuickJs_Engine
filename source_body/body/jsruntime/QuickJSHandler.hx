@@ -14,29 +14,29 @@ import states.PlayState;
 import backend.MusicBeatState;
 
 /**
- * QuickJS-NG 运行时 + JS↔Haxe 桥。
+ * QuickJS-NG runtime and the JS/Haxe bridge.
  *
- * 桥接形态：「单 trampoline + 函数编号」。
- *   JS 侧:  __host(idx, a, b, c, d, e, f)  ← 由 Haxe 一次性 eval 出来的 wrapper 调
- *   C  侧:  qjs_host 读编号和六个字符串，回调 Haxe 的 hostDispatch
- *   Haxe:   按编号查表
- * 加函数只改 Haxe 表 + WRAPPERS 字符串，C 一个字符都不用动。
+ * Shape: one trampoline plus numeric function ids.
+ *   JS side:  __host(idx, a, b, c, d, e, f), called by wrappers Haxe evals once
+ *   C side:   qjs_host reads the id and six strings, calls back into hostDispatch
+ *   Haxe:     switch on the id
+ * Adding a function touches the Haxe switch and the WRAPPERS string, never C.
  *
- * 之前用过「每函数一条 trampoline」和「JS_SetOpaque 存函数名」，都不划算：
- * 前者代码量爆炸，后者对 CFunction 不可靠（class id 对不上就读不到）。
+ * One trampoline per function and JS_SetOpaque holding names were both tried and
+ * dropped: the first explodes the code size, the second is unreliable for CFunction.
  *
- * 其它约定：
- * - runtime/context 是 C++ 文件级 static，不往 Dynamic 里塞裸指针（GC 会移动对象）。
- * - 错误只 trace + 写 testout/js_log.txt，不抛异常：一个脚本挂了不能带走整个游戏。
+ * Other rules:
+ * - runtime/context are file static in C++; no raw pointers in Dynamic (the GC moves them).
+ * - Errors only trace and log to testout/js_log.txt: one bad script must not take the game down.
  */
-// 路径说明（写死层级看着丑，但没有更好的办法）：
-//   hxcpp 的编译/链接工作目录是 export/<mode>/windows/obj，
-//   生成的 .cpp 在 obj/src/jsruntime/ 下 —— 因此：
-//     libpath 相对 obj：../../../../third_party/quickjs-ng/build
-//     #include 相对 cpp：../../../../../../third_party/quickjs-ng/quickjs.h
-//   buildXml 的 <include> 在这个 hxcpp 版本里不会生成 -I（试过，无效），
-//   所以头文件只能用带引号的相对包含。
-//   好处：项目换目录、换机器都不用改，静态库由 manage.sh 在本机编。
+// Why the hardcoded path depth:
+//   hxcpp compiles and links in export/<mode>/windows/obj and generates .cpp under
+//   obj/src/jsruntime/, therefore:
+//     libpath is relative to obj: ../../../../third_party/quickjs-ng/build
+//     #include is relative to the cpp: ../../../../../../third_party/quickjs-ng/quickjs.h
+//   buildXml's <include> does not produce -I on this hxcpp version (tried, no effect),
+//   so headers use quoted relative includes.
+//   Benefit: moving the repo or changing machines needs no edits; manage.sh builds the lib.
 @:buildXml('
 <target id="haxe">
 	<libpath name="../../../../third_party/quickjs-ng/build" />
@@ -53,13 +53,13 @@ import backend.MusicBeatState;
 #define QJS_MAX_CTX 32
 static JSRuntime *g_js_rt = nullptr;
 static JSContext *g_ctxs[QJS_MAX_CTX];
-static int g_cur = -1;			// trampoline 用：当前正在跑哪个 context
+static int g_cur = -1;			// for the trampoline: which context is running
 static char g_js_err[1024];
 static char g_js_out[8192];
-static char g_js_ret[1024];		// 上一次 js_invoke 的返回值（字符串化）
+static char g_js_ret[1024];		// return value of the last js_invoke, stringified
 
-// 每个 .js 文件一个 context（对齐 Lua「一个文件一个解释器」），
-// 这样同名回调不会互相覆盖。runtime 只有一个，context 用整数句柄表示。
+// One context per .js file (one interpreter per file, like Lua), so same-named
+// callbacks do not shadow each other. One runtime, contexts addressed by integer handle.
 static JSContext *js_ctx(int h) {
 	if (h < 0 || h >= QJS_MAX_CTX) return nullptr;
 	return g_ctxs[h];
@@ -69,7 +69,7 @@ static int js_new_ctx(int memLimitMB) {
 	if (g_js_rt == nullptr) {
 		g_js_rt = JS_NewRuntime();
 		if (g_js_rt == nullptr) return -1;
-		// 上限是整个 runtime 的，所有 context 共用
+		// the budget is runtime wide, shared by every context
 		if (memLimitMB > 0) JS_SetMemoryLimit(g_js_rt, (size_t)memLimitMB * 1024 * 1024);
 	}
 	for (int i = 0; i < QJS_MAX_CTX; i++) {
@@ -117,7 +117,7 @@ static bool js_eval_h(int h, const char *code, const char *name) {
 	JSContext *c = js_ctx(h);
 	if (c == nullptr || code == nullptr) return false;
 	g_cur = h;
-	// 长度用 strlen：Haxe String 的 length 是字符数，中文注释会让 UTF-8 字节数更大
+	// strlen, not Haxe String.length: that counts characters, not UTF-8 bytes
 	JSValue r = JS_Eval(c, code, strlen(code), name, JS_EVAL_TYPE_GLOBAL);
 	bool ok = !JS_IsException(r);
 	if (!ok) js_take_err(c);
@@ -141,10 +141,10 @@ static const char *js_get_str_h(int h, const char *name) {
 	return g_js_out;
 }
 
-// 读全局，顺便告诉 Haxe 它是什么类型：
-//   0 = undefined/null（等于「没有这个变量」），1 = 布尔，2 = 数字，3 = 字符串，
-//   4 = 对象 / 函数（只有字符串化结果，桥是字符串桥，搬不过去）。
-// 不给类型的话，setOnScripts 塞进来的 true / 3.5 读回去就全成了 "true" / "3.5"。
+// Reads a global and tells Haxe its type:
+//   0 = undefined/null (no such variable), 1 = bool, 2 = number, 3 = string,
+//   4 = object/function (stringified only; this is a string bridge).
+// Without the type, true / 3.5 set by setOnScripts come back as "true" / "3.5".
 static int js_get_typed_h(int h, const char *name) {
 	JSContext *c = js_ctx(h);
 	g_js_out[0] = 0;
@@ -169,7 +169,7 @@ static int js_get_typed_h(int h, const char *name) {
 typedef ::String (*qjs_host_fn)(int, ::String, ::String, ::String, ::String, ::String, ::String);
 static qjs_host_fn g_host = nullptr;
 
-// 唯一的宿主入口：argv[0] = 函数编号，argv[1..6] = 字符串参数
+// The only host entry: argv[0] = function id, argv[1..6] = string arguments
 static JSValue qjs_host(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv) {
 	int idx = 0;
 	if (argc > 0) JS_ToInt32(ctx, &idx, argv[0]);
@@ -187,15 +187,15 @@ static JSValue qjs_host(JSContext *ctx, JSValueConst this_val, int argc, JSValue
 	return JS_NewString(ctx, r.utf8_str());
 }
 
-// 调用 JS 全局函数（回调用）：
-//   mode 0 = 无参，1 = (number)，2 = (string)，
+// Calls a JS global (for callbacks):
+//   mode 0 = no args, 1 = (number), 2 = (string),
 //   mode 3 = (string, number)，4 = (string, string)，5 = (string, number, number)
-// 返回值顺手字符串化丢进 g_js_ret：脚本 return Function_Stop 要靠它往上传。
-// 截断上限 1KB —— 回调返回值本来就只该是哨兵或短值，长字符串自己写文件。
+// The return value is stringified into g_js_ret; that is how Function_Stop travels up.
+// Truncated at 1KB: callbacks should return sentinels or short values, not long strings.
 static bool js_invoke(int h, const char *name, int mode, double num, const char *str, const char *str2, double extra) {
 	JSContext *c = js_ctx(h);
 	if (c == nullptr) return false;
-	g_js_err[0] = 0; // 清掉上一次的残留，否则「函数不存在」会被误报成异常
+	g_js_err[0] = 0; // clear the previous value, otherwise "no such function" looks like an exception
 	g_js_ret[0] = 0;
 	g_cur = h;
 
@@ -243,9 +243,9 @@ class QuickJSHandler
 {
 	public static inline var NAME:String = 'quickjs';
 
-	// ---------------------------------------------------------------- 文件日志
-	// trace 只往 stdout 走，双击启动的窗口没有控制台，等于全丢。
-	// 脚本相关的输出一律再写一份到 testout/js_log.txt，出问题能直接看。
+	// ---------------------------------------------------------------- file log
+	// trace only goes to stdout, and double-clicked builds have no console, so it is lost.
+	// Script output is written to testout/js_log.txt as well, so it can be read afterwards.
 	static var LOG_PATH:String = './testout/js_log.txt';
 
 	public static function log(msg:String):Void
@@ -260,7 +260,7 @@ class QuickJSHandler
 		#end
 	}
 
-	/** 每首歌开头清一次，免得日志越滚越长 */
+	/** Truncated at the start of each song so the log does not grow forever. */
 	public static function truncateLog(header:String):Void
 	{
 		#if sys
@@ -273,8 +273,8 @@ class QuickJSHandler
 		#end
 	}
 
-	// ---------------------------------------------------------------- 生命周期
-	/** 新建一个 context，返回整数句柄（<0 表示失败）。每个 .js 文件一个。 */
+	// ---------------------------------------------------------------- lifecycle
+	/** Creates a context, returns an integer handle (<0 on failure). One per .js file. */
 	public static function newContext(memLimitMB:Int = 256):Int
 	{
 		var h:Int = -1;
@@ -294,7 +294,7 @@ class QuickJSHandler
 		untyped __cpp__('js_free_ctx(h);');
 	}
 
-	/** 当前正在执行回调的是哪个 context（宿主函数里往回调用时用） */
+	/** Which context is running a callback (used by host functions calling back in). */
 	public static function current():Int
 	{
 		var h:Int = -1;
@@ -302,7 +302,7 @@ class QuickJSHandler
 		return h;
 	}
 
-	/** 推进整个 runtime 的 microtask（所有 context 一起） */
+	/** Pumps the runtime's microtasks (all contexts). */
 	public static function pump():Void
 	{
 		untyped __cpp__('
@@ -313,7 +313,7 @@ class QuickJSHandler
 		');
 	}
 
-	// ---------------------------------------------------------------- 执行
+	// ---------------------------------------------------------------- execution
 	public static function eval(h:Int, code:String, ?chunkName:String = '<js>'):Bool
 	{
 		var out:Bool = false;
@@ -348,8 +348,8 @@ class QuickJSHandler
 	}
 
 	/**
-	 * 读脚本里的全局，带回类型。undefined / null 都算「没有」，返回 null。
-	 * 对象 / 函数只能拿到字符串化结果（String(obj)），桥是字符串桥。
+	 * Reads a global with its type. undefined / null mean missing and return null.
+	 * Objects and functions only stringify; this is a string bridge.
 	 */
 	public static function getGlobal(h:Int, name:String):Dynamic
 	{
@@ -367,7 +367,7 @@ class QuickJSHandler
 		};
 	}
 
-	/** 上一次 callGlobal* 的返回值（字符串化）；脚本没 return 就是空串。 */
+	/** Return value of the last callGlobal* (stringified); empty when the script returned nothing. */
 	public static function lastReturn():String
 	{
 		var s:String = '';
@@ -375,8 +375,8 @@ class QuickJSHandler
 		return s;
 	}
 
-	// ---------------------------------------------------------------- 回调调用
-	/** 无参回调。函数不存在时静默返回 false。 */
+	// ---------------------------------------------------------------- callback calls
+	/** No-arg callback. Returns false silently when the function does not exist. */
 	public static function callGlobal(h:Int, name:String):Bool
 	{
 		if (!isReady(h)) return false;
@@ -386,7 +386,7 @@ class QuickJSHandler
 		return ok;
 	}
 
-	/** 一个数字参数的回调（onUpdate / onBeatHit / onStepHit …） */
+	/** Callback taking one number (onUpdate / onBeatHit / onStepHit ...) */
 	public static function callGlobalNum(h:Int, name:String, v:Float):Bool
 	{
 		if (!isReady(h)) return false;
@@ -396,7 +396,7 @@ class QuickJSHandler
 		return ok;
 	}
 
-	/** 一个字符串参数的回调 */
+	/** Callback taking one string */
 	public static function callGlobalStr(h:Int, name:String, s:String):Bool
 	{
 		if (!isReady(h)) return false;
@@ -406,7 +406,7 @@ class QuickJSHandler
 		return ok;
 	}
 
-	/** (字符串, 数字) 回调 */
+	/** (string, number) callback */
 	public static function callGlobalStrNum(h:Int, name:String, s1:String, n1:Float):Bool
 	{
 		if (!isReady(h)) return false;
@@ -416,7 +416,7 @@ class QuickJSHandler
 		return ok;
 	}
 
-	/** (字符串, 数字, 数字) 回调：onTimerCompleted(tag, loops, loopsLeft) */
+	/** (string, number, number) callback: onTimerCompleted(tag, loops, loopsLeft) */
 	public static function callGlobalStrNumNum(h:Int, name:String, s1:String, n1:Float, n2:Float):Bool
 	{
 		if (!isReady(h)) return false;
@@ -426,7 +426,7 @@ class QuickJSHandler
 		return ok;
 	}
 
-	/** (字符串, 字符串) 回调：onTweenCompleted(tag, vars) 之类 */
+	/** (string, string) callback: onTweenCompleted(tag, vars) and friends */
 	public static function callGlobalStrStr(h:Int, name:String, s1:String, s2:String):Bool
 	{
 		if (!isReady(h)) return false;
@@ -436,7 +436,7 @@ class QuickJSHandler
 		return ok;
 	}
 
-	/** setOnScripts 的 JS 侧同步：数字 / 布尔 / 字符串 都能落进全局 */
+	/** JS side of setOnScripts: numbers, booleans and strings all land as globals */
 	public static function setGlobal(h:Int, name:String, v:Dynamic):Void
 	{
 		if (!isReady(h) || v == null) return;
@@ -455,8 +455,8 @@ class QuickJSHandler
 		}
 	}
 
-	// ---------------------------------------------------------------- 宿主函数表
-	/** 字符串 → 数字 / 布尔 / null / 原字符串（回调返回值也靠它还原类型） */
+	// ---------------------------------------------------------------- host function table
+	/** String -> number / bool / null / the original string (also used to coerce return values) */
 	@:keep public static function coerce(v:String):Dynamic
 	{
 		if (v == null) return null;
@@ -494,16 +494,16 @@ class QuickJSHandler
 	}
 
 	/**
-	 * JS 侧包装：全部走 __host(编号, a, b, c, d, e, f)。
-	 * 编号必须和下面 hostDispatch 的 case 一一对应。
+	 * JS wrappers all go through __host(id, a, b, c, d, e, f).
+	 * Ids must match the hostDispatch cases one to one.
 	 */
 	static inline var WRAPPERS:String = '
 		const __h = (i, a, b, c, d, e, f) => __host(i,
 			a === undefined ? "" : String(a), b === undefined ? "" : String(b),
 			c === undefined ? "" : String(c), d === undefined ? "" : String(d),
 			e === undefined ? "" : String(e), f === undefined ? "" : String(f));
-		// 停止哨兵：Lua 里 return Function_Stop 那一套，JS 侧同名可用。
-		// 值必须和 LuaUtils 里那五个常量逐字一致，PlayState 靠字符串比对认人。
+		// Stop sentinels: `return Function_Stop` in Lua, same names available in JS.
+		// Values must match the five LuaUtils constants exactly; PlayState compares strings.
 		globalThis.Function_Continue = "##PSYCHLUA_FUNCTIONCONTINUE";
 		globalThis.Function_Stop = "##PSYCHLUA_FUNCTIONSTOP";
 		globalThis.Function_StopLua = "##PSYCHLUA_FUNCTIONSTOPLUA";
@@ -741,13 +741,13 @@ class QuickJSHandler
 		globalThis.startDialogue = (f, m) => __h(226, f, m);
 		globalThis.changePresence = (d, s, k, hs, e) => __h(227, d, s, k, hs, e);
 		globalThis.loadSong = (n, d) => __h(228, n, d) === "1";
-		// Lua 的 startTween 收的是 table；这里把对象序列化成 "x=100,angle=90" 再解析回去
+		// Lua startTween takes a table; serialize the object as "x=100,angle=90" and parse back
 		globalThis.startTween = (t, v, vals, dur, ease) => __h(229, t, v,
 			(vals !== null && typeof vals === "object")
 				? Object.keys(vals).map(k => k + "=" + vals[k]).join(",")
 				: String(vals === undefined ? "" : vals), dur, ease) === "1";
 
-		// ---- 230..252 补齐 Lua 那边有、这边以前缺的
+		// ---- 230..252: functions Lua had and this side lacked
 		globalThis.getModSetting = (k, m) => __h(230, k, m);
 		globalThis.setOnScripts = (v, a, ignoreSelf) => __h(231, v, a, ignoreSelf) === "1";
 		globalThis.setOnLuas = (v, a, ignoreSelf) => __h(232, v, a, ignoreSelf) === "1";
@@ -766,7 +766,7 @@ class QuickJSHandler
 		globalThis.getAchievementScore = (n) => Number(__h(245, n));
 		globalThis.setAchievementScore = (n, v, save) => Number(__h(246, n, v, save));
 		globalThis.addAchievementScore = (n, v, save) => Number(__h(247, n, v, save));
-		// Lua 里的名字，和上面 227 的 changePresence 是同一个东西，纯别名
+		// The name used in Lua; same thing as changePresence at 227, a pure alias
 		globalThis.changeDiscordPresence = (d, s, k, hs, e) => __h(227, d, s, k, hs, e);
 		globalThis.changeDiscordClientID = (id) => __h(248, id);
 		globalThis.getTranslationPhrase = (k, d) => __h(249, k, d);
@@ -774,7 +774,7 @@ class QuickJSHandler
 		globalThis.close = () => __h(251) === "1";
 	';
 
-	/** 编号 → 实现。加函数只在这张表里加一行。 */
+	/** Id -> implementation. Adding a function means one case here. */
 	@:keep static function hostDispatch(idx:Int, a:String, b:String, c:String, d:String, e:String, f:String):String
 	{
 		try {
@@ -880,7 +880,7 @@ class QuickJSHandler
 			case 10: // setObjectCamera
 				var o10:Dynamic = LuaUtils.getObjectDirectly(a);
 				if (o10 == null) return '0';
-				if (!Std.isOfType(o10, flixel.FlxSprite)) return '0'; // 组 / Bar 这类没有 cameras 字段
+				if (!Std.isOfType(o10, flixel.FlxSprite)) return '0'; // groups and Bar have no cameras field
 				var sp10:flixel.FlxSprite = cast o10;
 				sp10.cameras = [b == 'hud' ? PlayState.instance.camHUD : PlayState.instance.camGame];
 				return '1';
@@ -909,8 +909,8 @@ class QuickJSHandler
 				var i13:Int = grp13.members.indexOf(obj13);
 				if (i13 < 0)
 				{
-					// 1.0 把 healthBar / iconP1 塞进 uiGroup，按 members 查不到；
-					// 给一个「在 UI 之上」的位置，否则 +1 之后会被舞台盖住
+					// 1.0 puts healthBar / iconP1 inside uiGroup, unreachable through members;
+					// return a position above the UI or +1 would be hidden by the stage
 					var ui13:Dynamic = Reflect.getProperty(grp13, 'uiGroup');
 					if (ui13 != null && ui13.members != null)
 					{
@@ -1135,7 +1135,7 @@ class QuickJSHandler
 				return '1';
 
 
-			// ---- 44..50 随机 / 字符串
+			// ---- 44..50 random / strings
 			case 44: return Std.string(FlxG.random.int(inum(a, 0), inum(b, 10)));
 			case 45: return Std.string(FlxG.random.float(fnum(a, 0), fnum(b, 1)));
 			case 46: return FlxG.random.bool(inum(a, 50)) ? '1' : '0';
@@ -1144,11 +1144,11 @@ class QuickJSHandler
 			case 49: return StringTools.startsWith(a, b) ? '1' : '0';
 			case 50: return StringTools.endsWith(a, b) ? '1' : '0';
 
-			// ---- 51..53 颜色（Lua 侧也是 FlxColor.fromString）
+			// ---- 51..53 colours (Lua also uses FlxColor.fromString)
 			case 51: return Std.string(FlxColor.fromString('#' + a));
 			case 52, 53: return Std.string(FlxColor.fromString(a));
 
-			// ---- 54..66 分数 / 评价
+			// ---- 54..66 score / ratings
 			case 54: return Std.string(PlayState.instance != null ? PlayState.instance.songScore : 0);
 			case 55:
 				if (PlayState.instance == null) return '0';
@@ -1199,7 +1199,7 @@ class QuickJSHandler
 				PlayState.instance.ratingFC = a;
 				return '1';
 
-			// ---- 67..71 角色
+			// ---- 67..71 characters
 			case 67, 69:
 				var ch67:Dynamic = charOf(a);
 				if (ch67 == null) return '0';
@@ -1220,7 +1220,7 @@ class QuickJSHandler
 				ch71.playAnim(b, truthy(c));
 				return '1';
 
-			// ---- 72..80 相机
+			// ---- 72..80 cameras
 			case 72, 73:
 				var cam72:FlxCamera = LuaUtils.cameraFromString(a);
 				if (cam72 == null) return '0';
@@ -1255,7 +1255,7 @@ class QuickJSHandler
 				cam80.follow(tgt80);
 				return '1';
 
-			// ---- 81..83 存在性（跟 Lua 一样按类型判定，不是看键在不在）
+			// ---- 81..83 existence (type-checked like Lua, not just key presence)
 			case 81:
 				var o81:Dynamic = vars().get(a);
 				return (o81 != null && Std.isOfType(o81, psychlua.ModchartSprite)) ? '1' : '0';
@@ -1266,7 +1266,7 @@ class QuickJSHandler
 				var o83:Dynamic = vars().get('sound_' + a);
 				return (o83 != null && Std.isOfType(o83, flixel.sound.FlxSound)) ? '1' : '0';
 
-			// ---- 84..86 物体杂项
+			// ---- 84..86 object misc
 			case 84:
 				var o1:Dynamic = LuaUtils.getObjectDirectly(a);
 				var o2:Dynamic = LuaUtils.getObjectDirectly(b);
@@ -1284,7 +1284,7 @@ class QuickJSHandler
 				o86.animation.play(b, truthy(c));
 				return '1';
 
-			// ---- 87..92 noteTween（和 Lua 一样打 StrumNote，存同一个键名）
+			// ---- 87..92 noteTween (targets StrumNote, same key names as Lua)
 			case 87, 88, 89, 90, 91, 92:
 				if (PlayState.instance == null) return '0';
 				var strums = PlayState.instance.strumLineNotes;
@@ -1312,7 +1312,7 @@ class QuickJSHandler
 				}));
 				return '1';
 
-			// ---- 93..108 声音
+			// ---- 93..108 sound
 			case 93:
 				var s93:Dynamic = soundOf(a);
 				if (s93 == null) return '0';
@@ -1388,7 +1388,7 @@ class QuickJSHandler
 				Paths.music(a);
 				return '1';
 
-			// ---- 109..111 组
+			// ---- 109..111 groups
 			case 109:
 				var g109:Dynamic = Reflect.getProperty(LuaUtils.getTargetInstance(), a);
 				var o109:Dynamic = LuaUtils.getObjectDirectly(b);
@@ -1413,7 +1413,7 @@ class QuickJSHandler
 				item111.updateHitbox();
 				return '1';
 
-			// ---- 112..119 中点 / 屏幕位置 / 鼠标
+			// ---- 112..119 midpoints / screen positions / mouse
 			case 112, 113:
 				var o112:Dynamic = LuaUtils.getObjectDirectly(a);
 				if (o112 == null) return '0';
@@ -1433,7 +1433,7 @@ class QuickJSHandler
 				var pos118:Dynamic = FlxG.mouse.getScreenPosition(cam118);
 				return Std.string(idx == 118 ? pos118.x : pos118.y);
 
-			// ---- 120..125 鼠标 / 键盘
+			// ---- 120..125 mouse / keyboard
 			case 120:
 				return switch (a.toLowerCase())
 				{
@@ -1465,7 +1465,7 @@ class QuickJSHandler
 				var k123:Dynamic = Reflect.getProperty(ks, a.toUpperCase());
 				return (k123 == true) ? '1' : '0';
 
-			// ---- 126..129 文件
+			// ---- 126..129 files
 			case 126:
 				if (PlayState.instance == null) return '0';
 				var col126:FlxColor = (b.length > 0) ? CoolUtil.colorFromString(b) : FlxColor.WHITE;
@@ -1475,7 +1475,7 @@ class QuickJSHandler
 			case 128: return sys.FileSystem.exists(a) ? sys.io.File.getContent(a) : '';
 			case 129: return sys.FileSystem.exists(a) ? sys.io.File.getContent(a) : '';
 
-			// ---- 130..132 歌曲控制
+			// ---- 130..132 song control
 			case 130:
 				if (PlayState.instance == null) return '0';
 				PlayState.instance.startCountdown();
@@ -1492,7 +1492,7 @@ class QuickJSHandler
 				substates.PauseSubState.restartSong(false);
 				return '1';
 
-			// ---- 134..137 其它
+			// ---- 134..137 misc
 			case 134:
 				if (PlayState.instance == null) return '0';
 				var type134:Int = switch (b.toLowerCase())
@@ -1521,7 +1521,7 @@ class QuickJSHandler
 				return Std.string(o137.pixels.getPixel32(inum(b, 0), inum(c, 0)));
 
 
-			// ---- 138..153 文本（跟 TextFunctions.hx 同一套语义）
+			// ---- 138..153 text (same semantics as TextFunctions.hx)
 			case 138: // makeLuaText
 				var t138:String = a.replace('.', '');
 				LuaUtils.destroyObject(t138);
@@ -1634,7 +1634,7 @@ class QuickJSHandler
 				vars().remove(a.replace('.', ''));
 				return '1';
 
-			// ---- 154..156 键盘别名（Lua 里 keyboard* 跟 key* 是同一套）
+			// ---- 154..156 keyboard aliases (keyboard* and key* are the same set in Lua)
 			case 154, 155, 156:
 				var ks2:Dynamic = switch (idx)
 				{
@@ -1644,7 +1644,7 @@ class QuickJSHandler
 				}
 				return (Reflect.getProperty(ks2, a.toUpperCase()) == true) ? '1' : '0';
 
-			// ---- 157..161 手柄
+			// ---- 157..161 gamepads
 			case 157, 158:
 				var pad:Dynamic = FlxG.gamepads.getByID(inum(a, 0));
 				if (pad == null) return '0';
@@ -1666,7 +1666,7 @@ class QuickJSHandler
 				}
 				return (Reflect.getProperty(btnState, b) == true) ? '1' : '0';
 
-			// ---- 162..166 存档（键名跟 Lua 一致：save_<name>）
+			// ---- 162..166 save data (same key names as Lua: save_<name>)
 			case 162:
 				var skey:String = 'save_' + a;
 				if (!vars().exists(skey))
@@ -1701,7 +1701,7 @@ class QuickJSHandler
 				vars().remove('save_' + a);
 				return '1';
 
-			// ---- 167..168 图集
+			// ---- 167..168 atlases
 			case 167: // loadGraphic(tag, image, gridX, gridY)
 				var o167:Dynamic = LuaUtils.getObjectDirectly(a);
 				if (o167 == null || !Std.isOfType(o167, flixel.FlxSprite)) return '0';
@@ -1738,7 +1738,7 @@ class QuickJSHandler
 				return '1';
 
 
-			// ---- 170..176 图集 / FlxAnimate
+			// ---- 170..176 atlases / FlxAnimate
 			case 170: // loadFrames(tag, image, spriteType)
 				var o170:Dynamic = LuaUtils.getObjectDirectly(a);
 				if (o170 == null || !Std.isOfType(o170, flixel.FlxSprite)) return '0';
@@ -1793,7 +1793,7 @@ class QuickJSHandler
 			case 176: // addAnimation(tag, name, "0,1,2", fps, loop)
 				return Std.string(LuaUtils.addAnimByIndices(a, b, null, csvInts(c), fnum(d, 24), truthy(e)));
 
-			// ---- 177..184 luaSprite* 旧别名（DeprecatedFunctions.hx 那套）
+			// ---- 177..184 luaSprite* legacy aliases (the DeprecatedFunctions.hx set)
 			case 177: // luaSpriteMakeGraphic
 				var o177:Dynamic = vars().get(a);
 				if (o177 == null) return '0';
@@ -1846,20 +1846,20 @@ class QuickJSHandler
 				LuaUtils.setVarInArray(o184, b, coerce(c));
 				return '1';
 
-			// ---- 185..200 脚本管理
+			// ---- 185..200 script management
 			case 185, 187: // addLuaScript / addHScript
 				var p185:String = resolveScript(a);
 				if (p185 == null) return '0';
 				return JSPlayer.loadFile(p185) ? '1' : '0';
 
 			case 186, 188: // removeLuaScript / removeHScript
-				// 每个 .js 一个 context，能单独卸。脚本卸自己（或卸一个正在回调里的脚本）时
-				// C 那边还在这个 ctx 的栈上，立刻 JS_FreeContext 会直接崩，
-				// 所以 JSPlayer 会把 free 推到下一帧。
+				// One context per .js, unloadable individually. When a script unloads itself (or a
+				// script currently in a callback), C is still on that ctx's stack and freeing it
+				// would crash, so JSPlayer defers the free by one frame.
 				var p186:String = resolveScript(a);
 				var p186name:String = (p186 != null) ? p186 : a;
 				if (JSPlayer.unloadFile(p186name)) return '1';
-				log('[warn] removeLuaScript/removeHScript: 没有这个脚本在跑 $a');
+				log('[warn] removeLuaScript/removeHScript: no script running as $a');
 				return '0';
 
 			case 189: // isRunning
@@ -1869,9 +1869,9 @@ class QuickJSHandler
 			case 190: // getRunningScripts
 				return JSPlayer.getLoadedFiles().join(String.fromCharCode(1));
 
-			case 191: // callScript(script, func, arg) —— 调那个脚本自己的 context
-				// Lua 那边是把被调函数的返回值原样交回去的，这里也照做：
-				// 函数不存在才返回 '0'（Lua 是返回 nil，JS 侧没有 nil 就沿用 '0' 这个约定）。
+			case 191: // callScript(script, func, arg): call into that script's own context
+				// Lua hands the callee's return value straight back; same here:
+				// only a missing function returns '0' (Lua returns nil; JS uses '0' by convention).
 				var h191:Int = JSPlayer.handleOf(a);
 				if (h191 < 0) h191 = QuickJSHandler.current();
 				if (!QuickJSHandler.callGlobalStr(h191, b, c)) return '0';
@@ -1904,12 +1904,12 @@ class QuickJSHandler
 				vars().set(a, coerce(b));
 				return b;
 
-			case 197: // getGlobalFromScript → 读对应脚本上下文里的全局
+			case 197: // getGlobalFromScript: read a global from that script's context
 				var h197:Int = JSPlayer.handleOf(a);
 				if (h197 < 0) h197 = QuickJSHandler.current();
 				return QuickJSHandler.globalString(h197, b);
 
-			case 198: // setGlobalFromScript → 写对应脚本上下文
+			case 198: // setGlobalFromScript: write a global in that script's context
 				var h198:Int = JSPlayer.handleOf(a);
 				if (h198 < 0) h198 = QuickJSHandler.current();
 				QuickJSHandler.setGlobal(h198, b, coerce(c));
@@ -1924,8 +1924,8 @@ class QuickJSHandler
 				return (b.length > 0) ? b : a.split('.').pop();
 
 			case 200: // instanceArg
-				// Lua 用它把实例当参数传给 callMethod；JS 侧参数只能是字符串，
-				// 只能把 tag 传过去，脚本里自己 getVar 取回来
+				// Lua passes instances to callMethod; JS arguments are strings only, so pass the
+				// tag and let the script getVar it back
 				return a;
 
 			// ---- 201..214 Shader
@@ -1954,7 +1954,7 @@ class QuickJSHandler
 				for (v207 in arr207) parts207.push((idx == 211) ? (((v207 == true) ? '1' : '0')) : Std.string(v207));
 				return parts207.join(String.fromCharCode(1));
 
-			case 208, 210, 212: // setShader*Array（逗号分隔）
+			case 208, 210, 212: // setShader*Array (comma separated)
 				var sh208:flixel.addons.display.FlxRuntimeShader = psychlua.ShaderFunctions.getShader(a);
 				if (sh208 == null) return '0';
 				if (idx == 208) sh208.setFloatArray(b, csvFloats(c));
@@ -1976,8 +1976,8 @@ class QuickJSHandler
 				o214.shader = null;
 				return '1';
 
-			// ---- 215..217 anyGamepad*（按名字查，跟 gamepad* 一样走反射；
-			// FlxGamepadManager.anyJustPressed 要的是枚举 id，不是字符串）
+			// ---- 215..217 anyGamepad* (looked up by name via reflection, like gamepad*;
+			// FlxGamepadManager.anyJustPressed wants enum ids, not strings)
 			case 215, 216, 217:
 				for (i215 in 0...4)
 				{
@@ -1994,7 +1994,7 @@ class QuickJSHandler
 				return '0';
 
 
-			// ---- 218..226 文件 / 自定义子界面 / 视频对话
+			// ---- 218..226 files / custom substates / video cutscenes
 			case 218: // saveFile(path, content, absolute)
 				try {
 					var p218:String = truthy(c) ? a : Paths.mods(a);
@@ -2088,10 +2088,10 @@ class QuickJSHandler
 				}));
 				return '1';
 
-			// ---- 230..252 补齐 Lua 有、这边以前缺的
-			// 语义全对着 FunkinLua / ShaderFunctions / Achievements / Language 的实现对齐，
-			// 只是参数只能是字符串（桥的限制），数组型参数收不进来。
-			case 230: // getModSetting(setting, ?mod) —— 不给 mod 就用脚本自己属于的那个
+			// ---- 230..252 filling in what Lua had and this side lacked
+			// Semantics mirror FunkinLua / ShaderFunctions / Achievements / Language; arguments are
+			// strings only (bridge limit), so array arguments cannot be passed.
+			case 230: // getModSetting(setting, ?mod): without a mod, use the script's own
 				if (a == null || a.length == 0) return '';
 				var mod230:String = b;
 				if (mod230 == null || mod230.length == 0)
@@ -2101,7 +2101,7 @@ class QuickJSHandler
 				}
 				if (mod230 == null || mod230.length == 0)
 				{
-					log('[warn] getModSetting: 没给 mod 名，脚本又不在 mod 目录里');
+					log('[warn] getModSetting: no mod name and the script is not inside a mod folder');
 					return '';
 				}
 				var v230:Dynamic = LuaUtils.getModSetting(a, mod230);
@@ -2111,7 +2111,7 @@ class QuickJSHandler
 				var ps231:PlayState = PlayState.instance;
 				if (ps231 == null) return '0';
 				var ex231:Array<String> = [];
-				// 第三个参数是 ignoreSelf：默认 false（和 Lua 一样）
+				// third argument is ignoreSelf, false by default (same as Lua)
 				if (truthy(c))
 				{
 					var self231:JSScriptHost = JSPlayer.hostOfHandle(current());
@@ -2127,8 +2127,8 @@ class QuickJSHandler
 				var ps234:PlayState = PlayState.instance;
 				if (ps234 == null) return '';
 				var ex234:Array<String> = [];
-				// Lua 那边 ignoreSelf 默认 true：不排除自己的话，自己发的事件自己先收一遍，
-				// 写在回调里就是死循环。
+				// Lua defaults ignoreSelf to true: otherwise the sender receives its own event and a
+				// callback that triggers the event loops forever.
 				var self234:JSScriptHost = JSPlayer.hostOfHandle(current());
 				if (self234 != null) ex234.push(self234.scriptId());
 				var args234:Array<Dynamic> = (b != null && b.length > 0) ? [coerce(b)] : [];
@@ -2159,7 +2159,7 @@ class QuickJSHandler
 				#if ACHIEVEMENTS_ALLOWED
 				if (!backend.Achievements.exists(a))
 				{
-					log('[warn] unlockAchievement: 没有这个成就 $a');
+					log('[warn] unlockAchievement: no such achievement $a');
 					return '';
 				}
 				return backend.Achievements.unlock(a);
@@ -2194,7 +2194,7 @@ class QuickJSHandler
 				#if ACHIEVEMENTS_ALLOWED
 				if (!backend.Achievements.exists(a)) return '-1';
 				var val246:Float = fnum(b, (idx == 246) ? 0 : 1);
-				// 第三个参数是 saveIfNotUnlocked，Lua 那边默认 true；这里空串也当 true
+				// third argument is saveIfNotUnlocked, true by default in Lua; empty string counts as true
 				var save246:Bool = (c == null || c.length == 0) ? true : truthy(c);
 				var r246:Float = (idx == 246)
 					? backend.Achievements.setScore(a, val246, save246)
@@ -2204,10 +2204,10 @@ class QuickJSHandler
 				return '-1';
 				#end
 
-			case 248: // changeDiscordClientID(?id) —— 空串 = 回默认 ID
+			case 248: // changeDiscordClientID(?id): empty string restores the default id
 				#if DISCORD_ALLOWED
-				// 默认 ID 是 private final，Lua 那边是在同一个类里直接用的；
-				// 这里绕过可见性读一下，别传 null 进去（set_clientID 会拿它去重连）
+				// The default id is private final and Lua used it from inside the same class; read it
+				// through @:privateAccess rather than passing null (set_clientID would reconnect with it)
 				var id248:String = (a != null && a.length > 0) ? a : @:privateAccess backend.DiscordClient._defaultID;
 				backend.DiscordClient.clientID = id248;
 				return '1';
@@ -2221,33 +2221,33 @@ class QuickJSHandler
 			case 250: // getFileTranslation(key)
 				return backend.Language.getFileTranslation(a);
 
-			case 251: // close() —— Lua 是把自己标 dead，JS 这边就是卸掉自己的 context
+			case 251: // close(): Lua marks itself dead; JS unloads its own context
 				var self251:JSScriptHost = JSPlayer.hostOfHandle(current());
 				if (self251 == null) return '0';
 				return JSPlayer.unloadFile(self251.path) ? '1' : '0';
 
 			default:
-				var m2:String = '[warn] 未实现的宿主函数编号 $idx (a=$a)';
+				var m2:String = '[warn] unimplemented host function id $idx (a=$a)';
 				Log.trace('[js] ' + m2, null);
 				log(m2);
 				return '';
 		}
 	}
 
-	// ---------------------------------------------------------------- 小工具
+	// ---------------------------------------------------------------- helpers
 	static inline function vars():Map<String, Dynamic>
 		return MusicBeatState.getVariables();
 
 	static function tweenKey(tag:String):String
 		return 'tween_' + LuaUtils.formatVariable(tag);
 
-	// tween 存在 MusicBeatState 的 variables 里、键名跟 Lua 一致，
-	// 这样 JS 的 cancelTween 能取消 Lua 建的 tween，反过来也一样
+	// Tweens live in MusicBeatState variables under the same keys as Lua, so a JS
+	// cancelTween can cancel a Lua tween and vice versa
 	static function tweenStore(tag:String, tw:FlxTween):Void
 	{
 		if (tw == null) return;
 		vars().set(tweenKey(tag), tw);
-		// 记住是哪个脚本建的，onTweenCompleted 只回给它
+		// remember the owner so onTweenCompleted only goes back to it
 		JSPlayer.registerOwner(tweenKey(tag), current());
 	}
 
@@ -2269,8 +2269,8 @@ class QuickJSHandler
 		};
 	}
 
-	// 返回强类型：用 Dynamic 访问 size / alignment 这类字段时，hxcpp 反射拿不到值
-	// （表现为 NaN 或 Invalid field），文本那批函数全得靠它
+	// Strongly typed on return: hxcpp reflection cannot read fields like size / alignment
+	// through Dynamic (NaN or Invalid field), and the text functions depend on it
 	static function csvFloats(v:String):Array<Float>
 	{
 		var out:Array<Float> = [];
@@ -2303,7 +2303,7 @@ class QuickJSHandler
 		return out;
 	}
 
-	/** 脚本名 → 实际路径（和 Lua 的 findScript 一个思路，先补扩展名再交给 Paths 找） */
+	/** Script name -> real path: add the extension, then let Paths find it (same idea as Lua). */
 	static function resolveScript(path:String):String
 	{
 		if (path == null || path.length == 0) return null;
@@ -2333,12 +2333,12 @@ class QuickJSHandler
 		return vars().get(LuaUtils.formatVariable('sound_' + tag));
 	}
 
-	// ---------------------------------------------------------------- 注册
-	/** 注册 trace + 所有包装函数（一次 eval 搞定） */
+	// ---------------------------------------------------------------- registration
+	/** Installs trace and every wrapper in a single eval. */
 	public static function installHostFunctions(h:Int):Void
 	{
 		if (!isReady(h)) return;
-		// 取地址必须在方法体里：此处 QuickJSHandler_obj 已经定义
+		// The address must be taken inside a method body: QuickJSHandler_obj exists here
 		untyped __cpp__('g_host = (qjs_host_fn)::jsruntime::QuickJSHandler_obj::hostDispatch;');
 		untyped __cpp__('
 			JSContext *c = js_ctx(h);

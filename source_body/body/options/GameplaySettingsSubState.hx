@@ -135,9 +135,9 @@ class GameplaySettingsSubState extends BaseOptionsMenu
 			BOOL);
 		addOption(option);
 
-		// ---- 旧版回退。原来单独开了一页 Compat，选项菜单顶层已经很挤，
-		// 三项又都是「脚本/手感的版本差异」，并进 Gameplay 更顺手。
-		// 默认全关 = 1.0.4 原样；打开才回退成 0.6.3 那套。
+		// ---- legacy fallbacks. These had their own Compat page, but the top level of the
+		// options menu is crowded and all three are version differences.
+		// All off means 1.0.4 behaviour; turning one on restores the 0.6.3 way.
 		option = new Option('Legacy HUD Layout',
 			'Flatten the HUD group so old scripts can sort objects by member index again (0.6.3 style).',
 			'compatLegacyUI',

@@ -1,9 +1,9 @@
 package backend;
 
 /**
- * 0.6.3 里 Section 是个独立的类（谱面段落），1.0 只保留了 `SwagSection` 这个 typedef。
- * 老 HScript 写 `import Section;` / `new Section()` 会直接找不到类，所以补个壳子。
- * 只负责"能建、能读字段"，不参与引擎的谱面流程 —— 真正的段落数据还是 SwagSection。
+ * 0.6.3 had Section as a real class (a chart section); 1.0 only keeps the SwagSection typedef.
+ * Old HScript doing `import Section;` / `new Section()` could not find it, hence this shell.
+ * It can be constructed and read from; the engine still uses SwagSection for real data.
  */
 class Section
 {

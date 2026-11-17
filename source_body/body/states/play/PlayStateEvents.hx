@@ -11,9 +11,9 @@ import psychlua.LuaUtils;
 import crowplexus.hscript.Expr.Error as IrisError;
 
 /**
- * 从 PlayState.hx 搬出来的歌曲事件系统（事件预缓存、事件触发、事件判定）。逻辑是逐行原样搬的，只把对 PlayState 成员的引用改成 ps.xxx，
- * 需要私有访问所以加了 @:access。
- * PlayState 里保留了同名转发，外部调用和子类 override 都不受影响。
+ * Song events (precache, firing, ordering), moved out of PlayState.hx. Logic is copied
+ * line for line; only PlayState member references became ps.xxx. Needs @:access, and
+ * PlayState keeps same-named forwards so callers and overrides are unaffected.
  */
 @:access(states.PlayState)
 @:access(backend.MusicBeatState)

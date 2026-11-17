@@ -9,28 +9,28 @@ import sys.io.File;
 
 class FunkinJS
 {
-	/** 认领的扩展名。 */
+	/** Extension this host claims. */
 	public static inline var EXTENSION:String = '.js';
 
 	// ───────────────────────────────────────────────────────────────────────────
-	//  JavaScriptUtils.hx 完整性校验
+	//  JavaScriptUtils.hx integrity check
 	//
-	//  那个文件里装的是 issue 全文，属于"证据"。谁动了它 —— 哪怕只是改个空格、
-	//  调个换行 —— 游戏启动时立刻抛异常退出。不静默、不降级、不打日志然后继续跑。
+	//  That file holds the issue archive - it is evidence. If anyone edits it, even
+	//  a space or a line ending, the game exits on boot. No warning, no fallback.
 	//
-	//  要合法修改内容的话，改完记得同步下面的 UTILS_FNV：
+	//  To edit it legitimately, update UTILS_FNV below:
 	//      python .workbuddy/hash_utils.py
-	//  否则下次启动就是黑屏 + 崩溃报告，别怪没人提醒。
+	//  (recompute FNV-1a 31 over the file, newlines normalised to LF).
 	// ───────────────────────────────────────────────────────────────────────────
-	static inline var UTILS_FNV:Int = 0x692816E4;
-	// 源码目录搬过一次（source/ → source_body/body/），这个路径是运行时按 CWD 找文件的，
-	// 改目录不改它 → 启动时找不到源文件会静默放行；哪天路径又对了反而会误判被篡改。
+	static inline var UTILS_FNV:Int = 0x1CF604D9;
+	// Resolved against CWD at runtime. It moved once (source/ -> source_body/body/);
+	// a stale path here makes the check skip silently instead of failing loudly.
 	static inline var UTILS_REL:String = 'source_body/body/psychlua/JavaScriptUtils.hx';
 
 	/**
-	 * 校验 JavaScriptUtils.hx 有没有被动过。
-	 * 找不到源码文件时直接放行 —— 发行版里本来就没有 source 目录，
-	 * 那种情况下唯一能做的判断就是"没得判"。
+	 * Verifies JavaScriptUtils.hx has not been touched.
+	 * A missing source file is allowed: release builds do not ship the source tree,
+	 * so there is nothing to compare against.
 	 */
 	public static function verifyUtilsIntegrity():Void
 	{
@@ -55,8 +55,8 @@ class FunkinJS
 
 		trace('[integrity] ' + msg);
 
-		// throw 会被 lime 的全局异常处理接住然后继续跑，达不到"干崩"的效果，
-		// 所以这里直接把进程终止掉。
+		// throw would be caught by lime's global handler and the game would keep running,
+		// which defeats the point, so kill the process instead.
 		#if sys
 		Sys.exit(1);
 		#end
@@ -80,7 +80,7 @@ class FunkinJS
 		return null;
 	}
 
-	/** FNV-1a 31 位，先统一换行符，免得 CRLF / LF 之间来回吵。 */
+	/** FNV-1a 31 bit. Newlines are normalised to LF so CRLF and LF agree. */
 	static function fnv1a(content:String):Int
 	{
 		var bytes:haxe.io.Bytes = haxe.io.Bytes.ofString(content.split('\r\n').join('\n'));
@@ -95,20 +95,20 @@ class FunkinJS
 	}
 
 	/**
-	 * 把 JS 变成 Lua。
+	 * Turns JS into Lua.
 	 *
-	 * 按顺序跑几遍扫描，每一遍只负责一种语法，字符串和注释全程原样跳过：
+	 * Several passes in order, one syntax each. Strings and comments are skipped untouched:
 	 *
-	 *   1. 模板字符串   `hi ${name}`        → ("hi " .. tostring(name))
-	 *   2. 箭头函数     (a) => a * 2        → function(a) return a * 2 end
-	 *   3. C 风格 for   for (i = 0; i < 4; i++) → do local i = 0 while i < 4 do ... end end
-	 *   4. 对象字面量   {a: 1, b: 2}        → {a = 1, b = 2}
-	 *   5. 运算符       === / !==           → == / ~=
+	 *   1. template strings  `hi ${name}`  -> ("hi " .. tostring(name))
+	 *   2. arrow functions   (a) => a * 2  -> function(a) return a * 2 end
+	 *   3. C style for   for (i = 0; i < 4; i++) -> do local i = 0 while i < 4 do ... end end
+	 *   4. object literals   {a: 1, b: 2}  -> {a = 1, b = 2}
+	 *   5. operators     === / !==         -> == / ~=
 	 *   6. let / const  let x = 1           → local x = 1
-	 *   7. 花括号       { ... }             → ... end（代码块）/ 原样（对象）
+	 *   7. braces      { ... }           -> ... end (block) / as-is (object)
 	 *
-	 * 每遍都是"扫描 + 重写"，不做正则替换，所以字符串里的 `=>`、注释里的 `{`
-	 * 不会被误伤。class 保持原样（让它在 Lua 侧明确报语法错，好过静默错乱）。
+	 * Every pass scans and rewrites, never regex-replaces, so `=>` in a string and `{`
+	 * in a comment are left alone. `class` is kept as-is so Lua reports a syntax error.
 	 */
 	public static function transpile(code:String):String
 	{
@@ -126,9 +126,9 @@ class FunkinJS
 		return s;
 	}
 
-	// ── 扫描工具 ─────────────────────────────────────────────────────────────
+	// -- scanning helpers -----------------------------------------------------
 
-	/** i 指向引号（' " `），返回结束引号之后的位置。 */
+	/** i points at a quote (' " `); returns the position just past the closing one. */
 	static function skipStringEnd(code:String, i:Int):Int
 	{
 		var q:Int = code.charCodeAt(i);
@@ -161,7 +161,7 @@ class FunkinJS
 		return code.length;
 	}
 
-	/** i 在字符串/注释起点就返回跳过后的位置，否则原样返回 i。 */
+	/** If i is at a string or comment start, returns the position past it. Otherwise i. */
 	static function skipLiteral(code:String, i:Int):Int
 	{
 		if(i >= code.length) return i;
@@ -176,7 +176,7 @@ class FunkinJS
 		return i;
 	}
 
-	/** 把一段普通文本转成 Lua 双引号字符串。 */
+	/** Escapes a plain text run into a Lua double quoted string. */
 	static function quoteLua(s:String):String
 	{
 		var out:StringBuf = new StringBuf();
@@ -194,7 +194,7 @@ class FunkinJS
 		return out.toString();
 	}
 
-	// ── 1. 模板字符串 ────────────────────────────────────────────────────────
+	// -- 1. template strings -------------------------------------------------
 
 	static function passTemplateStrings(code:String):String
 	{
@@ -274,7 +274,7 @@ class FunkinJS
 		return {text: '(' + pieces.join(' .. ') + ')', next: i};
 	}
 
-	// ── 2. 箭头函数 ──────────────────────────────────────────────────────────
+	// -- 2. arrow functions --------------------------------------------------
 
 	static function passArrows(code:String):String
 	{
@@ -290,8 +290,8 @@ class FunkinJS
 			var c:Int = code.charCodeAt(i);
 			if(c == 61 && i + 1 < code.length && code.charCodeAt(i + 1) == 62)
 			{
-				// 向前找参数：`)` 结尾就是括号列表，否则是单个标识符。
-				// `=>` 前面可能有空格（`(a, b) => ...`），截断 out 时要把这些空格也减掉。
+				// Look back for the parameter list: a trailing ) means a parenthesised list,
+				// otherwise a single identifier. Spaces before => are trimmed along with it.
 				var tail:Int = i - 1;
 				var tailSpaces:Int = 0;
 				while(tail >= 0 && isSpaceChar(code.charAt(tail))) { tailSpaces++; tail--; }
@@ -331,13 +331,13 @@ class FunkinJS
 					var after:Int = skipSpaces(code, i + 2);
 					if(after < code.length && code.charAt(after) == '{')
 					{
-						// 块体：交给花括号那一步把 { } 变成 end（function 不会补 then/do）
+						// Block body: the brace pass turns { } into end (function needs no then/do).
 						out += 'function' + params;
 						i = after;
 						continue;
 					}
 
-					// 表达式体：找到这一层的结束位置，补 return ... end
+					// Expression body: find where it ends at this level, append return ... end.
 					var end:Int = findArrowExprEnd(code, after);
 					out += 'function' + params + ' return ' + code.substring(after, end) + ' end';
 					i = end;
@@ -351,7 +351,7 @@ class FunkinJS
 		return out;
 	}
 
-	/** 表达式体的结束位置：同层的 , ) ; } 或换行。 */
+	/** End of an expression body: , ) ; } at this level, or a newline. */
 	static function findArrowExprEnd(code:String, from:Int):Int
 	{
 		var i:Int = from;
@@ -374,7 +374,7 @@ class FunkinJS
 		return i;
 	}
 
-	// ── 3. C 风格 for ────────────────────────────────────────────────────────
+	// -- 3. C style for ------------------------------------------------------
 
 	static function passForLoops(code:String):String
 	{
@@ -446,7 +446,7 @@ class FunkinJS
 		return t;
 	}
 
-	/** 从 open（指向 `(`）找到匹配的 `)`。 */
+	/** From open (at `(`) find the matching `)`. */
 	static function matchParen(code:String, open:Int):Int
 	{
 		var depth:Int = 0;
@@ -463,7 +463,7 @@ class FunkinJS
 		return -1;
 	}
 
-	/** 从 open（指向 `{`）找到匹配的 `}`。 */
+	/** From open (at `{`) find the matching `}`. */
 	static function matchBrace(code:String, open:Int):Int
 	{
 		var depth:Int = 0;
@@ -480,7 +480,7 @@ class FunkinJS
 		return -1;
 	}
 
-	/** 按顶层分隔符切分（忽略括号/方括号/字符串里的）。 */
+	/** Split on a top level separator, ignoring ones inside brackets or strings. */
 	static function splitTopLevel(s:String, sep:String):Array<String>
 	{
 		var parts:Array<String> = [];
@@ -505,7 +505,7 @@ class FunkinJS
 		return parts;
 	}
 
-	// ── 4. 对象字面量 ────────────────────────────────────────────────────────
+	// -- 4. object literals -------------------------------------------------
 
 	static function passObjectLiterals(code:String):String
 	{
@@ -535,8 +535,8 @@ class FunkinJS
 	}
 
 	/**
-	 * 把对象 body 里顶层的 `key:` 换成 `key =`，顺便把简写 `{a, b}` 补成 `{a = a, b = b}`。
-	 * 嵌套对象递归处理。
+	 * Rewrites top level `key:` into `key =`, expands shorthand `{a, b}` to `{a = a, b = b}`.
+	 * Nested objects are handled recursively.
 	 */
 	static function rewriteObjectBody(body:String):String
 	{
@@ -562,12 +562,12 @@ class FunkinJS
 			if(c == '(' || c == '[') depth++;
 			else if(c == ')' || c == ']') depth--;
 
-			// 顶层（depth 0）的 `标识符:` → `标识符 =`
+			// top level (depth 0) `ident: ` -> `ident = `
 			if(c == ':' && depth == 0)
 			{
 				var back:Int = out.length - 1;
 				while(back >= 0 && isSpaceChar(out.charAt(back))) back--;
-				if(back >= 0 && out.charAt(back) == '>' ) { out += c; i++; continue; } // 不是箭头（保险）
+				if(back >= 0 && out.charAt(back) == '>' ) { out += c; i++; continue; } // not an arrow (safety)
 
 				var j:Int = i - 1;
 				while(j >= 0 && isSpaceChar(body.charAt(j))) j--;
@@ -580,7 +580,7 @@ class FunkinJS
 				continue;
 			}
 
-			// 简写属性 `{a, b}`：顶层逗号前是裸标识符，且它已经在 out 里
+			// shorthand `{a, b}`: a bare identifier before a top level comma
 			if(c == ',')
 			{
 				if(depth == 0)
@@ -614,7 +614,7 @@ class FunkinJS
 		}
 	}
 
-	// ── 5. 复合赋值 x += y ────────────────────────────────────────────────────
+	// -- 5. compound assignment x += y ---------------------------------------
 
 	static function passCompoundAssign(code:String):String
 	{
@@ -634,7 +634,7 @@ class FunkinJS
 				var back:Int = out.length - 1;
 				while(back >= 0 && isSpaceChar(out.charAt(back))) back--;
 
-				// 往左吃一个左值：标识符 + 连续的 .name 或 [..]
+				// eat one lvalue to the left: identifier plus .name or [..] runs
 				var ls:Int = back;
 				while(ls >= 0)
 				{
@@ -675,7 +675,7 @@ class FunkinJS
 		return out;
 	}
 
-	// ── 6. 运算符 ────────────────────────────────────────────────────────────
+	// -- 6. operators --------------------------------------------------------
 	static function passOperators(code:String):String
 	{
 		if(code.indexOf('===') < 0 && code.indexOf('!==') < 0) return code;
@@ -734,15 +734,15 @@ class FunkinJS
 		return out;
 	}
 
-	// ── 7. 花括号 → do / end ─────────────────────────────────────────────────
+	// -- 7. braces -> do / end -----------------------------------------------
 
 	static function passBraces(code:String):String
 	{
 		if(code == null) return null;
 
 		var out:StringBuf = new StringBuf();
-		var blockStack:Array<Bool> = [];  // true = 代码块，false = 对象字面量
-		var quoteChar:Int = 0;            // 当前字符串引号字符码，0 = 不在字符串里
+		var blockStack:Array<Bool> = [];  // true = code block, false = object literal
+		var quoteChar:Int = 0;            // current quote char code, 0 = not in a string
 		var i:Int = 0;
 		var length:Int = code.length;
 
@@ -751,7 +751,7 @@ class FunkinJS
 			var ch:String = code.charAt(i);
 			var cc:Int = code.charCodeAt(i);
 
-			// 字符串内部：原样拷贝，遇到同类引号才结束（跳过转义）
+			// inside a string: copy as-is, ends on the same quote (escapes skipped)
 			if(quoteChar != 0)
 			{
 				out.add(ch);
@@ -761,7 +761,7 @@ class FunkinJS
 				continue;
 			}
 
-			// 字符串开始
+			// string start
 			if(ch == '"' || ch == "'" || ch == '`')
 			{
 				quoteChar = cc;
@@ -770,7 +770,7 @@ class FunkinJS
 				continue;
 			}
 
-			// 行注释：// 转成 --，里面的花括号不碰
+			// line comment: // becomes --, braces inside are left alone
 			if(ch == '/' && i + 1 < length && code.charAt(i + 1) == '/')
 			{
 				out.add('--');
@@ -790,7 +790,7 @@ class FunkinJS
 				if(!isBlock) out.add('{');
 				else
 				{
-					// if (x) { 光把 { 删掉是 if (x) ... end，Lua 不认，得补上 then / do
+					// if (x) { would become if (x) ... end; Lua needs then / do inserted
 					var opener:String = blockOpener(code, i);
 					if(opener.length > 0) out.add(opener);
 				}
@@ -808,8 +808,8 @@ class FunkinJS
 					continue;
 				}
 
-				// `} else if (x) {` 不能翻成 `end else if ... end`（Lua 里 end 后面不能挂 else），
-				// 得是 `elseif (x) then`；`} else {` 则是 `else`，此时那个块不写 end。
+				// `} else if (x) {` cannot become `end else if ... end` (Lua has no else after end),
+				// it has to be `elseif (x) then`; `} else {` becomes `else` with no end.
 				var peek:Int = skipSpaces(code, i + 1);
 				if(matchWord(code, peek, 'else'))
 				{
@@ -839,7 +839,7 @@ class FunkinJS
 		return out.toString();
 	}
 
-	/** 判断这个 `{` 是代码块还是对象字面量。 */
+	/** Tells whether this `{` opens a code block or an object literal. */
 	static function isCodeBlock(code:String, bracePos:Int):Bool	{
 		var i:Int = bracePos - 1;
 		while(i >= 0)
@@ -856,13 +856,13 @@ class FunkinJS
 
 		var prev:String = code.charAt(i);
 
-		// f() {  /  if (...) {  /  嵌套块
+		// f() {  /  if (...) {  /  nested block
 		if(prev == ')' || prev == '{' || prev == ';') return true;
 
-		// = {   ( {   [ {   , {   : {  → 对象字面量
+		// = {   ( {   [ {   , {   : {  -> object literal
 		if(prev == '=' || prev == '(' || prev == '[' || prev == ',' || prev == ':') return false;
 
-		// 关键字结尾（else / try / do / finally）→ 代码块
+		// keyword before it (else / try / do / finally) -> code block
 		var word:StringBuf = new StringBuf();
 		var j:Int = i;
 		while(j >= 0)
@@ -880,11 +880,11 @@ class FunkinJS
 	}
 
 	/**
-	 * 代码块前面该补什么关键字。`if (x) {` 在 Lua 里是 `if (x) then`，
-	 * `while (x) {` 是 `while (x) do`，别的（function / else / try）本来就不用补。
+	 * Keyword to insert before a block. `if (x) {` is `if (x) then` in Lua,
+	 * `while (x) {` is `while (x) do`; function / else / try need none.
 	 *
-	 * 只看括号前那个词，所以 `else if (x) {` 也能认成 if。
-	 * 表达式里出现字符串带括号的情况没处理，够用就行。
+	 * Only the word before the parenthesis is read, so `else if (x) {` still counts as if.
+	 * Parentheses inside strings in an expression are not handled - good enough.
 	 */
 	static function blockOpener(code:String, bracePos:Int):String
 	{
@@ -911,7 +911,7 @@ class FunkinJS
 			i = j - 1;
 		}
 
-		// `if (x) {` 里 `if` 和 `(` 之间有空格，往回读完关键字前先跳过
+		// `if (x) {` has a space between if and (, skip it before reading the keyword
 		while(i >= 0 && isSpaceChar(code.charAt(i))) i--;
 
 		var end:Int = i;
@@ -940,7 +940,7 @@ class FunkinJS
 		return i;
 	}
 
-	/** 从 at 开始是不是一个完整的单词（后面不接标识符字符），不分大小写。 */
+	/** Whole word at `at` (not followed by an identifier char), case insensitive. */
 	static function matchWord(code:String, at:Int, word:String):Bool
 	{
 		if(at < 0 || at + word.length > code.length) return false;
@@ -951,17 +951,17 @@ class FunkinJS
 	}
 
 	/**
-	 * 加载并执行一个 .js 脚本。
-	 * 解析路径、去重、转译、然后把结果当 Lua 跑。
+	 * Loads and runs a .js script.
+	 * Resolves the path, dedupes, transpiles, then runs the result as Lua.
 	 */
 	public static function start(jsPath:String, ?playState:states.PlayState):FunkinLua
 	{
 		#if MODS_ALLOWED
 		if(!FileSystem.exists(jsPath)) return null;
 
-		// Gameplay → JS Engine 选了 QuickJS 就走真运行时，不转译、不进 Lua 解释器。
-		// 以前这里无条件下面的 transpile，所以任何带 `+` 拼接的 JS 都会变成
-		// 「unexpected symbol near '+'」——报错还挂着 "lua script"，很容易看错。
+		// Gameplay -> JS Engine = QuickJS takes the real runtime: no transpile, no Lua.
+		// This used to transpile unconditionally, so any JS using `+` came out as
+		// "unexpected symbol near '+'" while the error still said "lua script".
 		if(ClientPrefs.data.jsEngine == 'QuickJS')
 		{
 			jsruntime.JSPlayer.loadFile(jsPath);
@@ -985,7 +985,7 @@ class FunkinJS
 		#end
 	}
 
-	/** 给调用方用的便捷判断。 */
+	/** Convenience check for callers. */
 	public static inline function isJSFile(path:String):Bool
 		return path != null && path.toLowerCase().endsWith(EXTENSION);
 }

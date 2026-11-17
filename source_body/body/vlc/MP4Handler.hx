@@ -4,8 +4,8 @@ package vlc;
 import hxcodec.flixel.FlxVideo;
 
 /**
- * 0.6.x 里视频播放器叫 `vlc.MP4Handler`（hxcodec 2.x）。
- * 现在底层是 hxvlc，这里留个同名壳，`import vlc.MP4Handler;` 还能用。
+ * 0.6.x called the video player `vlc.MP4Handler` (hxcodec 2.x).
+ * hxvlc is underneath now; this shell keeps `import vlc.MP4Handler;` working.
  */
 @:keep
 class MP4Handler extends FlxVideo

@@ -8,12 +8,12 @@ import sys.io.File;
 using StringTools;
 
 /**
- * 启动引擎选择。
+ * Startup engine selection.
  *
- * 读取可执行文件所在目录（bin 根）的 engine.txt：
- *   body    -> 当前本体（本仓 fork）
- *   vanilla -> 原版 Psych Engine 1.0.4（source_vanilla 里的原版代码）
- * 文件不存在、读取失败或值不认识，一律回退到 body。
+ * Reads engine.txt next to the executable (bin root):
+ *   body    -> this fork
+ *   vanilla -> original Psych Engine 1.0.4 (source_vanilla)
+ * Missing file, read failure or an unknown value falls back to body.
  */
 class Engine
 {

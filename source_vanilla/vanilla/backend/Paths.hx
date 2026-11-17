@@ -35,8 +35,8 @@ class Paths
 	}
 
 	/**
-	 * 资产和模组的版本目录名。原版这棵树用 1.0.4，本体用 body，两边各写各的。
-	 * 运行时所有基础资源都走 assets/<VERSION_DIR>/...，模组走 mods/<VERSION_DIR>/...。
+	 * Version directory for assets and mods. This tree uses 1.0.4, body uses body.
+	 * Runtime assets come from assets/<VERSION_DIR>/..., mods from mods/<VERSION_DIR>/...
 	 */
 	public static var VERSION_DIR:String = '1.0.4';
 
@@ -179,13 +179,13 @@ class Paths
 	}
 
 	/**
-	 * 文件到底在不在：先看磁盘，再看编译期清单。
+	 * Whether a file exists: disk first, compile-time manifest second.
 	 *
-	 * 只查 OpenFlAssets.exists 就是只查 lime 编译时生成的清单。我们的素材分两种进 bin：
-	 * 编译期就在仓里的（会进清单），和编译完才由 manage.sh 铺进去的（base_game 那一坨，
-	 * 永远不在清单里）。后者在磁盘上有、清单里没有，于是这里判成"不存在"，
-	 * getPath 直接把 week4/images/gore/*.png 改写成 shared 路径 → 图集加载不到 →
-	 * Limo 的 update 拿到 animation.curAnim == null 当场空指针。
+	 * OpenFlAssets.exists only sees the manifest lime generates at compile time. Assets reach
+	 * bin two ways: those in the repo at compile time (in the manifest) and those manage.sh
+	 * copies in afterwards (base_game, never in the manifest). The latter were reported
+	 * missing, getPath rewrote week4/images/gore/*.png to a shared path, the atlas failed to
+	 * load and Limo's update hit animation.curAnim == null.
 	 */
 	public static function existsOnDiskOrManifest(path:String, ?type:AssetType = null):Bool
 	{
@@ -196,11 +196,11 @@ class Paths
 	}
 
 	/**
-	 * 图集描述文件（.xml / .txt）优先读磁盘内容。
+	 * Atlas descriptions (.xml / .txt) are read from disk when possible.
 	 *
-	 * FlxAtlasFrames 拿到字符串会先 OpenFlAssets.exists() 当资源 id 查，查不到再把字符串
-	 * 本身当 XML 解析。所以我们把磁盘上的 xml **路径** 丢进去时，清单里没有它 → 拿路径
-	 * 当 XML 解析 → 炸。这里把磁盘内容读出来直接传，让 flixel 走 parse 字符串那条路。
+	 * FlxAtlasFrames checks OpenFlAssets.exists() on the string as an asset id, then parses the
+	 * string as XML. Passing a disk path that the manifest lacks meant the path itself was
+	 * parsed as XML and blew up. Read the file and pass the content instead.
 	 */
 	inline static public function readTextOrPath(path:String):String
 	{
@@ -351,10 +351,10 @@ class Paths
 				return true;
 		}
 		#end
-		// 和本体一致：先看磁盘再看清单。
-		// assets/base_game 的素材是构建之后才铺进 bin 的，永远不在编译期清单里，
-		// 只查 OpenFlAssets 会把它们判成缺失 —— 表现就是 Freeplay 里大部分角色头像
-		// 退回 icon-face（图标文件明明在盘上）。
+		// Same as body: disk first, manifest second.
+		// assets/base_game is copied into bin after building, never in the manifest, so checking
+		// OpenFlAssets alone reports them missing and most Freeplay character icons fall back to
+		// icon-face even though the files are on disk.
 		var path:String = getPath(key, type, parentFolder, false);
 		#if MODS_ALLOWED
 		if(FileSystem.exists(path)) return true;
@@ -479,7 +479,7 @@ class Paths
 	inline static public function mods(key:String = '')
 		return 'mods/$VERSION_DIR/$key';
 
-	/** 当前版本自己的 modsList.txt，各版本互不干扰。 */
+	/** This version's own modsList.txt; versions do not touch each other's. */
 	inline static public function modsListPath():String
 		return 'mods/$VERSION_DIR/modsList.txt';
 

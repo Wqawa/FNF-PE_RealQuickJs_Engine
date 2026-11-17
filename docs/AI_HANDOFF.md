@@ -6,6 +6,8 @@
 > 最后更新 2026-11-17。逐条修复记录在 `docs/LUA_COMPAT.md`（**改兼容层必须同步更新它**），
 > 逐日流水账在 `.workbuddy/memory/YYYY-MM-DD.md`。
 >
+> - `docs/JS_TRANSPILE_HISTORY.md`（2026-11-17）：FunkinJS 转译器的原始说明和 issue 存档。
+>   从 `JavaScriptUtils.hx` 的注释里搬出来的，那个文件现在只留英文说明 + 一个空类。
 > - `docs/SCRIPT_ISOLATION_AUDIT.md`（2026-11-17）：三棵树所有「脚本隔离」点的问题表
 >   （查找 / 类解析 / 资源路径 / 装载判重），动手改 `Paths`、`ScriptClassAliases`、
 >   `IsolatedImports` 之前先看它。
@@ -164,6 +166,27 @@ vanilla 分支没有自动入口，只能人工开机验；pe063 有探针（只
 | body `Main.hx` 的 `@:cppInclude('./external/gamemode_client.h')` | 相对源文件 | 否，`external/` 跟目录树一起搬了；而且只在 linux 分支生效 |
 | `manage.sh` 的 QuickJS 源码检查 | 绝对路径 | 已同步 |
 | `harness/apply_hook.py` 注入点 | 绝对路径 | 已同步 |
+
+### 0.0.5 2026-11-17 第三轮：注释统一成英文
+
+body 树 41 个文件、1388 行中文注释，逐条改成英文，风格照上游 Psych：`//` 短句、说清「为什么」、
+不写 Markdown 标题、不留「注意」「说明」这类前缀。代码一行没动，只换注释。
+
+顺手做了两件事：
+
+- `JavaScriptUtils.hx` 原来是 **1518 行纯注释**（725 行中文，大半是某个同类项目的 issue 存档），
+  没有一行代码。现在抽成 `docs/JS_TRANSPILE_HISTORY.md`，`JavaScriptUtils.hx` 只留 30 行英文
+  说明 + 一个空类 —— 它仍是 `verifyUtilsIntegrity()` 的哈希锚点，改它必须同步 `UTILS_FNV`。
+- 公共层（`source/`）、`pe063`、`vanilla` 里我们自己写的中文注释也一起换了，四个树现在都是英文。
+
+翻译时踩到的两个坑（都属于「注释在字符串里」）：
+
+| 位置 | 坑 |
+|---|---|
+| `@:cppFileCode('...')` / `@:buildXml('...')` | 里面是单引号字符串，注释里的 `hxcpp's` 会把字符串截断，报 `Expected )` |
+| `static inline var WRAPPERS:String = '...'` | 同上，`LuaUtils'`、`Lua's` 都会炸，报 `Missing ;` |
+
+改完编译 + 三条回归全绿。
 
 ### 0.1 未解决（2026-11-13 记录，之后没复核）：0.6.3 的 Options → Switch Engine 打不开
 

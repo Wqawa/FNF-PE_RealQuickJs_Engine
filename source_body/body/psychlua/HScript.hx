@@ -33,7 +33,7 @@ class HScript extends Iris implements IScriptHost
 	public var returnValue:Dynamic;
 	public var closed:Bool = false;
 
-	/** 同一个脚本的同一个错误只报一次，见 reportHaxeError() / reportError() */
+	/** One report per script per distinct error. See reportHaxeError() / reportError(). */
 	static var reportedHaxeErrors:Map<String, Bool> = new Map<String, Bool>();
 
 	public static function resetErrorLog():Void
@@ -43,12 +43,12 @@ class HScript extends Iris implements IScriptHost
 	public var parentLua:FunkinLua;
 
 	/**
-	 * 报一条 HScript 错误。
+	 * Reports an HScript error.
 	 *
-	 * 0.6.3 的 executeAuto 每帧跑挂也就是每帧报一句，没人管；放到 1.0 上，
-	 * 像 ECR 那种在 onUpdatePost 里引用未定义变量的脚本会每秒刷 60 条，
-	 * 调试文本直接废掉。默认按「脚本 + 错误内容」去重，和 luaTrace 共用
-	 * ClientPrefs.data.moreLuaErrors 这个开关（关掉合并 = 每条都打）。
+	 * 0.6.3's executeAuto failing every frame reported every frame and nobody cared; on
+	 * 1.0 a script like ECR that references an undefined variable in onUpdatePost prints 60
+	 * lines a second and the debug text becomes useless. Dedupes on script + message by
+	 * default, sharing ClientPrefs.data.moreLuaErrors with luaTrace (on = no merging).
 	 */
 	public static function reportHaxeError(parent:FunkinLua, message:String, ?funcName:String):Void
 	{
@@ -59,16 +59,16 @@ class HScript extends Iris implements IScriptHost
 			reportedHaxeErrors.set(key, true);
 		}
 
-		// 除了屏幕上那行，也往 testout/js_log.txt 落一份 —— 跑完直接看文件，
-		// 不用翻控制台。每首歌开头 JSPlayer.beginSong() 会把它清空。
+		// Besides the on-screen line, write to testout/js_log.txt so it can be read after a run
+		// without digging through a console. JSPlayer.beginSong() clears it per song.
 		#if sys
 		try {
 			sys.FileSystem.createDirectory('./testout');
 			var f = sys.io.File.append('./testout/js_log.txt', false);
-			// 顺手记一下现场的几样东西，下次再出 "Invalid access" 不用猜：
-			//   game / bf / dad —— PlayState.instance 上到底有没有这些
-			//   hsGame          —— HScript 变量表里那个 game 到底指向谁
-			//   same            —— 它和 PlayState.instance 是不是同一个对象
+			// Also dumps a few things from the scene, so an "Invalid access" needs no guessing:
+			//   game / bf / dad - whether PlayState.instance actually has them
+			//   hsGame          - what `game` points at in the HScript variables
+			//   same            - whether that is PlayState.instance
 			var diag:String = '';
 			var g:Dynamic = PlayState.instance;
 			if(g != null)
@@ -96,9 +96,9 @@ class HScript extends Iris implements IScriptHost
 		} catch(e:Dynamic) {}
 		#end
 
-		// 屏幕上是否显示：Gameplay Settings 的 "Show HScript Errors"，或者脚本自己
-		// 开了 luaDebugMode。都关着就只留日志文件 —— 对齐 0.6.3（那边的 luaTrace
-		// 默认就不输出，所以同一个坏脚本在 0.6.3 上"一条报错都没有"）。
+		// On-screen output depends on Gameplay Settings -> Show HScript Errors, or the script
+		// setting luaDebugMode. Both off means file only, matching 0.6.3 (its luaTrace printed
+		// nothing by default, so the same broken script showed no errors at all).
 		var debugMode:Bool = ClientPrefs.data.hscriptErrors;
 		if(!debugMode && parent != null)
 		{
@@ -127,16 +127,16 @@ class HScript extends Iris implements IScriptHost
 		{
 			trace('initializing haxe interp for: ${parent.scriptName}');
 
-			// manualRun=true：只建解释器，执行交给下面统一处理。
-			// 这样第一段代码就跑挂时实例仍然挂得住 —— 0.6.3 的 executeAuto 也是
-			// 报了错但不丢 hscript。以前这里 catch 完把 parent.hscript 置 null，
-			// 调用方下一帧又 new 一个、又报一遍，变成每帧重建解释器。
+			// manualRun=true: build the interpreter only; execution is handled below.
+			// That way the instance survives a failing first chunk - 0.6.3's executeAuto also
+			// reported and kept the hscript. This used to null parent.hscript in the catch, so the
+			// caller built a new one next frame and reported again, rebuilding every frame.
 			try {
 				hs = new HScript(parent, code, varsToBring, true);
 				parent.hscript = hs;
 			}
 			catch(e:IrisError) {
-				// 连解释器本身都建不出来（preset 阶段就炸），这种才是真没救
+				// The interpreter itself could not be built (it blew up in preset); nothing to save here
 				reportHaxeError(parent, Printer.errorToString(e, false), parent.lastCalledFunction);
 				parent.hscript = null;
 				return;
@@ -160,10 +160,10 @@ class HScript extends Iris implements IScriptHost
 
 	public var origin:String;
 
-	// 文件名里的版本标记，形如 `xxx(%run_v_0.7.3).hx`。规则和 FunkinLua.VERSION_TAG 一致。
+	// Version tag in the file name, e.g. xxx(%run_v_0.7.3).hx. Same rule as FunkinLua.VERSION_TAG.
 	static final VERSION_TAG:EReg = ~/\(%run_v_([^)]+)\)/;
 
-	/** 从脚本路径里抠出版本标记，没有就 null。 */
+	/** Extracts the version tag from a path, null when absent. */
 	public static function parseVersionTag(path:String):String
 	{
 		if (path == null) return null;
@@ -184,7 +184,7 @@ class HScript extends Iris implements IScriptHost
 		{
 			this.origin = filePath;
 			#if MODS_ALLOWED
-			// 同上：mods/<版本>/<mod>/ 这层结构让老的 split 判断失效，统一走 Paths
+			// Same reason as above: the mods/<version>/<mod>/ layout breaks the old split check
 			this.modFolder = Paths.modFromScriptPath(filePath);
 			#end
 		}
@@ -232,15 +232,15 @@ class HScript extends Iris implements IScriptHost
 
 	var varsToBring(default, set):Any = null;
 	override function preset() {
-		// 文件名里的 `(%run_v_x.x.x)`：和 FunkinLua.parseVersionTag 同一条规则。
-		// 0.7.3 的 .hx 脚本会按版本分支，没有这个全局它们永远看到真实版本。
+		// (%run_v_x.x.x) in the file name, same rule as FunkinLua.parseVersionTag.
+		// 0.7.3 .hx scripts branch on the version; without this global they always see the real one.
 		var vTag:String = parseVersionTag(origin);
 		set('version', vTag != null ? vTag : states.MainMenuState.psychEngineVersion.trim());
 		super.preset();
 
 		// Some very commonly used classes
 		set('Type', Type);
-		// Iris 只给了 Std / Math / StringTools，这几个是 0.6.x 脚本里当全局用的
+		// Iris provides only Std / Math / StringTools; these are globals in 0.6.x scripts
 		set('Reflect', Reflect);
 		set('Lambda', Lambda);
 		set('Date', Date);
@@ -263,7 +263,7 @@ class HScript extends Iris implements IScriptHost
 		set('FlxTween', flixel.tweens.FlxTween);
 		set('FlxEase', flixel.tweens.FlxEase);
 		set('FlxColor', CustomFlxColor);
-		// 0.6.x 的脚本很少写 import，这些类直接当全局用
+		// 0.6.x scripts rarely import; these classes are used as globals
 		set('FlxObject', flixel.FlxObject);
 		set('FlxRect', flixel.math.FlxRect);
 		set('FlxAngle', flixel.math.FlxAngle);
@@ -293,8 +293,8 @@ class HScript extends Iris implements IScriptHost
 		set('FlxAnimate', FlxAnimate);
 		#end
 
-		// 0.6.x 的脚本会把类名当值用（`Type.getClassName(Boyfriend)`），
-		// 只有 import 不够，别名表整张倒进变量表
+		// 0.6.x scripts use class names as values (Type.getClassName(Boyfriend)), so
+		// imports alone are not enough: dump the whole alias table into the variables
 		backend.ScriptClassAliases.applyToHScript(this);
 
 		// Functions & Variables
@@ -452,9 +452,9 @@ class HScript extends Iris implements IScriptHost
 		set('parentLua', null);
 		#end
 		set('this', this);
-		// 脚本嘴里的 `game` 就是这一局。以前优先取 FlxG.state，但事件在 create
-		// 阶段触发、或者切 state 的瞬间，那玩意儿可能是 LoadingState 之类的 ——
-		// hscript 到它上面找 boyfriend 就是 null，报 "Invalid access to field"。
+		// `game` is the current play state. This used to prefer FlxG.state, but during create
+		// or mid state switch that can be LoadingState, and looking for boyfriend on it gave
+		// null and an "Invalid access to field".
 		set('game', currentGame());
 		set('controls', Controls.instance);
 
@@ -561,7 +561,7 @@ class HScript extends Iris implements IScriptHost
 		return null;
 	}
 
-	/** 出错时报"谁调的"：优先 Lua 那边正在跑的回调名 */
+	/** Who to blame in errors: the Lua callback name when running under one. */
 	function calledFrom():String
 	{
 		#if LUA_ALLOWED
@@ -579,15 +579,15 @@ class HScript extends Iris implements IScriptHost
 	}
 
 	// ------------------------------------------------------------- IScriptHost
-	// PlayState 分发只认这套方法，不再区分 Iris 的 call 和 Lua 的 call。
+	// Dispatch only uses this interface, no more Iris call vs Lua call split.
 	public function scriptId():String return origin;
 	public function scriptMod():String return modFolder;
 	public function isClosed():Bool return closed;
 
 	/**
-	 * 这个实例自己报的错（不是 runHaxeCode 那种外面包着的），统一走这里，
-	 * 才能受 "Show HScript Errors" 开关控制。挂在 Lua 下面就用 parentLua 的
-	 * 脚本名和去重表；独立 .hx 脚本直接进 Iris。
+	 * Errors raised by this instance (not wrapped by runHaxeCode) go through here so the
+	 * Show HScript Errors switch applies. Under Lua it uses parentLua's script name and
+	 * dedupe table; a standalone .hx script goes straight to Iris.
 	 */
 	public function reportError(message:String, ?funcName:String):Void
 	{
@@ -599,7 +599,7 @@ class HScript extends Iris implements IScriptHost
 		}
 		#end
 
-		// 独立 .hx 脚本：没有 Lua 那边可以借，按脚本路径自己兜一份
+		// Standalone .hx: no Lua to borrow from, so key the dedupe on the script path
 		var key:String = (origin != null ? origin : 'HScript') + '|' + message;
 		if(!ClientPrefs.data.moreLuaErrors)
 		{
@@ -624,15 +624,15 @@ class HScript extends Iris implements IScriptHost
 	}
 
 	/**
-	 * 脚本该看到的「当前这一局」。
+	 * What a script should see as "the current play state".
 	 *
-	 * 0.6.3 的写法是 `interp.variables.set('game', PlayState.instance)`，无条件。
-	 * 1.0 这边原来取 FlxG.state —— 事件在 create 阶段触发、或者正卡在切 state
-	 * 的瞬间，那玩意儿可能还挂在 LoadingState 上，hscript 去它身上找 boyfriend
-	 * 就是 null，报 "Invalid access to field"。
+	 * 0.6.3 did `interp.variables.set('game', PlayState.instance)` unconditionally.
+	 * 1.0 used FlxG.state, which during create or mid state switch can still be
+	 * LoadingState; looking for boyfriend there gives null and an
+	 * "Invalid access to field".
 	 *
-	 * 所以优先 PlayState.instance；只有在 instance 还没建出来（菜单脚本之类）
-	 * 的时候才退回 FlxG.state。
+	 * So prefer PlayState.instance, falling back to FlxG.state only when it does not exist
+	 * yet (menu scripts and the like).
 	 */
 	public static function currentGame():Dynamic
 	{
@@ -720,7 +720,7 @@ class CustomInterp extends crowplexus.hscript.Interp
 	public var parentInstance(default, set):Dynamic = [];
 	private var _instanceFields:Array<String>;
 
-	/** 出错了要报到谁那里去（决定走不走 "Show HScript Errors" 开关） */
+	/** Who receives errors (decides whether Show HScript Errors applies). */
 	public var owner:HScript = null;
 	function set_parentInstance(inst:Dynamic):Dynamic
 	{
@@ -749,7 +749,7 @@ class CustomInterp extends crowplexus.hscript.Interp
 		var f = get(o, funcToRun);
 
 		if (f == null) {
-			// 和 runHaxeCode 的错误走同一个出口，不然这里会绕过开关直接刷屏
+			// Same exit as runHaxeCode errors, otherwise this bypasses the switch and floods
 			if (owner != null) owner.reportError('Tried to call null function $funcToRun', funcToRun);
 			else Iris.error('Tried to call null function $funcToRun', posInfos());
 			return null;
@@ -759,17 +759,17 @@ class CustomInterp extends crowplexus.hscript.Interp
 	}
 
 	/**
-	 * import 的落点：默认 `proxyImports` 查不到就 `Type.resolveClass`。
-	 * 三棵树里同名类的全限定名一字不差（`objects.Character` 本体那份、
-	 * `vanilla.objects.Character` 原版那份），body 模式下不该拿到带前缀的那些 ——
-	 * 那个类内部写死的 `Paths.VERSION_DIR` 会把资源带到另一棵树去。
+	 * Where `import` lands: by default proxyImports, then Type.resolveClass.
+	 * The three trees have identical FQNs for the same class (objects.Character in body,
+	 * vanilla.objects.Character in the original). Body mode must not resolve the prefixed
+	 * ones: their hardcoded Paths.VERSION_DIR pulls assets from the other tree.
 	 */
 	override function getOrImportClass(name:String):Dynamic
 	{
 		var cls:Dynamic = super.getOrImportClass(name);
 		if (cls == null || !backend.ScriptClassAliases.isForeignTree(cls)) return cls;
 
-		// 别棵树的：让别名表按本树的规则再指一次，指不到就 null
+		// from another tree: let the alias table resolve it this tree's way, else null
 		return backend.ScriptClassAliases.resolve(name);
 	}
 
@@ -794,9 +794,9 @@ class CustomInterp extends crowplexus.hscript.Interp
 			return v;
 		}
 
-		// 未知标识符。0.6.3 的 executeAuto 会把它甩给 resolveClass 动态解析，
-		// 1.0 这边只剩一张静态别名表，表外的裸类名（比如 `new Spooky()`）直接炸。
-		// 补上同样的一层：按包列表猜一遍，命中就缓存进 variables，下次直接取。
+		// Unknown identifier. 0.6.3's executeAuto handed it to resolveClass, while 1.0 only
+		// has a static alias table, so bare class names outside it (new Spooky()) just failed.
+		// Same fallback here: guess over the package list and cache hits in variables.
 		var cls:Dynamic = backend.ScriptClassAliases.resolveDeep(id);
 		if(cls != null) {
 			variables.set(id, cls);

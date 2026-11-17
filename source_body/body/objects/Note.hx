@@ -101,10 +101,10 @@ class Note extends FlxSprite
 	public static var defaultNoteSkin(default, never):String = 'noteSkins/NOTE_assets';
 
 	/**
-	 * 0.6.x / 0.7.x 的 `arrowSkin` 写的是 images/ 根下的裸名（`NOTE_assets`），
-	 * 1.0 把内置皮肤挪进了 `noteSkins/`（像素皮肤在 `pixelUI/noteSkins/`，前缀由调用方拼）。
-	 * 名字能直接加载就原样保留（mod 自带扁平素材），加载不了才当内置皮肤换成新路径。
-	 * 带 `/` 的显式路径一律不动。
+	 * 0.6.x / 0.7.x arrowSkin used a bare name under images/ (NOTE_assets);
+	 * 1.0 moved built-in skins into noteSkins/ (pixel ones under pixelUI/noteSkins/, the
+	 * caller adds that prefix). If the plain name loads, keep it (mod ships flat assets);
+	 * otherwise treat it as a built-in and swap in the new path. Explicit paths with / are left alone.
 	 */
 	public static function resolveNoteSkin(skin:String):String
 	{
@@ -382,7 +382,7 @@ class Note extends FlxSprite
 			if(skin == null || skin.length < 1)
 				skin = defaultNoteSkin + postfix;
 			else
-				skin = resolveNoteSkin(skin); // 老谱面的裸名（'NOTE_assets'）→ noteSkins/ 下
+				skin = resolveNoteSkin(skin); // bare old chart name ('NOTE_assets') -> noteSkins/
 		}
 		else rgbShader.enabled = false;
 

@@ -58,8 +58,8 @@ class NoteSplash extends FlxSprite
 	}
 
 	public var maxAnims(default, set):Int = 0;
-	// 调用方要的名字。texture 可能被解析成别的实际路径（比如裸名 → noteSplashes/xxx），
-	// 拿 texture 和请求名比较会永远不相等，每 spawn 一次就重载一遍图集。
+	// The name the caller asked for. texture may resolve elsewhere (bare name -> noteSplashes/xxx),
+	// so comparing texture with the request never matched and reloaded the atlas every spawn.
 	public var requestedSplash:String = null;
 	public function loadSplash(?splash:String)
 	{
@@ -77,8 +77,8 @@ class NoteSplash extends FlxSprite
 		frames = Paths.getSparrowAtlas(texture);
 		if (frames == null && splash.indexOf('/') == -1)
 		{
-			// 0.6.x 的 splash 写的是 images/ 根下的扁平素材名（'noteSplashes'），1.0 把内置皮肤
-			// 挪进了 noteSplashes/ 子目录。根目录能加载就原样用（mod 自带素材），加载不了才当内置皮肤。
+			// 0.6.x splashes used a flat name under images/ ('noteSplashes'); 1.0 moved the built-in
+			// one into noteSplashes/. Use it as-is if it loads, otherwise treat it as the built-in.
 			var nested:String = 'noteSplashes/$splash' + getSplashSkinPostfix();
 			frames = Paths.getSparrowAtlas(nested);
 			if (frames != null) texture = nested;

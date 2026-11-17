@@ -120,11 +120,11 @@ class Paths
 	}
 
 	/**
-	 * 文件到底在不在：先看磁盘，再看编译期清单。
+	 * Whether a file exists: disk first, compile-time manifest second.
 	 *
-	 * 只查 OpenFlAssets 会把 mods/ 下的资源和构建后才铺进 bin 的素材统统判成缺失
-	 * （它们永远不进清单）。lua 的 texture 贴图模式（AtlasFrameMaker）第一步就是
-	 * fileExists，判错就整个贴图建不出来。本体那边早就有这个判断，这里补齐。
+	 * Checking OpenFlAssets alone reports mods/ assets and anything copied into bin after
+	 * building as missing (they never enter the manifest). Lua's texture mode
+	 * (AtlasFrameMaker) starts with fileExists, so one wrong answer kills the whole sprite.
 	 */
 	static public function existsOnDiskOrManifest(path:String, ?type:AssetType = null):Bool
 	{
@@ -163,10 +163,10 @@ class Paths
 
 	inline static function getLibraryPathForce(file:String, library:String)
 	{
-		// 不用 lime 的库 selector 了。原来拼的是 '$library:assets/$library/$file'，
-		// 库名、库内路径、磁盘路径是三套东西，和本体/原版那两棵树（都走普通路径）
-		// 混在一起时 bin/assets 下会多出一堆扁平目录，而且 OpenFlAssets 查不到就静默失败。
-		// 现在三棵树统一：assets/<版本>/<库名>/file。
+		// The lime library selector is gone. It used to build '$library:assets/$library/$file',
+		// where library name, in-library path and disk path are three different things; mixed
+		// with the other two trees it littered bin/assets with flat folders and failed silently.
+		// All three trees now use assets/<version>/<library>/file.
 		return 'assets/0.6.3/$library/$file';
 	}
 
@@ -323,12 +323,12 @@ class Paths
 	}
 
 	/**
-	 * 图集描述文件（.xml / .txt）有磁盘副本就读磁盘内容。
+	 * Atlas descriptions (.xml / .txt) are read from disk when a copy exists there.
 	 *
-	 * FlxAtlasFrames 拿到字符串先 OpenFlAssets.exists() 当资源 id 查清单，查不到才把字符串
-	 * 本身当 XML 解析。把磁盘 xml 的**路径**传进去时，只要清单里没有它，就会拿路径当 XML
-	 * 去 parse —— 于是整张图集的帧全丢，贴图不显示（看起来就是"背景丢了"）。
-	 * 读成字符串传进去就没这个问题。
+	 * FlxAtlasFrames checks OpenFlAssets.exists() on the string as an asset id first, then
+	 * parses the string as XML. Passing a disk path meant that when the manifest lacked it,
+	 * the path was parsed as XML, every frame was lost and the sprite never drew.
+	 * Reading it into a string avoids this.
 	 */
 	inline static public function readTextOrPath(path:String):String
 	{
@@ -381,7 +381,7 @@ class Paths
 
 		var path = getPath('images/$key.png', IMAGE, library);
 		//trace(path);
-		// 磁盘优先：构建后才铺进 bin 的素材不在编译期清单里，只查 OpenFlAssets 会漏
+		// Disk first: assets copied in after building are not in the manifest
 		#if MODS_ALLOWED
 		if (FileSystem.exists(path)) {
 			if(!currentTrackedAssets.exists(path)) {
@@ -427,9 +427,9 @@ class Paths
 		#if MODS_ALLOWED
 		{
 			var realPath:String = './' + gottenPath;
-			// openfl 9.5 的 Sound.fromFile 遇到不存在的文件会直接抛 IOError，打断调用方（比如 lua 回调）。
-			// 老版 openfl 只是返回一个空音效，这里保持老行为，避免调用方拿到 null 后崩
-			// （FlxSound 对 length 为 0 的 Sound 是安全的，不会播但也不会出错）。
+			// openfl 9.5 Sound.fromFile throws IOError on a missing file, breaking the caller (a lua
+			// callback). Older openfl returned an empty sound; keep that so callers do not get null
+			// (FlxSound handles a zero-length Sound: it does not play and does not crash).
 			var loaded:Sound = null;
 			if(FileSystem.exists(realPath))
 			{

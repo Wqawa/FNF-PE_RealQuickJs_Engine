@@ -1,12 +1,12 @@
 package jsruntime;
 
 /**
- * QuickJS-NG 的最小绑定（先只验证能链接 + 能跑 eval）。
+ * Minimal QuickJS-NG binding (first step: prove it links and can eval).
  *
- * 静态库由 manage.sh 功能 10 生成：third_party/quickjs-ng/build/quickjs-ng.lib。
- * 只需 quickjs.c / libregexp.c / libunicode.c 三个源文件（这个 fork 把 cutils 并进 quickjs.c 了）。
+ * The static library is built by manage.sh into third_party/quickjs-ng/build/quickjs-ng.lib.
+ * Only quickjs.c / libregexp.c / libunicode.c are needed (cutils is folded into quickjs.c here).
  *
- * 这里的路径是硬编码的绝对路径，仓库移动后 manage.sh 编译前会自动对齐（见 cmd_build）。
+ * The path below is absolute; manage.sh realigns it before building when the repo moves (cmd_build).
  */
 @:buildXml('
 <target id="haxe">
@@ -16,12 +16,12 @@ package jsruntime;
 </target>
 ')
 @:cppFileCode('
-// 绝对路径直接 include：项目路径带空格，hxcpp 的 <include> 加 -I 会被拆开
+// Absolute include on purpose: the project path has spaces and hxcpp splits -I.
 #include "D:/FNF/FNF-PE_RealQuickJs_Engine/third_party/quickjs-ng/quickjs.h"
 ')
 class QuickJS
 {
-	/** 顺便把结果落到 testout/quickjs_smoke.txt —— 双击启动看不到控制台，写文件才查得到 */
+	/** Also writes to testout/quickjs_smoke.txt: double-clicked builds have no console. */
 	static function note(text:String):Void
 	{
 		#if sys
@@ -34,7 +34,7 @@ class QuickJS
 		#end
 	}
 
-	/** 跑一次 1+1，返回结果字符串；失败返回错误描述。只用来验证 ABI 通不通。 */
+	/** Runs 1+1, returns the result string or an error description. ABI smoke test only. */
 	public static function smokeTest():String
 	{
 		var out:String = 'fail';
