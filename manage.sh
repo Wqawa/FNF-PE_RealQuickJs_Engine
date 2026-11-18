@@ -388,10 +388,11 @@ cmd_assets() {
 
 	head_ "运行期目录"
 	if [ "$check" = 0 ]; then
-		for d in body 1.0.4 0.6.3 global; do mkdir -p "$BIN/mods/$d"; done
+		# 没有全局 mod 了（2026-11-16 删的机制），只留三棵树各自的目录
+		for d in body 1.0.4 0.6.3; do mkdir -p "$BIN/mods/$d"; done
 		[ -f "$BIN/engine.txt" ] || printf 'body' > "$BIN/engine.txt"
 	fi
-	for d in body 1.0.4 0.6.3 global; do [ -d "$BIN/mods/$d" ] && ok "mods/$d" || bad "mods/$d 不存在"; done
+	for d in body 1.0.4 0.6.3; do [ -d "$BIN/mods/$d" ] && ok "mods/$d" || bad "mods/$d 不存在"; done
 	[ -f "$BIN/engine.txt" ] && ok "engine.txt = $(tr -d '\r\n' < "$BIN/engine.txt")" || bad "engine.txt 不存在"
 
 	head_ "素材完整性"
