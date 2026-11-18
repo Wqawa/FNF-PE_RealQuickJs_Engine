@@ -28,6 +28,11 @@ class ScriptClassAliases
 		if(initialized) return;
 		initialized = true;
 
+		// ---------------------------------------------------------------- root
+		// Scripts still write Main.fpsVar / new Main(). The process entry class owns the
+		// bare name Main now, and it has no fpsVar, so point the name back at the game class.
+		bind('Main', body.Main);
+
 		// ---------------------------------------------------------------- backend
 		bind('Achievements', backend.Achievements);
 		bind('BaseStage', backend.BaseStage);

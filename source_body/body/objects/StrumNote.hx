@@ -53,7 +53,7 @@ class StrumNote extends FlxSprite
 
 		var skin:String = null;
 		if(PlayState.SONG != null && PlayState.SONG.arrowSkin != null && PlayState.SONG.arrowSkin.length > 1) skin = PlayState.SONG.arrowSkin;
-		else skin = Note.defaultNoteSkin;
+		else skin = Note.resolveDefaultNoteSkin();
 		skin = Note.resolveNoteSkin(skin); // bare old chart name ('NOTE_assets') lives under noteSkins/ in 1.0
 
 		var customSkin:String = skin + Note.getNoteSkinPostfix();
