@@ -26,8 +26,22 @@ vs_Community.exe
 art/build_html.bat
 art/build_html-debug.bat
 
-# WorkBuddy 本地构建日志与备忘，不入库
-.workbuddy/
+# WorkBuddy 本地目录。只把 README 里写到的测试工具入库，
+# 日志 / 流水账 / 上游克隆 / 产物都不进
+.workbuddy/*
+!.workbuddy/build.sh
+!.workbuddy/prep_assets.sh
+!.workbuddy/run_test.sh
+!.workbuddy/run_qjs_test.sh
+!.workbuddy/run_063_probe.sh
+!.workbuddy/harness/
+!.workbuddy/luatest/
+.workbuddy/testout/
+.workbuddy/tmp/
+.workbuddy/memory/
+.workbuddy/upstream/
+.workbuddy/*.log
+__pycache__/
 
 # building/build.sh -cache 用的 hxcpp 编译缓存
 .cache/
