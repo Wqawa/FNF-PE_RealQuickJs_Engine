@@ -69,6 +69,12 @@ function onCreatePost()
 			'before=' .. tostring(before) .. ' after=' .. tostring(after))
 	end
 
+	-- 脚本里写的 Main 必须还是那棵游戏类（fpsVar 在它身上），不是进程入口
+	t('class_main_alias', function()
+		addHaxeLibrary('Main')
+		return getPropertyFromClass('Main', 'fpsVar') ~= nil
+	end)
+
 	-- hscript 的 (%run_v_x) 版本标记
 	t('hscript_version_tagged', function()
 		return getVar('hx_version_tagged') == '0.7.3'
