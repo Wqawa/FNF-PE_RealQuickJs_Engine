@@ -21,7 +21,7 @@ fi
 
 echo "拷 base_game 素材到 $BIN/assets/body ..."
 mkdir -p "$BIN/assets/body" "$BIN/assets/1.0.4" "$BIN/assets/0.6.3"
-mkdir -p "$BIN/mods/body" "$BIN/mods/1.0.4" "$BIN/mods/0.6.3" "$BIN/mods/global"
+mkdir -p "$BIN/mods/body" "$BIN/mods/1.0.4" "$BIN/mods/0.6.3"
 cp -r "$ROOT/assets/base_game/." "$BIN/assets/body/"
 
 echo "铺原版 1.0.4 素材到 $BIN/assets/1.0.4 ..."

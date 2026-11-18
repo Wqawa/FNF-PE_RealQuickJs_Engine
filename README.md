@@ -18,7 +18,7 @@ JS 那侧的 FunkinJS 转译器和存档是个故意留着的装置 —— 针�
 | `vanilla` | 原版 PE 1.0.4 | `source_vanilla/vanilla/` | `assets/1.0.4/` | `mods/1.0.4/` |
 | `pe063` | Psych Engine 0.6.3 | `source_063/pe063/` | `assets/0.6.3/` | `mods/0.6.3/` |
 
-文件缺失、读失败、值不认识，一律回 `body`。三棵树各读自己那本 `modsList.txt`；11-16 起 `mods/global/` 那套全局 mod 机制整个删了，目录还在但没人读。
+文件缺失、读失败、值不认识，一律回 `body`。三棵树各读自己那本 `modsList.txt`；11-16 起 `mods/global/` 那套全局 mod 机制整个删了，编译时也不再创建这个目录。
 
 ### 编译
 
