@@ -408,6 +408,28 @@ story / freeplay / 谱面编辑器都是直接 `switchState`，不经过 `Loadin
 `currentLevel` 停在上一首歌的 week 目录，菜单里的图会先去 `assets/<ver>/<week>/` 找。
 `switchState` 里对非 PlayState 的目标复位成 `shared`。
 
+### 第 11 轮：Main 别名 / 0.6.x 扁平箭头皮肤（2026-11-18）
+
+**33. 脚本里的 `Main` 拿不到 `fpsVar`** — `backend/ScriptClassAliases.hx`
+
+目录重构后进程入口占了根包 `Main` 这个名字，body 的启动类变成 `body.Main`。
+脚本里 `addHaxeLibrary('Main')` + `Main.fpsVar.visible = false` 这种写法，
+`resolve('Main')` 会拿到**进程入口**，它没有 `fpsVar` —— 于是 FPS 关不掉、
+替换 FPS 的脚本读 `Main.fpsVar.currentFPS` 也永远是 null。
+
+修：别名表里加 `bind('Main', body.Main)`。这条同时覆盖三条路：
+lua 反射（getPropertyFromClass）、addHaxeLibrary、hscript 的 `import Main`。
+
+**34. 0.6.x 的扁平箭头皮肤被内置皮肤盖掉** — `objects/Note.hx` / `objects/StrumNote.hx`
+
+0.6.x 的 mod 把 `NOTE_assets.png/xml` 直接放 `images/` 根下；1.0 的内置箭头在
+`images/noteSkins/NOTE_assets`。谱面 `arrowSkin` 为空时走默认值，于是永远读内置那套，
+mod 根目录里的箭头从头到尾没被看过。
+
+修：新增 `Note.resolveDefaultNoteSkin()` —— 如果 `images/NOTE_assets.png` 存在
+（基础资源里没有这一份，所以只可能是 mod 提供的），就用扁平的 `NOTE_assets`；
+否则还是 `noteSkins/NOTE_assets`。`Note` 和 `StrumNote` 的默认值都改走它。
+
 ### 当前状态
 
 | 脚本 | 用例 | 失败 |

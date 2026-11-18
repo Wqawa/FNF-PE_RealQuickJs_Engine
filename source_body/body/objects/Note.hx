@@ -106,6 +106,19 @@ class Note extends FlxSprite
 	 * caller adds that prefix). If the plain name loads, keep it (mod ships flat assets);
 	 * otherwise treat it as a built-in and swap in the new path. Explicit paths with / are left alone.
 	 */
+	/**
+	 * Default note skin, aware of the 0.6.x layout.
+	 *
+	 * 1.0 keeps the built-in arrows at images/noteSkins/NOTE_assets.png while 0.6.x mods
+	 * ship images/NOTE_assets.png at the images root. The base game has no root copy, so
+	 * one existing there can only come from a mod and should win over the built-in.
+	 */
+	public static function resolveDefaultNoteSkin():String
+	{
+		if(Paths.fileExists('images/NOTE_assets.png', IMAGE)) return 'NOTE_assets';
+		return defaultNoteSkin;
+	}
+
 	public static function resolveNoteSkin(skin:String):String
 	{
 		if(skin == null || skin.length < 1 || skin.indexOf('/') > -1) return skin;
@@ -380,7 +393,7 @@ class Note extends FlxSprite
 		{
 			skin = PlayState.SONG != null ? PlayState.SONG.arrowSkin : null;
 			if(skin == null || skin.length < 1)
-				skin = defaultNoteSkin + postfix;
+				skin = (postfix.length < 1 ? resolveDefaultNoteSkin() : defaultNoteSkin) + postfix;
 			else
 				skin = resolveNoteSkin(skin); // bare old chart name ('NOTE_assets') -> noteSkins/
 		}
