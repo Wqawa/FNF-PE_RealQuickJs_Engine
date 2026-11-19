@@ -513,12 +513,12 @@ class QuickJSHandler
 			c === undefined ? "" : String(c), d === undefined ? "" : String(d),
 			e === undefined ? "" : String(e), f === undefined ? "" : String(f));
 		// Stop sentinels: `return Function_Stop` in Lua, same names available in JS.
-		// Values must match the five LuaUtils constants exactly; PlayState compares strings.
-		globalThis.Function_Continue = "##PSYCHLUA_FUNCTIONCONTINUE";
-		globalThis.Function_Stop = "##PSYCHLUA_FUNCTIONSTOP";
-		globalThis.Function_StopLua = "##PSYCHLUA_FUNCTIONSTOPLUA";
-		globalThis.Function_StopHScript = "##PSYCHLUA_FUNCTIONSTOPHSCRIPT";
-		globalThis.Function_StopAll = "##PSYCHLUA_FUNCTIONSTOPALL";
+		// Interpolated from ScriptConstants so the three hosts cannot drift apart.
+		globalThis.Function_Continue = "${backend.ScriptConstants.Function_Continue}";
+		globalThis.Function_Stop = "${backend.ScriptConstants.Function_Stop}";
+		globalThis.Function_StopLua = "${backend.ScriptConstants.Function_StopLua}";
+		globalThis.Function_StopHScript = "${backend.ScriptConstants.Function_StopHScript}";
+		globalThis.Function_StopAll = "${backend.ScriptConstants.Function_StopAll}";
 		globalThis.trace = (m) => __h(-1, m);
 		globalThis.getProperty = (v) => __h(0, v);
 		globalThis.setProperty = (v, val) => __h(1, v, val);

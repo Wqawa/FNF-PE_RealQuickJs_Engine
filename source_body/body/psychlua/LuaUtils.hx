@@ -21,11 +21,12 @@ typedef LuaTweenOptions = {
 
 class LuaUtils
 {
-	public static final Function_Stop:String = "##PSYCHLUA_FUNCTIONSTOP";
-	public static final Function_Continue:String = "##PSYCHLUA_FUNCTIONCONTINUE";
-	public static final Function_StopLua:String = "##PSYCHLUA_FUNCTIONSTOPLUA";
-	public static final Function_StopHScript:String = "##PSYCHLUA_FUNCTIONSTOPHSCRIPT";
-	public static final Function_StopAll:String = "##PSYCHLUA_FUNCTIONSTOPALL";
+	// Aliases into the shared layer: one definition, no drift with the JS / vanilla hosts.
+	public static inline var Function_Stop:String = backend.ScriptConstants.Function_Stop;
+	public static inline var Function_Continue:String = backend.ScriptConstants.Function_Continue;
+	public static inline var Function_StopLua:String = backend.ScriptConstants.Function_StopLua;
+	public static inline var Function_StopHScript:String = backend.ScriptConstants.Function_StopHScript;
+	public static inline var Function_StopAll:String = backend.ScriptConstants.Function_StopAll;
 
 	/**
 	 * Logs which mod a script belongs to on load. All three channels use one format so

@@ -318,12 +318,10 @@ class ScriptClassAliases
 		return StringTools.startsWith(fqn, 'vanilla.') || StringTools.startsWith(fqn, 'pe063.');
 	}
 
-	/** Engine classes (the per-tree prefixed families). flixel / openfl do not count. */
+	/** Engine classes of another tree. Single source in the shared layer. */
 	static function isEngineClass(fqn:String):Bool
 	{
-		for (pkg in SEARCH_PACKAGES)
-			if (pkg.length > 0 && StringTools.startsWith(fqn, pkg)) return true;
-		return false;
+		return backend.ScriptConstants.isEngineClass(fqn);
 	}
 
 	/**
@@ -385,10 +383,12 @@ class ScriptClassAliases
 	 * replacement for the explicit table: some entries are renamed
 	 * (Boyfriend -> Character, GitarooPause -> PauseSubState) and cannot be guessed.
 	 */
-	// Keep in sync with ENGINE_PACKAGES below: isEngineClass() reuses this list to decide
-	// whether a resolved class belongs to another tree. A missing package here means a
-	// cold class resolves to the same-named class in the body tree and silently pulls
-	// assets/body.
+	// Package search order for bare names a script passes to getPropertyFromClass /
+	// addHaxeLibrary (resolveDeep below). The first entry is the empty prefix so a
+	// genuinely flat class still resolves. Finer sub-packages come before their parent
+	// only where a top-level class of the same name exists - order matters here.
+	// This is a *search* list; "is this class from another tree" is answered by
+	// ScriptConstants.isEngineClass(), which lives in the shared layer.
 	static final SEARCH_PACKAGES:Array<String> = [
 		'',
 		'backend.',

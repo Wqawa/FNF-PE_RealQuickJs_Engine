@@ -19,11 +19,12 @@ typedef LuaTweenOptions = {
 
 class LuaUtils
 {
-	public static final Function_Stop:String = "##PSYCHLUA_FUNCTIONSTOP";
-	public static final Function_Continue:String = "##PSYCHLUA_FUNCTIONCONTINUE";
-	public static final Function_StopLua:String = "##PSYCHLUA_FUNCTIONSTOPLUA";
-	public static final Function_StopHScript:String = "##PSYCHLUA_FUNCTIONSTOPHSCRIPT";
-	public static final Function_StopAll:String = "##PSYCHLUA_FUNCTIONSTOPALL";
+	// Aliases into the shared layer: one definition, no drift with the body / JS hosts.
+	public static inline var Function_Stop:String = backend.ScriptConstants.Function_Stop;
+	public static inline var Function_Continue:String = backend.ScriptConstants.Function_Continue;
+	public static inline var Function_StopLua:String = backend.ScriptConstants.Function_StopLua;
+	public static inline var Function_StopHScript:String = backend.ScriptConstants.Function_StopHScript;
+	public static inline var Function_StopAll:String = backend.ScriptConstants.Function_StopAll;
 
 	/**
 	 * After the move to vanilla.*, Lua/HScript still reflect by the old package names
@@ -58,24 +59,13 @@ class LuaUtils
 		return isOtherTreeClass(fallback) ? null : fallback;
 	}
 
-	/** Engine classes of the body tree (packages without the vanilla. prefix). */
-	// Keep in sync with the other two trees' package lists (ScriptClassAliases in body,
-	// FunkinLua in pe063) and with IsolatedImports.ENGINE_PACKAGES. A package left out
-	// here is a class that silently resolves to the body tree instead of returning null.
-	static final ENGINE_PACKAGES:Array<String> = [
-		'backend.', 'states.', 'objects.', 'options.', 'substates.', 'psychlua.',
-		'shaders.', 'cutscenes.', 'flxanimate.', 'debug.',
-		'mobile.', 'unused.', 'hxcodec.', 'vlc.'
-	];
-
+	/** Engine classes of another tree. Single source in the shared layer. */
 	public static function isOtherTreeClass(cl:Dynamic):Bool
 	{
 		if (cl == null) return false;
 		var clsName:String = Type.getClassName(cl);
 		if (clsName == null || clsName.indexOf('vanilla.') == 0) return false;
-		for (pkg in ENGINE_PACKAGES)
-			if (clsName.indexOf(pkg) == 0) return true;
-		return false;
+		return backend.ScriptConstants.isEngineClass(clsName);
 	}
 
 	// Bare-name fallback: 'vanilla.' + pkg + '.' + name. Mirrors the package families

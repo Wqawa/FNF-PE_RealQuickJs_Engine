@@ -7,7 +7,7 @@ import substates.GameOverSubstate;
 
 //
 // Functions that use a high amount of Reflections, which are somewhat CPU intensive
-// These functions are held together by duct tape
+// Reflection is slow, so these are kept together and avoid hot paths where possible
 //
 
 class ReflectionFunctions

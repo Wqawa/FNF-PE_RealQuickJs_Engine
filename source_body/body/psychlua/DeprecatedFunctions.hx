@@ -10,7 +10,7 @@ class DeprecatedFunctions
 	public static function implement(funk:FunkinLua)
 	{
 		var lua:State = funk.lua;
-		// DEPRECATED, DONT MESS WITH THESE SHITS, ITS JUST THERE FOR BACKWARD COMPATIBILITY
+		// Deprecated APIs kept only for old mods; leave the bodies as-is
 		Lua_helper.add_callback(lua, "addAnimationByIndicesLoop", function(obj:String, name:String, prefix:String, indices:String, framerate:Int = 24) {
 			FunkinLua.luaTrace("addAnimationByIndicesLoop is deprecated! Use addAnimationByIndices instead", false, true);
 			return LuaUtils.addAnimByIndices(obj, name, prefix, indices, framerate, true);
@@ -104,9 +104,9 @@ class DeprecatedFunctions
 		Lua_helper.add_callback(lua, "scaleLuaSprite", function(tag:String, x:Float, y:Float) {
 			FunkinLua.luaTrace("scaleLuaSprite is deprecated! Use scaleObject instead", false, true);
 			if(MusicBeatState.getVariables().exists(tag)) {
-				var shit:ModchartSprite = MusicBeatState.getVariables().get(tag);
-				shit.scale.set(x, y);
-				shit.updateHitbox();
+				var target:ModchartSprite = MusicBeatState.getVariables().get(tag);
+				target.scale.set(x, y);
+				target.updateHitbox();
 				return true;
 			}
 			return false;

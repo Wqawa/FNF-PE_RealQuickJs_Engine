@@ -9,7 +9,7 @@ class ShaderFunctions
 	public static function implement(funk:FunkinLua)
 	{
 		var lua = funk.lua;
-		// shader shit
+		// shader callbacks
 		funk.addLocalCallback("initLuaShader", function(name:String) {
 			if(!ClientPrefs.data.shaders) return false;
 
@@ -32,14 +32,14 @@ class ShaderFunctions
 			}
 
 			var split:Array<String> = obj.split('.');
-			var leObj:FlxSprite = LuaUtils.getObjectDirectly(split[0]);
+			var target:FlxSprite = LuaUtils.getObjectDirectly(split[0]);
 			if(split.length > 1) {
-				leObj = LuaUtils.getVarInArray(LuaUtils.getPropertyLoop(split), split[split.length-1]);
+				target = LuaUtils.getVarInArray(LuaUtils.getPropertyLoop(split), split[split.length-1]);
 			}
 
-			if(leObj != null) {
+			if(target != null) {
 				var arr:Array<String> = funk.runtimeShaders.get(shader);
-				leObj.shader = new vanilla.shaders.ErrorHandledShader.ErrorHandledRuntimeShader(shader, arr[0], arr[1]);
+				target.shader = new vanilla.shaders.ErrorHandledShader.ErrorHandledRuntimeShader(shader, arr[0], arr[1]);
 				return true;
 			}
 			#else
@@ -49,13 +49,13 @@ class ShaderFunctions
 		});
 		Lua_helper.add_callback(lua, "removeSpriteShader", function(obj:String) {
 			var split:Array<String> = obj.split('.');
-			var leObj:FlxSprite = LuaUtils.getObjectDirectly(split[0]);
+			var target:FlxSprite = LuaUtils.getObjectDirectly(split[0]);
 			if(split.length > 1) {
-				leObj = LuaUtils.getVarInArray(LuaUtils.getPropertyLoop(split), split[split.length-1]);
+				target = LuaUtils.getVarInArray(LuaUtils.getPropertyLoop(split), split[split.length-1]);
 			}
 
-			if(leObj != null) {
-				leObj.shader = null;
+			if(target != null) {
+				target.shader = null;
 				return true;
 			}
 			return false;
