@@ -13,6 +13,7 @@ class OptionsState extends MusicBeatState
 		'Visuals',
 		'Gameplay',
 		'Switch Engine'
+		#if MOBILE_CONTROLS , 'Touch Controls' #end
 		#if TRANSLATIONS_ALLOWED , 'Language' #end
 	];
 	private var grpOptions:FlxTypedGroup<Alphabet>;
@@ -35,6 +36,8 @@ class OptionsState extends MusicBeatState
 				openSubState(new options.GameplaySettingsSubState());
 			case 'Switch Engine':
 				openSubState(new options.EngineSelectSubState());
+			case 'Touch Controls':
+				openSubState(new mobile.MobileControlSelectSubState());
 			case 'Adjust Delay and Combo':
 				MusicBeatState.switchState(new options.NoteOffsetState());
 			case 'Language':

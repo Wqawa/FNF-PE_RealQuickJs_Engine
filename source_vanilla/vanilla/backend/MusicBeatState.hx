@@ -58,12 +58,18 @@ class MusicBeatState extends FlxState
 	public function addMobileControls():MobileInputManager
 	{
 		removeMobileControls();
+
+		var custom:Bool = ClientPrefs.data.controlsMode == 'Custom';
 		mobileControls = switch(ClientPrefs.data.controlsMode)
 		{
 			case 'Left': new TouchPad('LEFT_FULL', 'NONE');
 			case 'Hitbox': new Hitbox();
 			default: new TouchPad('RIGHT_FULL', 'NONE');
 		}
+		// 'Custom' is the right-hand pad with the buttons where the editor left them
+		if (custom)
+			vanilla.mobile.MobileData.applyPositions(cast mobileControls);
+
 		mobileControls.cameras = [FlxG.camera];
 		mobileControls.register();
 		add(mobileControls);

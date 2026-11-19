@@ -17,6 +17,7 @@ import flixel.FlxBasic;
 
 #if MOBILE_CONTROLS
 import flixel.util.FlxDestroyUtil;
+import pe063.mobile.MobileData;
 import pe063.mobile.input.MobileInputManager;
 import pe063.mobile.objects.Hitbox;
 import pe063.mobile.objects.TouchPad;
@@ -68,12 +69,18 @@ class MusicBeatState extends FlxUIState
 	public function addMobileControls():MobileInputManager
 	{
 		removeMobileControls();
+
+		var custom:Bool = ClientPrefs.controlsMode == 'Custom';
 		mobileControls = switch(ClientPrefs.controlsMode)
 		{
 			case 'Left': new TouchPad('LEFT_FULL', 'NONE');
 			case 'Hitbox': new Hitbox();
 			default: new TouchPad('RIGHT_FULL', 'NONE');
 		}
+		// 'Custom' is the right-hand pad with the buttons where the editor left them
+		if (custom)
+			MobileData.applyPositions(cast mobileControls);
+
 		mobileControls.cameras = [FlxG.camera];
 		mobileControls.register();
 		add(mobileControls);

@@ -14,8 +14,10 @@ import vanilla.states.TitleState;
 	public var flashing:Bool = true;
 	public var autoPause:Bool = true;
 	public var antialiasing:Bool = true;
-	public var controlsMode:String = 'Right'; // touch controls: Right / Left / Hitbox
+	public var controlsMode:String = 'Right'; // touch controls: Right / Left / Custom / Hitbox
 	public var controlsAlpha:Float = #if (android || ios) 0.6 #else 0 #end; // touch controls visibility
+	public var dynamicColors:Bool = false; // touch arrows take the note colors
+	public var wideScreen:Bool = false; // stretch the canvas over the whole phone screen
 	public var noteSkin:String = 'Default';
 	public var splashSkin:String = 'Psych';
 	public var splashAlpha:Float = 0.6;

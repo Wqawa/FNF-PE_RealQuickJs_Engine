@@ -29,7 +29,9 @@ using StringTools;
 
 class OptionsState extends MusicBeatState
 {
-	var options:Array<String> = ['Note Colors', 'Controls', 'Adjust Delay and Combo', 'Graphics', 'Visuals and UI', 'Gameplay', 'Switch Engine'];
+	var options:Array<String> = ['Note Colors', 'Controls', 'Adjust Delay and Combo', 'Graphics', 'Visuals and UI', 'Gameplay', 'Switch Engine'
+		#if MOBILE_CONTROLS , 'Touch Controls' #end
+	];
 	private var grpOptions:FlxTypedGroup<Alphabet>;
 	private static var curSelected:Int = 0;
 	public static var menuBG:FlxSprite;
@@ -50,6 +52,8 @@ class OptionsState extends MusicBeatState
 				LoadingState.loadAndSwitchState(new pe063.options.NoteOffsetState());
 			case 'Switch Engine':
 				openSubState(new pe063.options.EngineSelectSubState());
+			case 'Touch Controls':
+				openSubState(new pe063.mobile.MobileControlSelectSubState());
 		}
 	}
 

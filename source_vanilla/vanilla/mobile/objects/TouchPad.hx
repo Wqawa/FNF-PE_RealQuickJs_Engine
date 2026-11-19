@@ -104,7 +104,30 @@ class TouchPad extends MobileInputManager
 		button.tag = Graphic.toUpperCase();
 		button.color = Color;
 		button.parentAlpha = button.alpha;
+		applyDynamicColor(button);
 		return button;
+	}
+
+	/** 'Dynamic Controls Color': arrows take the note colors from the settings. */
+	public static function applyDynamicColor(button:TouchButton):Void
+	{
+		if (!ClientPrefs.data.dynamicColors)
+			return;
+
+		var index:Int = switch (button.tag)
+		{
+			case 'LEFT': 0;
+			case 'DOWN': 1;
+			case 'UP': 2;
+			case 'RIGHT': 3;
+			default: -1;
+		}
+		if (index < 0)
+			return;
+
+		button.color = ClientPrefs.data.arrowRGB[index][0];
+		if (button.label != null)
+			button.label.color = button.color;
 	}
 
 	override function set_alpha(Value:Float):Float

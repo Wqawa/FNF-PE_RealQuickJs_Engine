@@ -60,6 +60,15 @@ class MobileInputManager extends FlxTypedSpriteGroup<TouchButton>
 	public function hasButton(id:MobileInputID):Bool
 		return trackedButtons.exists(id);
 
+	/** First button whose tag matches, e.g. 'UP'. The layout editor needs this. */
+	public function byTag(tag:String):TouchButton
+	{
+		for (button in members)
+			if (button != null && button.tag == tag)
+				return button;
+		return null;
+	}
+
 	inline public function buttonPressed(button:MobileInputID):Bool
 		return anyPressed([button]);
 

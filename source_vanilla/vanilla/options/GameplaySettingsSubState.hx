@@ -118,10 +118,10 @@ class GameplaySettingsSubState extends BaseOptionsMenu
 
 		#if MOBILE_CONTROLS
 		var option:Option = new Option('Touch Controls',
-			'Which layout the on-screen buttons use.',
+			'Which layout the on-screen buttons use. Custom means you placed them yourself.',
 			'controlsMode',
 			STRING,
-			['Right', 'Left', 'Hitbox']);
+			['Right', 'Left', 'Custom', 'Hitbox']);
 		addOption(option);
 
 		var option:Option = new Option('Touch Controls Alpha',
@@ -129,6 +129,21 @@ class GameplaySettingsSubState extends BaseOptionsMenu
 			'controlsAlpha',
 			PERCENT);
 		addOption(option);
+
+		var option:Option = new Option('Dynamic Controls Color',
+			'Use the note colors for the touch arrows instead of the default ones.',
+			'dynamicColors',
+			BOOL);
+		addOption(option);
+
+		#if (android || ios)
+		var option:Option = new Option('Wide Screen',
+			'Stretch the game over the whole screen instead of keeping the 16:9 canvas.',
+			'wideScreen',
+			BOOL);
+		option.onChange = () -> FlxG.scaleMode = new vanilla.mobile.MobileScaleMode();
+		addOption(option);
+		#end
 		#end
 
 		super();

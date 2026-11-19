@@ -202,6 +202,11 @@ class Main extends Sprite
 		});
 		addChild(new FlxGame(game.width, game.height, game.initialState, game.framerate, game.framerate, game.skipSplash, game.startFullscreen));
 
+		#if mobile
+		// letterboxes exactly like RatioScaleMode until 'Wide Screen' is turned on
+		FlxG.scaleMode = new mobile.MobileScaleMode();
+		#end
+
 		#if !mobile
 		fpsVar = new FPSCounter(10, 3, 0xFFFFFF);
 		addChild(fpsVar);

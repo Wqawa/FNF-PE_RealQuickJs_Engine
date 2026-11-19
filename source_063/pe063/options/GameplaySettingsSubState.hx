@@ -145,6 +145,31 @@ class GameplaySettingsSubState extends BaseOptionsMenu
 		option.changeValue = 0.1;
 		addOption(option);
 
+		#if MOBILE_CONTROLS
+		var option:Option = new Option('Touch Controls',
+			'Which layout the on-screen buttons use.',
+			'controlsMode',
+			'string',
+			'',
+			['Right', 'Left', 'Custom', 'Hitbox']);
+		addOption(option);
+
+		var option:Option = new Option('Touch Controls Alpha',
+			'How visible the on-screen buttons are. 0 hides them.',
+			'controlsAlpha',
+			'percent');
+		addOption(option);
+
+		#if mobile
+		var option:Option = new Option('Wide Screen',
+			'Stretch the game over the whole screen instead of keeping the 16:9 canvas.',
+			'wideScreen',
+			'bool');
+		option.onChange = function() FlxG.scaleMode = new pe063.mobile.MobileScaleMode();
+		addOption(option);
+		#end
+		#end
+
 		super();
 	}
 

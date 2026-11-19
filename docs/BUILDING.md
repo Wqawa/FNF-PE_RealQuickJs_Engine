@@ -174,9 +174,14 @@ apk 里的目录，所以布局表写在 `MobileLayouts.hx` 里。
   按钮 = `bg.png` 底盘 + 字母/方向图，都按 1280x720 坐标摆。
 - 布局表在 `mobile/MobileLayouts.hx` 里写死。上游是从 `assets/shared/mobile/DPadModes/*.json`
   读的，安卓上那些文件在 apk 里，`FileSystem` 列不到，除非像移植版那样首启把整个 assets 拷到外部目录。
-- 打歌有三种布局，Gameplay Settings → Touch Controls 里切：
-  `Right` / `Left`（右手或左手方向键）/ `Hitbox`（四条透明轨道，点轨道打 note）。
+- 打歌有四种布局，Gameplay Settings → Touch Controls 里切：
+  `Right` / `Left`（右手或左手方向键）/ `Custom`（自己摆的位置）/ `Hitbox`（四条透明轨道，点轨道打 note）。
   `Touch Controls Alpha` 控制透明度，拖到 0 就等于关掉触屏。
+- `Custom` 的位置在 Options → Touch Controls 里拖：中间就是真的那套按键，拖到哪儿算哪儿，
+  `Save` 存进单独的存档（`mobileControls`，`MobileData` 管），`Reset` 清掉回到默认。
+  `Dynamic Controls Color` 让方向键跟着音符颜色走（只有 1.0.4 的两棵树有，0.6.3 的音符颜色是图里画死的）。
+- `Wide Screen` 把画布拉满整块屏，不再留黑边（`mobile/MobileScaleMode.hx`）。关着的时候它跟
+  flixel 默认的 `RatioScaleMode` 一样，所以是启动时统一装上去，选项只翻个标志位。
 - 菜单用同一套按键：`MusicBeatState.create()` 给每个界面自动挂一个左下角四向键 + 右下 `A`/`B`，
   `A` = 确认，`B` = 返回。PlayState 进来会先摘掉它再挂打歌用的那套。
   （选项菜单之类叠在已有键盘上的子界面不会再挂一层，靠 `MobileInputManager.current` 判断。）

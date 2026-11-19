@@ -89,6 +89,11 @@ class Main extends Sprite
 		ClientPrefs.loadDefaultKeys();
 		addChild(new FlxGame(gameWidth, gameHeight, initialState, framerate, framerate, skipSplash, startFullscreen));
 
+		#if mobile
+		// letterboxes exactly like RatioScaleMode until 'Wide Screen' is turned on
+		FlxG.scaleMode = new pe063.mobile.MobileScaleMode();
+		#end
+
 		#if !mobile
 		fpsVar = new FPSCounter(10, 3, 0xFFFFFF);
 		addChild(fpsVar);

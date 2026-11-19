@@ -13,8 +13,9 @@ class ClientPrefs {
 	public static var showFPS:Bool = true;
 	public static var flashing:Bool = true;
 	public static var globalAntialiasing:Bool = true;
-	public static var controlsMode:String = 'Right'; // touch controls: Right / Left / Hitbox
+	public static var controlsMode:String = 'Right'; // touch controls: Right / Left / Custom / Hitbox
 	public static var controlsAlpha:Float = #if mobile 0.6 #else 0 #end; // touch controls visibility
+	public static var wideScreen:Bool = false; // stretch the canvas over the whole phone screen
 	public static var noteSplashes:Bool = true;
 	public static var lowQuality:Bool = false;
 	public static var shaders:Bool = true;
@@ -104,6 +105,7 @@ class ClientPrefs {
 		FlxG.save.data.globalAntialiasing = globalAntialiasing;
 		FlxG.save.data.controlsMode = controlsMode;
 		FlxG.save.data.controlsAlpha = controlsAlpha;
+		FlxG.save.data.wideScreen = wideScreen;
 		FlxG.save.data.noteSplashes = noteSplashes;
 		FlxG.save.data.lowQuality = lowQuality;
 		FlxG.save.data.shaders = shaders;
@@ -171,6 +173,9 @@ class ClientPrefs {
 		}
 		if(FlxG.save.data.controlsAlpha != null) {
 			controlsAlpha = FlxG.save.data.controlsAlpha;
+		}
+		if(FlxG.save.data.wideScreen != null) {
+			wideScreen = FlxG.save.data.wideScreen;
 		}
 		if(FlxG.save.data.noteSplashes != null) {
 			noteSplashes = FlxG.save.data.noteSplashes;

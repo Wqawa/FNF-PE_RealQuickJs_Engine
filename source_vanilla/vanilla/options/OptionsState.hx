@@ -13,6 +13,7 @@ class OptionsState extends MusicBeatState
 		'Gameplay'
 		#if TRANSLATIONS_ALLOWED , 'Language' #end
 		, 'Switch Engine'
+		#if MOBILE_CONTROLS , 'Touch Controls' #end
 	];
 	private var grpOptions:FlxTypedGroup<Alphabet>;
 	private static var curSelected:Int = 0;
@@ -38,6 +39,8 @@ class OptionsState extends MusicBeatState
 				openSubState(new vanilla.options.LanguageSubState());
 			case 'Switch Engine':
 				openSubState(new vanilla.options.EngineSelectSubState());
+			case 'Touch Controls':
+				openSubState(new vanilla.mobile.MobileControlSelectSubState());
 		}
 	}
 
