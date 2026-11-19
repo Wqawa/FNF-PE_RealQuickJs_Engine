@@ -9,8 +9,9 @@
 #  用法：
 #    bash manage.sh                 交互式：先选语言，再选功能
 #    bash manage.sh --zh            跳过语言选择
-#    bash manage.sh --en 4          直接跑 4 号功能（CI / 快捷方式）
-#    bash manage.sh --zh 10 bopeebo 带参数跑（测试歌名）
+#    bash manage.sh --en 2          直接跑 2 号功能（CI / 快捷方式）
+#    bash manage.sh --zh 7 lua bopeebo  回归带参数（子命令 + 歌名）
+#    bash manage.sh --zh release    名字别名也行（编号重排也不受影响）
 #
 #  Windows 双击 manage.bat；它只负责找到 bash 然后转给这里（batch 干不了
 #  HAHA/awk/硬链接这些活）。
@@ -1193,29 +1194,29 @@ print_menu() {
 	say "  FNF-PE RealQuickJS 工具箱" "  FNF-PE RealQuickJS Toolbox"
 	printf '==============================================================\n\n'
 	if [ "$L" = "en" ]; then
-		printf '  1)  Environment check    desktop (auto-repair libs); sub-pick desktop/android/all\n'
-		printf '  2)  Build                release / debug / clean (old 2/3/4)\n'
-		printf '  5)  Assets              copy+verify or verify only (old 5/6)\n'
-		printf '  7)  Lua compat audit    function-name diff against an upstream tree\n'
-		printf '  8)  Rebuild import map  regenerate the vanilla HScript import table\n'
-		printf '  9)  QuickJS library     Windows or Android static lib (old 9/14)\n'
-		printf ' 10)  Regression          Lua / QuickJS / 0.6.3 probe (old 10/11/12)\n'
-		printf ' 13)  Android build       arm64-v8a apk\n'
-		printf ' 15)  Android env         check + repair toolchain (JDK/SDK/NDK/lime/QJS)\n'
+		printf '  1)  Environment check    desktop / android / all (sub-menu)\n'
+		printf '  2)  Build                release / debug / clean (sub-menu)\n'
+		printf '  3)  Assets              copy+verify / verify only (sub-menu)\n'
+		printf '  4)  Lua compat audit    function-name diff against an upstream tree\n'
+		printf '  5)  Rebuild import map  regenerate the vanilla HScript import table\n'
+		printf '  6)  QuickJS library     Windows / Android (sub-menu)\n'
+		printf '  7)  Regression          Lua / QuickJS / 0.6.3 probe (sub-menu)\n'
+		printf '  8)  Android build       arm64-v8a apk\n'
+		printf '  9)  Android env         check + repair toolchain (JDK/SDK/NDK/lime/QJS)\n'
 		printf '  0)  Quit\n'
-		printf '\n  Old numbers still work: 3=debug 4=clean 6=verify-only 11=qjs 12=probe 14=qjs-android\n'
+		printf '\n  Names also work: release debug clean verify audit imports luatest qjstest probe063 android\n'
 	else
-		printf '  1)  环境体检       桌面（缺库自动补）；进入后可选 桌面/安卓/全部\n'
-		printf '  2)  编译           release / debug / 全量重编（原 2/3/4）\n'
-		printf '  5)  素材           铺+校验 / 只校验（原 5/6）\n'
-		printf '  7)  Lua 兼容审计   拿上游源码树当基准，比 add_callback 注册的函数名\n'
-		printf '  8)  重建 import 表 扫 source_vanilla 重生成 HScript 的 import 隔离表\n'
-		printf '  9)  QuickJS 静态库 Windows / Android 二选一（原 9/14）\n'
-		printf ' 10)  回归测试       Lua / QuickJS / 0.6.3 探针（原 10/11/12）\n'
-		printf ' 13)  安卓构建       arm64-v8a 包\n'
-		printf ' 15)  安卓环境       体检 + 补齐（JDK/SDK/NDK/lime/QJS arm64）\n'
+		printf '  1)  环境体检       桌面 / 安卓 / 全部（二级菜单）\n'
+		printf '  2)  编译           release / debug / 全量重编（二级菜单）\n'
+		printf '  3)  素材           铺+校验 / 只校验（二级菜单）\n'
+		printf '  4)  Lua 兼容审计   拿上游源码树当基准，比 add_callback 注册的函数名\n'
+		printf '  5)  重建 import 表 扫 source_vanilla 重生成 HScript 的 import 隔离表\n'
+		printf '  6)  QuickJS 静态库 Windows / Android 二选一（二级菜单）\n'
+		printf '  7)  回归测试       Lua / QuickJS / 0.6.3 探针（二级菜单）\n'
+		printf '  8)  安卓构建       arm64-v8a 包\n'
+		printf '  9)  安卓环境       体检 + 补齐（JDK/SDK/NDK/lime/QJS arm64）\n'
 		printf '  0)  退出\n'
-		printf '\n  旧编号仍可用：3=debug 4=clean 6=只校验 11=qjs 回归 12=探针 14=安卓 QJS\n'
+		printf '\n  名字也能用：release debug clean verify audit imports luatest qjstest probe063 android\n'
 	fi
 	printf '\n  > '
 }
@@ -1229,15 +1230,15 @@ ask_sub() {
 	printf '%s' "$pick"
 }
 
-# 统一命令（带子参数）+ 旧编号别名，都落到这里。
-# 编号 1-14 保持原义不变，老脚本 / 文档 / 肌肉记忆照用。
+# 统一命令（带子参数跳过二级询问）与连续编号 1-9 都落到这里。
+# 数字编号 2026-11-19 重排成连续的 1-9（见菜单）；旧数字编号语义冲突，已移除，
+# 但名字别名全部保留 —— 老脚本用 --zh release / --zh luatest 这些不会坏。
 run_action() {
 	# shift 掉动作本身，剩下的参数透传给测试函数（歌名）
 	local act="$1"; shift
 	case "$act" in
-		# ---- 合并后的统一入口（推荐）———
+		# ---- 统一入口：带参数直接用，不带参数才进二级询问 ———
 		env)
-			# 带参数（--zh env android）直接用；不带参数才交互问
 			local scope="${1:-}"
 			[ -z "$scope" ] && scope="$(ask_sub "  体检范围 [1]桌面 / [2]安卓 / [3]全部（回车=桌面）: " 1)"
 			case "$scope" in
@@ -1270,26 +1271,32 @@ run_action() {
 				3|probe) cmd_probe063 ;;
 				*)       cmd_test "$@" ;;
 			esac ;;
-		android-env|env-android) cmd_env android ;;
+		env-android|android-env) cmd_env android ;;
 
-		# ---- 旧编号 / 旧名字（兼容，别删）———
-		1)             cmd_env desktop ;;
-		2|release)     MODE=release; cmd_build 0 ;;
-		3|debug)       MODE=debug;   cmd_build 0 ;;
-		4|clean)       MODE=release; cmd_build 1 ;;
-		5|assets-full) cmd_assets 0 ;;
-		6|verify)      cmd_assets 1 ;;
-		7|audit)       cmd_audit ;;
-		8|imports)     cmd_imports ;;
-		9|quickjs-win) cmd_quickjs ;;
-		10|luatest)    cmd_test "$@" ;;
-		11|qjstest)    cmd_qjstest "$@" ;;
-		12|probe063)   cmd_probe063 ;;
-		13|android)    cmd_android ;;
-		14|qjsandroid) cmd_qjsandroid ;;
-		15)            cmd_env android ;;
-		0|q|Q)         return 99 ;;
-		*)             say "  没有这个编号" "  no such item"; return 2 ;;
+		# ---- 连续编号 1-9（和菜单一一对应）———
+		1) run_action env ;;
+		2) run_action build ;;
+		3) run_action assets ;;
+		4|audit)    cmd_audit ;;
+		5|imports)  cmd_imports ;;
+		6) run_action quickjs ;;
+		7) run_action test "$@" ;;
+		8|android)  cmd_android ;;
+		9) cmd_env android ;;
+
+		# ---- 名字别名（稳定接口，换编号也不受影响）———
+		release)     MODE=release; cmd_build 0 ;;
+		debug)       MODE=debug;   cmd_build 0 ;;
+		clean)       MODE=release; cmd_build 1 ;;
+		verify)      cmd_assets 1 ;;
+		assets-full) cmd_assets 0 ;;
+		quickjs-win) cmd_quickjs ;;
+		qjsandroid)  cmd_qjsandroid ;;
+		luatest)     cmd_test "$@" ;;
+		qjstest)     cmd_qjstest "$@" ;;
+		probe063)    cmd_probe063 ;;
+		0|q|Q)       return 99 ;;
+		*)           say "  没有这个编号" "  no such item"; return 2 ;;
 	esac
 }
 
@@ -1302,22 +1309,10 @@ if [ -n "$ACTION" ]; then
 	exit "$rc"
 fi
 
-# 菜单里显示的编号 → 统一命令名（带二级询问）。命令行参数仍走 run_action 原编号，
-# 保证 --zh 2 / --zh 10 这些老用法行为不变。
+# 菜单编号现已连续 1-9，和 run_action 一一对应，直接转发即可。
+# 保留这层是为了以后调整菜单顺序时只改这里，不用动 run_action。
 menu_action() {
-	case "$1" in
-		1) run_action env ;;
-		2) run_action build ;;
-		5) run_action assets ;;
-		7) run_action 7 ;;
-		8) run_action 8 ;;
-		9) run_action quickjs ;;
-		10) run_action test ;;
-		13) run_action 13 ;;
-		15) run_action 15 ;;
-		0|q|Q) return 99 ;;
-		*) run_action "$1" ;;
-	esac
+	run_action "$@"
 }
 
 while true; do

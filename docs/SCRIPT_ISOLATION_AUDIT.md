@@ -111,7 +111,7 @@ Animate 2019+ 图集、对象过桥、每首歌重建 context、vanilla 无自�
 ## 0.6.3 那个「lua 贴图出不来」的结论
 
 新加了探针 `source_063/pe063/debug/Probe.hx`（`PE_063_PROBE=1` 触发，
-`bash manage.sh --zh 12` 跑）。它不进游戏、不建 state，把 `AtlasFrameMaker`
+`bash manage.sh --zh probe063` 跑）。它不进游戏、不建 state，把 `AtlasFrameMaker`
 用到的路径算出来并真的构造一次图集。实测：
 
 ```
@@ -146,9 +146,9 @@ Adobe Animate 2018 的单个 `spritemap.json`，碰到 2019+ 的 `spritemap1.jso
 ## 怎么验证
 
 ```bash
-bash manage.sh --zh 10                # Lua/兼容层，含 isolation.txt（10 条）
-bash manage.sh --zh 11                # QuickJS 通道
-bash manage.sh --zh 12                # 0.6.3 路径探针（不进游戏）
+bash manage.sh --zh luatest                # Lua/兼容层，含 isolation.txt（10 条）
+bash manage.sh --zh qjstest                # QuickJS 通道
+bash manage.sh --zh probe063                # 0.6.3 路径探针（不进游戏）
 ```
 
 `isolation.txt` 覆盖：`Paths.VERSION_DIR` 是 body、`vanilla.*` 类拿不到、assets 根脚本的

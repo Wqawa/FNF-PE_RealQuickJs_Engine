@@ -23,12 +23,14 @@ JS 那侧的 FunkinJS 转译器和存档是个故意留着的装置 —— 针�
 ### 编译
 
 ```bash
-bash manage.sh            # 菜单：先选中文/英文，再按编号
-bash manage.sh --zh 2     # 跳过菜单，直接编译 release
-bash manage.sh --zh 3     # debug
+bash manage.sh              # 菜单：先选中文/英文，再按编号
+bash manage.sh --zh 2       # 跳过菜单，直接编译 release（2 号）
+bash manage.sh --zh debug   # 名字别名，同样跳过菜单
 ```
 
-菜单合并成 9 项 / 0 退出：1 环境体检（进后选桌面/安卓/全部）、2 编译（release/debug/全量）、5 素材（铺+校验/只校验）、7 Lua 兼容审计、8 重建 import 表、9 QuickJS 静态库（Windows/Android）、10 回归测试（Lua/QuickJS/0.6.3 探针）、13 安卓构建、15 安卓环境补齐。**旧编号 1–14 全部照用**（3=debug、4=clean、6=只校验、11=qjs 回归、12=探针、14=安卓 QJS），新命令也支持带参数跳过二级选择，如 `manage.sh --zh build debug`、`--zh test qjs bopeebo`、`--zh env android`。
+菜单编号连续 **1–9** / 0 退出：
+1 环境体检、2 编译、3 素材、4 Lua 兼容审计、5 重建 import 表、6 QuickJS 静态库、7 回归测试、8 安卓构建、9 安卓环境补齐。
+1/2/3/6/7 进二级菜单再选子项。**编号可能再调整，稳定调用请用名字别名**：`release` / `debug` / `clean` / `verify` / `audit` / `imports` / `luatest` / `qjstest` / `probe063` / `android`。带参数可跳过二级询问：`manage.sh --zh build debug`、`--zh test qjs bopeebo`、`--zh env android`。
 
 所有脚本都收在根目录 `manage.sh`（双击 `manage.bat`），`.workbuddy/` 只放测试数据和工具链，不再有散落的 sh。带动作调用时（如 `--zh 2`）会自己裹 `conhost --headless`，从编辑器/CI/后台起也不会给 haxe/cl/link 弹黑框。
 
@@ -39,12 +41,13 @@ bash manage.sh --zh 3     # debug
 ### 跑测试
 
 ```bash
-bash manage.sh --zh 10 [song]   # Lua / 兼容层，自动开局、收结果、清测试脚本
-bash manage.sh --zh 11 [song]   # QuickJS 桥
-bash manage.sh --zh 12          # 0.6.3 路径探针，不进游戏
+bash manage.sh --zh luatest [song]   # Lua / 兼容层（7 号），自动开局、收结果、清测试脚本
+bash manage.sh --zh qjstest [song]   # QuickJS 桥（7 号二级第 2 项）
+bash manage.sh --zh probe063         # 0.6.3 路径探针（7 号二级第 3 项），不进游戏
 ```
 
-调试构建加 `PE_BUILD=debug`，跳过谱面补丁用 `NOPATCH=1`；这两个环境变量对 10/11 都生效。
+等价写法：`--zh test lua [song]` / `--zh test qjs [song]` / `--zh test probe`。
+调试构建加 `PE_BUILD=debug`，跳过谱面补丁用 `NOPATCH=1`；对 Lua/QuickJS 两条都生效。
 
 跑游戏/跑测试不弹窗：窗口最小化 + 挪出屏幕 + 静音，不抢焦点。`PE_AUTOTEST_SHOW=1` 才显示画面。
 

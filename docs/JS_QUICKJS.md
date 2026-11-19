@@ -93,7 +93,7 @@ JS 脚本
 3. **编号只能往后加**，不许插队 —— 编号是硬编码在 `WRAPPERS` 字符串里的，改前面的等于
    把后面全错位。目前用到 `-1`（trace）和 `0..229`。
 4. 参数想拿真类型就自己 `coerce()` / `fnum()` / `inum()` / `truthy()` 转一把。
-5. 改完跑 `bash manage.sh --zh 11`。
+5. 改完跑 `bash manage.sh --zh qjstest`。
 
 `default:` 分支会打一条 `[warn] 未实现的宿主函数编号`，编号漏了能立刻看出来。
 
@@ -236,7 +236,7 @@ Lua 那边是同一个两层结构（`FunkinLua.getVar` 走 `get(name)`，脚本
 ## 12. 怎么验证它真的在跑
 
 ```bash
-bash manage.sh --zh 11 bopeebo
+bash manage.sh --zh qjstest bopeebo
 ```
 
 流程：注入 `AutoTestState` → 编译（窗口最小化 + 静音 + 挪屏幕外，不抢焦点）→

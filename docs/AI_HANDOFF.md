@@ -349,11 +349,11 @@ bash manage.sh env                     # 环境体检，缺库会自动补
 回归（两条，别混）：
 
 ```bash
-bash manage.sh --zh 10 [song]       # Lua / 兼容层
-bash manage.sh --zh 11 [song]       # QuickJS 真运行时
-bash manage.sh --zh 12              # 0.6.3 路径探针
-PE_BUILD=debug bash manage.sh --zh 10
-NOPATCH=1 bash manage.sh --zh 10    # 不给谱面打补丁
+bash manage.sh --zh luatest [song]  # Lua / 兼容层（7 号）
+bash manage.sh --zh qjstest [song]  # QuickJS 真运行时
+bash manage.sh --zh probe063        # 0.6.3 路径探针
+PE_BUILD=debug bash manage.sh --zh luatest
+NOPATCH=1 bash manage.sh --zh luatest   # 不给谱面打补丁
 ```
 
 - 测试入口 `AutoTestState.hx` 由 `harness/apply_hook.py on/off` 临时拷进 `source_body/body/`，跑完自动撤
