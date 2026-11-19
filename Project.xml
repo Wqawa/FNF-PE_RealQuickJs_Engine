@@ -2,7 +2,9 @@
 <project>
 	<!-- _________________________ Application Settings _________________________ -->
 
-	<app title="Friday Night Funkin': Psych Engine" file="PsychEngine" packageName="com.shadowmario.psychengine" package="com.shadowmario.psychengine" main="Main" version="0.2.8" company="ShadowMario" />
+	<!-- Android 的 manifest merger 要求包名至少有一段点号，单写 realQuickJSEngine 会挂在
+	     processDebugMainManifest。约定俗成加 com. 前缀，类名/目录名仍是 realQuickJSEngine。 -->
+	<app title="RealQuickJS Engine" file="realQuickJSEngine" packageName="com.realQuickJSEngine" package="com.realQuickJSEngine" main="Main" version="0.2.8" company="RealQuickJS" />
 
 	<!--Switch Export with Unique ApplicationID and Icon-->
 	<set name="APP_ID" value="0x0100f6c013bbc000" />
@@ -20,11 +22,16 @@
 	
 	<!-- ______________________ PSYCH ENGINE CUSTOMIZATION ______________________ -->
 
-	<define name="MODS_ALLOWED" if="desktop" />
-	<define name="HSCRIPT_ALLOWED" if="desktop" />
-	<define name="LUA_ALLOWED" if="desktop" />
+	<!-- 安卓也要跑 mod：linc_luajit 自带四个 ABI 的 libluajit .a，hscript-iris 是纯 Haxe，
+	     没有理由跟着上游锁在 desktop。锁着反而让 PlayState 里一堆无条件引用编不过。 -->
+	<define name="MODS_ALLOWED" if="desktop || android" />
+	<define name="HSCRIPT_ALLOWED" if="desktop || android" />
+	<define name="LUA_ALLOWED" if="desktop || android" />
 	<define name="ACHIEVEMENTS_ALLOWED" />
-	<define name="DISCORD_ALLOWED" />
+	<!-- discord-rpc 只有 win/mac/linux 的原生库，安卓上编译不过 -->
+	<define name="DISCORD_ALLOWED" if="desktop" />
+	<!-- 触屏虚拟按键：手机上是必须的，桌面只在显式 -DMOBILE_CONTROLS 时编进来（调试布局用） -->
+	<define name="MOBILE_CONTROLS" if="android" />
 	<define name="TRANSLATIONS_ALLOWED" />
 	<define name="IRIS_DEBUG"/>
 	
@@ -114,6 +121,13 @@
 		<assets path="assets/body/translations" rename="assets/body" exclude="*.mp3"  unless="web"/>
 	</section>
 
+	<!-- base_game 平时只在 officialBuild 里打；安卓没有 prep_assets.sh 那一步，
+	     直接用同一个 rename 打进包，跑到 assets/body/... -->
+	<section if="android">
+		<assets path="assets/base_game" rename="assets/body" exclude="*.ogg" if="web"/>
+		<assets path="assets/base_game" rename="assets/body" exclude="*.mp3"  unless="web"/>
+	</section>
+
 	<!-- ===== 1.0.4（原版） ===== -->
 	<assets path="assets/1.0.4/fonts" />
 	<assets path="assets/1.0.4/shared"       exclude="*.ogg" if="web"/>
@@ -188,6 +202,9 @@
 
 	<!-- _______________________________ Libraries ______________________________ -->
 
+	<!-- 安卓只出 arm64-v8a：QuickJS 要按 ABI 各编一份静态库，armv7 先不折腾 -->
+	<architecture exclude="armv7" if="android" />
+
 	<haxelib name="flixel" version="5.6.1"/>
 	<haxelib name="flixel-addons" version="3.2.2"/>
 	<!-- 0.6.3 那棵树要这两个，本体和原版 1.0.4 不用 -->
@@ -204,7 +221,7 @@
 
 	<!-- Disable Discord IO Thread -->
 	<haxedef name="DISCORD_DISABLE_IO_THREAD" if="hxdiscord_rpc" />
-	<haxedef name="NO_PRECOMPILED_HEADERS" if="linux" />
+	<haxedef name="NO_PRECOMPILED_HEADERS" if="linux || android" />
 
 	<!-- Enables a terminal log prompt on debug builds -->
 	<haxelib name="hxcpp-debug-server" if="debug"/>
@@ -263,7 +280,8 @@
 	<haxeflag name="--macro" value="allowPackage('flash')" />
 	<haxeflag name="--macro" value="include('my.pack')" />
 	<!-- Haxe 只编译被引用到的模块，不 include 的话 vanilla 整棵树会被静默跳过。
-	     vanilla.unused 是上游遗留的废代码（引用了没装的 faxe/heaps 库），单独排除。 -->
+	     vanilla.unused 是上游遗留的废代码（引用了没装的 faxe/heaps 库），单独排除。
+	     安卓只引导 body（source/Main.hx），这棵整树不编，否则老代码的平台问题会一堆。 -->
 	<haxeflag name="--macro" value="include('vanilla', true, ['vanilla.unused'])" />
 
 	<haxedef name="hscriptPos" if="HSCRIPT_ALLOWED" />

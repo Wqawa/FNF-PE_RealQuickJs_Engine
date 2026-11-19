@@ -20,7 +20,9 @@ class Main
 		// The crash handler must be installed before the fork: one entry, all three trees.
 		backend.EngineCrash.install();
 
-		// engine.txt in the bin root: vanilla = original 1.0.4, pe063 = 0.6.3, anything else = body
+		// engine.txt: vanilla = original 1.0.4, pe063 = 0.6.3, anything else = body
+		// 安卓上先查 apk 自己的目录（只读，肯定没有），再查工作目录
+		// .realQuickJSEngine/engine.txt —— Engine 两个候选都试。
 		if (Engine.isVanilla())
 		{
 			Lib.current.addChild(new vanilla.Main());

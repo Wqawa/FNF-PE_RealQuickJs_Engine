@@ -11,10 +11,14 @@ package jsruntime;
 // libpath is relative to the obj dir and #include relative to the generated cpp:
 //   export/<mode>/windows/obj  and  obj/src/jsruntime/. Same trick as QuickJSHandler.hx,
 //   which avoids absolute paths entirely (the repo path contains spaces and hxcpp splits -I).
+// Conditions go inside the XML: hxcpp appends every @:buildXml on the class, so wrapping
+// this in #if leaves both branches in Build.xml (see QuickJSHandler.hx).
 @:buildXml('
 <target id="haxe">
-	<libpath name="../../../../third_party/quickjs-ng/build" />
-	<lib name="quickjs-ng.lib" />
+	<libpath name="../../../../third_party/quickjs-ng/build" if="windows" />
+	<libpath name="../../../../third_party/quickjs-ng/build/android-arm64" unless="windows" />
+	<lib name="quickjs-ng.lib" if="windows" />
+	<lib name="-lquickjs-ng" unless="windows" />
 </target>
 ')
 @:cppFileCode('

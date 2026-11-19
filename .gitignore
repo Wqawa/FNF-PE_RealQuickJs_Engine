@@ -34,6 +34,8 @@ art/build_html-debug.bat
 !.workbuddy/run_test.sh
 !.workbuddy/run_qjs_test.sh
 !.workbuddy/run_063_probe.sh
+!.workbuddy/build_android.sh
+!.workbuddy/build_qjs_android.sh
 !.workbuddy/harness/
 !.workbuddy/luatest/
 .workbuddy/testout/

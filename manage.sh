@@ -300,9 +300,9 @@ cmd_build() {
 	# QuickJS.hx 的 libpath / #include 都是相对 hxcpp 构建目录的，仓库搬到哪都不用改。
 	# （以前这里用 sed 把绝对路径对齐到当前根目录，2026-11-17 改成相对路径后不再需要。）
 
-	if tasklist //FI "IMAGENAME eq PsychEngine.exe" 2>/dev/null | grep -qi psychengine; then
+	if tasklist //FI "IMAGENAME eq realQuickJSEngine.exe" 2>/dev/null | grep -qi realquickjsengine; then
 		say "  游戏在跑，先关掉" "  game is running, closing it"
-		taskkill //F //IM PsychEngine.exe >/dev/null 2>&1
+		taskkill //F //IM realQuickJSEngine.exe >/dev/null 2>&1
 		sleep 1
 	fi
 	# 引擎要链接 QuickJS-NG（JS 运行时）。源码在仓库里，静态库在本机编；

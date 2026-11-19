@@ -17,11 +17,11 @@ restore() {
 }
 trap restore EXIT
 
-taskkill //F //IM PsychEngine.exe > /dev/null 2>&1
+taskkill //F //IM realQuickJSEngine.exe > /dev/null 2>&1
 printf 'pe063' > "$BIN/engine.txt"
 
 cd "$BIN" || exit 1
-PE_063_PROBE=1 ./PsychEngine.exe > "$ROOT/.workbuddy/probe_run.log" 2>&1
+PE_063_PROBE=1 ./realQuickJSEngine.exe > "$ROOT/.workbuddy/probe_run.log" 2>&1
 echo "exit=$?"
 
 echo "== 结果 =="

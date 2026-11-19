@@ -86,11 +86,17 @@ class Engine
 
 	public static function writePath():String
 	{
+		#if android
+		// apk 所在目录只读，写到工作目录（.realQuickJSEngine/engine.txt）
+		var cwd:String = normalCwd();
+		if (cwd != null) return join(cwd, FILE_NAME);
+		#end
+
 		var appDir:String = applicationDirectory();
 		if (appDir != null) return join(appDir, FILE_NAME);
 
-		var cwd:String = normalCwd();
-		if (cwd != null) return join(cwd, FILE_NAME);
+		var cwd2:String = normalCwd();
+		if (cwd2 != null) return join(cwd2, FILE_NAME);
 
 		return null;
 	}

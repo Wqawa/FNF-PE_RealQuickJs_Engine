@@ -44,7 +44,7 @@
 
 ### 0.0 现在是什么状态
 
-同一个 `PsychEngine.exe` 里跑三棵独立的源码树，靠 `bin/engine.txt` 选：
+同一个 `realQuickJSEngine.exe` 里跑三棵独立的源码树，靠 `bin/engine.txt` 选：
 
 | engine.txt | 走哪棵 | 源码目录 | 资产目录 |
 |---|---|---|---|

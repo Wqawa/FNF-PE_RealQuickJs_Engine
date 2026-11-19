@@ -37,10 +37,20 @@ import backend.MusicBeatState;
 //   buildXml's <include> does not produce -I on this hxcpp version (tried, no effect),
 //   so headers use quoted relative includes.
 //   Benefit: moving the repo or changing machines needs no edits; manage.sh builds the lib.
+//
+// Android: export/<mode>/android/obj sits at the same depth as windows/obj, so the two
+// relative paths above still hold. Only the artifact differs — NDK clang links a
+// libquickjs-ng.a (arm64-v8a), not the MSVC .lib. Built by `.workbuddy/build_qjs_android.sh`.
+//
+// Do NOT wrap @:buildXml in #if: hxcpp collects every buildXml on the class and appends
+// them all (both branches ended up in Build.xml, so the link line got a .lib and a bare
+// lib name). Conditions belong inside the XML, where hxcpp evaluates them.
 @:buildXml('
 <target id="haxe">
-	<libpath name="../../../../third_party/quickjs-ng/build" />
-	<lib name="quickjs-ng.lib" />
+	<libpath name="../../../../third_party/quickjs-ng/build" if="windows" />
+	<libpath name="../../../../third_party/quickjs-ng/build/android-arm64" unless="windows" />
+	<lib name="quickjs-ng.lib" if="windows" />
+	<lib name="-lquickjs-ng" unless="windows" />
 </target>
 ')
 @:cppFileCode('

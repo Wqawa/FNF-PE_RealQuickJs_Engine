@@ -38,7 +38,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
-taskkill //F //IM PsychEngine.exe > /dev/null 2>&1
+taskkill //F //IM realQuickJSEngine.exe > /dev/null 2>&1
 sleep 1
 
 echo "== 注入测试入口 =="
@@ -97,7 +97,7 @@ trap 'cleanup; printf "%s" "$ORIG_ENGINE" > "$BIN/engine.txt"' EXIT
 printf 'body' > "$BIN/engine.txt"
 cd "$BIN"
 # NOMOD：玩家上次选的 mod 会把它自己的 lua/hscript 一起带进来，报错会混进结果里
-PE_AUTOTEST="$SONG" PE_AUTOTEST_NOMOD=1 ./PsychEngine.exe > "$ROOT/.workbuddy/game.log" 2>&1 &
+PE_AUTOTEST="$SONG" PE_AUTOTEST_NOMOD=1 ./realQuickJSEngine.exe > "$ROOT/.workbuddy/game.log" 2>&1 &
 GAME_PID=$!
 
 for i in $(seq 1 25); do
@@ -108,7 +108,7 @@ for i in $(seq 1 25); do
 	fi
 done
 
-taskkill //F //IM PsychEngine.exe > /dev/null 2>&1
+taskkill //F //IM realQuickJSEngine.exe > /dev/null 2>&1
 wait $GAME_PID 2>/dev/null
 
 echo "== 结果 =="

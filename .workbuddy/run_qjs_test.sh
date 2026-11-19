@@ -27,7 +27,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
-taskkill //F //IM PsychEngine.exe > /dev/null 2>&1
+taskkill //F //IM realQuickJSEngine.exe > /dev/null 2>&1
 sleep 1
 
 mkdir -p "$OUT"
@@ -79,7 +79,7 @@ printf 'body' > "$BIN/engine.txt"
 
 echo "== 开局 $SONG（jsEngine=QuickJS）=="
 cd "$BIN"
-PE_AUTOTEST="$SONG" PE_AUTOTEST_JSENGINE=QuickJS PE_AUTOTEST_NOMOD=1 ./PsychEngine.exe > "$ROOT/.workbuddy/game_qjs.log" 2>&1 &
+PE_AUTOTEST="$SONG" PE_AUTOTEST_JSENGINE=QuickJS PE_AUTOTEST_NOMOD=1 ./realQuickJSEngine.exe > "$ROOT/.workbuddy/game_qjs.log" 2>&1 &
 GAME_PID=$!
 
 # 等到 smoke_a 写完结果，再多给两秒让「自卸之后那一帧」真的跑过去
@@ -91,7 +91,7 @@ for i in $(seq 1 40); do
 	fi
 done
 
-taskkill //F //IM PsychEngine.exe > /dev/null 2>&1
+taskkill //F //IM realQuickJSEngine.exe > /dev/null 2>&1
 wait $GAME_PID 2>/dev/null
 
 # 运行日志是相对 cwd 写的，落在 bin/testout 里，抄一份到 .workbuddy 留证
