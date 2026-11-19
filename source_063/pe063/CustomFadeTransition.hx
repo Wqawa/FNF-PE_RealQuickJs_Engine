@@ -52,9 +52,14 @@ class CustomFadeTransition extends MusicBeatSubstate {
 			transBlack.y = transGradient.y - transBlack.height + 50;
 			leTween = FlxTween.tween(transGradient, {y: transGradient.height + 50}, duration, {
 				onComplete: function(twn:FlxTween) {
-					if(finishCallback != null) {
-						finishCallback();
-					}
+					// 先清 leTween 再回调。destroy() 用 leTween 判断"转场有没有跑完"，
+					// 不清的话正常结束之后 destroy 还会再补一次 finishCallback ——
+					// 而那个回调就是 FlxG.resetState()，等于在销毁 state 的过程中再切一次，
+					// 直接抛 "Attempting to resetState while the current state is destroyed"。
+					leTween = null;
+					var cb:Void->Void = finishCallback;
+					finishCallback = null;
+					if(cb != null) cb();
 				},
 			ease: FlxEase.linear});
 		}
@@ -82,8 +87,20 @@ class CustomFadeTransition extends MusicBeatSubstate {
 
 	override function destroy() {
 		if(leTween != null) {
-			finishCallback();
+			// 转场没跑完就被销毁了（所在 state 正在被 FlxG.switchState destroy）。
+			// 这里绝对不能同步调 finishCallback：它多半是 FlxG.resetState / switchState，
+			// 在 FlxState.destroy 里再切 state 会抛
+			// "Attempting to resetState while the current state is destroyed"，黑屏卡死。
+			// 留到下一帧，而且 state 已经没了就不再调（那种情况说明别人已经在切了）。
 			leTween.cancel();
+			leTween = null;
+			var cb:Void->Void = finishCallback;
+			finishCallback = null;
+			if(cb != null) {
+				new FlxTimer().start(0.01, function(_) {
+					if(FlxG.state != null && FlxG.state.exists) cb();
+				});
+			}
 		}
 		super.destroy();
 	}

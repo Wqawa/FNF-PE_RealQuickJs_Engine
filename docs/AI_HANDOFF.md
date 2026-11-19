@@ -450,6 +450,15 @@ QuickJS 冒烟 26 项（run_qjs_test.sh）
     回归盲区：AutoTestState 以前直接 `FlxG.switchState(new PlayState())` 并手动补
     `loadNextDirectory()`，正好绕开这条路径，所以测试全绿也发现不了。已改成和 Freeplay
     一致（`prepareToSong()` + `loadAndSwitchState()`），并把初始 currentLevel 设成 `shared`。
+14. **`pe063/CustomFadeTransition.destroy()` 里不能同步调 `finishCallback()`**（2026-11-19 修）。
+    那个回调在 `switchState` 里被赋成 `FlxG.resetState()`。正常转场结束时 `leTween` 没清，
+    于是 `FlxState.destroy` 过程中又会补调一次 `finishCallback` → 在销毁 state 的途中再切
+    state → `Critical Error: Uncatchable Throw: Attempting to resetState while the current
+    state is destroyed`，黑屏卡死（教程曲暂停菜单 Retry 必现）。
+    现在：`onComplete` 先 `leTween = null` + `finishCallback = null` 再回调；`destroy` 里只在
+    转场被打断时才处理，且改成下一帧 + `FlxG.state != null && exists` 才调。
+    注意 body/vanilla 的 `CustomFadeTransition` 是 `close()` 里回调并顺手清空，
+    不存在这个重复问题 —— 三棵树写法不一样，别照抄。
 
 ## 6. 已知未修
 
