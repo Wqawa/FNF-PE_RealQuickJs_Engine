@@ -80,10 +80,14 @@ $ADB logcat -s HXCPP
 
 ## 从零装工具链（换机器时才需要）
 
+**先跑 `bash manage.sh --zh 15`**：会体检 JDK17 / cmdline-tools / SDK 组件 / NDK / lime 配置 /
+QuickJS arm64 库，能自动补的都补（JDK 和 cmdline-tools 从 `dl/*.zip` 解压，SDK 组件走
+sdkmanager，QuickJS 库现场编）。只有 `dl/` 里没安装包、要手动下载时才照下面走。
+
 全装在 `.workbuddy/toolchain/`，不写注册表、不改系统 PATH：
 
 ```bash
-TC=D:/FNF/FNF-PE_RealQuickJs_Engine/.workbuddy/toolchain
+TC="$PWD/.workbuddy/toolchain"   # 在项目根目录执行；或换成 manage.sh 的 ROOT
 
 # 1. JDK 17（lime 8.1.2 的 gradle 7.4.2 / AGP 7.3.1 只认 17）
 curl -L -o dl/jdk17.zip https://mirrors.tuna.tsinghua.edu.cn/Adoptium/17/jdk/x64/windows/OpenJDK17U-jdk_x64_windows_hotspot_17.0.21_9.zip

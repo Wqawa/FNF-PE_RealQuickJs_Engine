@@ -20,8 +20,8 @@
 
 | 位置 | 是什么 | 状态 |
 |---|---|---|
-| `D:/FNF/FNF-PE_RealQuickJs_Engine` | 主仓，PE 1.0.4 fork（本体） | 分支 `main`，**有一堆未提交改动**，见第四节 |
-| `D:/FNF/PsychEngine_0.6.3` | 0.6.3 独立移植仓 | 分支 `dev_0.6.3`，已推到 fork，最新 `9659b03` |
+| `.`（本仓库根，原文写死过 `D:/FNF/FNF-PE_RealQuickJs_Engine`） | 主仓，PE 1.0.4 fork（本体） | 分支 `main`，**有一堆未提交改动**，见第四节 |
+| `../PsychEngine_0.6.3`（0.6.3 独立移植仓，换机器按实际位置） | 0.6.3 独立移植仓 | 分支 `dev_0.6.3`，已推到 fork，最新 `9659b03` |
 | `https://github.com/Wqawa/FNF-PE_RealQuickJs_Engine` | 两者的远端 | `main` + `dev_0.6.3` 两条分支 |
 
 0.6.3 仓的 remote 有两个：
@@ -150,8 +150,8 @@ RatioScaleMode → scale=1.275,1.275
 ## 六、构建与调试手册（这几天踩的坑）
 
 ```bash
-# 主仓
-cd D:/FNF/FNF-PE_RealQuickJs_Engine && bash manage.sh release
+# 主仓（在仓库根执行）
+bash manage.sh release
 # 0.6.3（用主仓的库根编）
 bash .workbuddy/tmp/build063.sh
 ```

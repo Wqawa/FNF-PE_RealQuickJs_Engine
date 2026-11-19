@@ -28,7 +28,7 @@ bash manage.sh --zh 2     # 跳过菜单，直接编译 release
 bash manage.sh --zh 3     # debug
 ```
 
-菜单 1–14 / 0 退出：1 环境体检（缺库自动补）、2 release、3 debug、4 全量重编、5 铺素材、6 只校验资产、7 Lua 兼容审计、8 重建 import 表、9 强制重建 QuickJS-NG 静态库、10 Lua 回归、11 QuickJS 回归、12 0.6.3 路径探针、13 安卓构建、14 Android QuickJS 静态库。
+菜单合并成 9 项 / 0 退出：1 环境体检（进后选桌面/安卓/全部）、2 编译（release/debug/全量）、5 素材（铺+校验/只校验）、7 Lua 兼容审计、8 重建 import 表、9 QuickJS 静态库（Windows/Android）、10 回归测试（Lua/QuickJS/0.6.3 探针）、13 安卓构建、15 安卓环境补齐。**旧编号 1–14 全部照用**（3=debug、4=clean、6=只校验、11=qjs 回归、12=探针、14=安卓 QJS），新命令也支持带参数跳过二级选择，如 `manage.sh --zh build debug`、`--zh test qjs bopeebo`、`--zh env android`。
 
 所有脚本都收在根目录 `manage.sh`（双击 `manage.bat`），`.workbuddy/` 只放测试数据和工具链，不再有散落的 sh。带动作调用时（如 `--zh 2`）会自己裹 `conhost --headless`，从编辑器/CI/后台起也不会给 haxe/cl/link 弹黑框。
 

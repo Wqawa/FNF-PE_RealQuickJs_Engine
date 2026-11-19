@@ -86,8 +86,14 @@ hxvlc 2.0.1
 find_haxe() {
 	local cand
 	if command -v haxe >/dev/null 2>&1; then HY_BIN="$(command -v haxe)"; return 0; fi
-	for cand in /d/FNF/Haxe/*/haxe/haxe.exe /c/Haxe/*/haxe.exe /c/haxe/haxe.exe "$ROOT/.haxe/haxe.exe"; do
-		[ -f "$cand" ] && { HY_BIN="$cand"; return 0; }
+	# HAXE_DIR 指 haxe.exe 所在目录（或 haxe 可执行文件本身）；换机器只设这一个变量。
+	# 后面是常见默认安装位置，用 /c /d 这些 Git Bash 挂载点，不绑定某个盘上的项目路径。
+	for cand in \
+		"${HAXE_DIR:-}" \
+		"${HAXE_DIR:-}/haxe.exe" \
+		/c/Haxe/*/haxe/haxe.exe /c/Haxe/haxe.exe /c/haxe/haxe.exe \
+		/d/Haxe/*/haxe/haxe.exe "$ROOT/.haxe/haxe.exe"; do
+		[ -n "$cand" ] && [ -f "$cand" ] && { HY_BIN="$cand"; return 0; }
 	done
 	return 1
 }
@@ -227,24 +233,41 @@ pick_msvc() {
 			done
 		}
 	done
+	# 标准安装位置（Program Files）本身是 Windows 约定，可移植；不再写死某个盘上的自建路径。
+	# 自建 / 精简版 VS 用 MSVC_DIR 环境变量指过来。
 	for base in \
-		"G:/vs/program/VC/Tools/MSVC" \
-		"D:/VS2019/BuildTools/VC/Tools/MSVC" \
 		"C:/Program Files/Microsoft Visual Studio/2022/BuildTools/VC/Tools/MSVC" \
 		"C:/Program Files/Microsoft Visual Studio/2022/Community/VC/Tools/MSVC" \
-		"C:/Program Files (x86)/Microsoft Visual Studio/2019/BuildTools/VC/Tools/MSVC"; do
+		"C:/Program Files/Microsoft Visual Studio/2022/Professional/VC/Tools/MSVC" \
+		"C:/Program Files (x86)/Microsoft Visual Studio/2019/BuildTools/VC/Tools/MSVC" \
+		"C:/Program Files/Microsoft Visual Studio/2019/BuildTools/VC/Tools/MSVC"; do
 		[ -d "$base" ] || continue
 		ver="$(ls -1 "$base" 2>/dev/null | sort -V | tail -1)"
 		[ -n "$ver" ] && { printf '%s' "$base/$ver"; return; }
 	done
+	# 精简版 / 自建 VS 常散在各盘根目录（VS2019/BuildTools、vs/program 等）。
+	# 遍历盘符 + 常见子目录，不绑定具体盘号。
+	local drive sub
+	for drive in c d e f g; do
+		for sub in VS2019/BuildTools vs/program VS2022/BuildTools VisualStudio/BuildTools; do
+			base="/$drive/$sub/VC/Tools/MSVC"
+			[ -d "$base" ] || continue
+			ver="$(ls -1 "$base" 2>/dev/null | sort -V | tail -1)"
+			[ -n "$ver" ] && { printf '%s' "$base/$ver"; return; }
+		done
+	done
 }
 
 pick_sdk() {
-	local base
+	local base drive
+	# SDK_DIR 覆盖；没设就按标准位置找，再遍历各盘符（换机器不用改脚本）。
 	for base in "${SDK_DIR:-}" \
-		"C:/Program Files (x86)/Windows Kits/10" "C:/Program Files/Windows Kits/10" \
-		"D:/Windows Kits/10" "E:/Windows Kits/10" "F:/Windows Kits/10" "G:/Windows Kits/10"; do
+		"C:/Program Files (x86)/Windows Kits/10" "C:/Program Files/Windows Kits/10"; do
 		[ -n "$base" ] && [ -d "$base/Include" ] && { printf '%s' "$base"; return; }
+	done
+	for drive in c d e f g h; do
+		base="/$drive/Windows Kits/10"
+		[ -d "$base/Include" ] && { printf '%s' "$base"; return; }
 	done
 }
 
@@ -271,8 +294,143 @@ setup_msvc() {
 	return 0
 }
 
+# ---------------------------------------------------------------- 安卓环境体检 / 补齐
+# 工具链全在 .workbuddy/toolchain/，不写系统 PATH、不装全局。检查项和补齐方式：
+#   JDK17 / cmdline-tools : dl/ 里有 zip 就解压补，没有就打印获取命令
+#   SDK 组件 / NDK        : cmdline-tools 的 sdkmanager 装（要网络 + 许可证）
+#   lime 配置             : lime config 写进 ~/.lime/config.xml
+#   QuickJS arm64 库      : 直接调 cmd_qjsandroid 现场编
+ANDROID_TC="$ROOT/.workbuddy/toolchain"
+ANDROID_SDK_DIR="$ANDROID_TC/android-sdk"
+ANDROID_NDK_DIR="$ANDROID_SDK_DIR/ndk/25.2.9519653"
+ANDROID_DL="$ANDROID_TC/dl"
+ANDROID_CMDLINE="$ANDROID_SDK_DIR/cmdline-tools/latest/bin"
+
+check_android_env() {
+	local miss=0
+	head_ "安卓工具链"
+	for d in "$ANDROID_TC/jdk17" "$ANDROID_CMDLINE" \
+	         "$ANDROID_SDK_DIR/platform-tools" "$ANDROID_SDK_DIR/platforms/android-33" \
+	         "$ANDROID_SDK_DIR/build-tools/33.0.2" "$ANDROID_NDK_DIR"; do
+		[ -d "$d" ] && ok "${d#$ROOT/}" || { bad "缺 ${d#$ROOT/}"; miss=$((miss+1)); }
+	done
+	head_ "lime 安卓配置"
+	# 用 lime config 回读，没配的项列出来（ANDROID_SETUP 在 setup_android_env 里 export，
+	# 但写进 config.xml 才对双击/别的终端生效）
+	local cfg="$HOME/.lime/config.xml"
+	if [ -f "$cfg" ] && grep -q 'ANDROID_SETUP' "$cfg"; then
+		ok "lime config: ANDROID_SETUP 已设"
+	else
+		warn "lime config 未写 ANDROID_SETUP（补齐会写入）"
+	fi
+	head_ "QuickJS arm64 静态库"
+	if [ -f "$ROOT/third_party/quickjs-ng/build/android-arm64/libquickjs-ng.a" ]; then
+		ok "libquickjs-ng.a ($(du -h "$ROOT/third_party/quickjs-ng/build/android-arm64/libquickjs-ng.a" | cut -f1))"
+	else
+		warn "libquickjs-ng.a 还没编（安卓构建会自动编，补齐也编）"
+	fi
+	return $miss
+}
+
+# 从 dl/ 的 zip 补齐 JDK 或 cmdline-tools。unzip 到临时目录再摆到目标，
+# 避免半途失败留下残缺目录。JDK 的 zip 顶层是 jdk-17.../ ，cmdline 是 cmdline-tools/。
+unpack_tool() {
+	local zip="$1" dest="$2" label="$3" tmp
+	[ -f "$zip" ] || { warn "$label：没有 $zip，无法自动补齐"; return 1; }
+	command -v unzip >/dev/null 2>&1 || { warn "$label：没有 unzip"; return 1; }
+	tmp="$(mktemp -d)"
+	if ! unzip -q "$zip" -d "$tmp"; then rm -rf "$tmp"; warn "$label：解压失败"; return 1; fi
+	mkdir -p "$(dirname "$dest")"
+	# JDK：找 zip 里唯一的 jdk*/ 顶层目录
+	if [ "$label" = "JDK17" ]; then
+		local top
+		top="$(find "$tmp" -maxdepth 1 -type d -name 'jdk*' | head -1)"
+		[ -n "$top" ] || { rm -rf "$tmp"; warn "JDK17：zip 里找不到 jdk* 目录"; return 1; }
+		rm -rf "$dest"; mv "$top" "$dest"
+	else
+		# cmdline-tools：zip 顶层是 cmdline-tools/bin，要摆成 sdk/cmdline-tools/latest/bin
+		rm -rf "$dest"; mkdir -p "$ANDROID_SDK_DIR/cmdline-tools"
+		mv "$tmp/cmdline-tools" "$ANDROID_SDK_DIR/cmdline-tools/latest" 2>/dev/null \
+			|| mv "$tmp" "$ANDROID_SDK_DIR/cmdline-tools/latest"
+	fi
+	rm -rf "$tmp"
+	ok "$label 补齐到 $dest"
+}
+
+cmd_env_android() {
+	local fix="${1:-1}" n=0
+	check_android_env || n=$?
+
+	if [ "$fix" != 1 ]; then
+		say "  只检查，不补齐。要补齐跑：manage.sh --zh env-android" "  check only."
+		return $([ "$n" -eq 0 ] && echo 0 || echo 1)
+	fi
+
+	# JDK17
+	if [ ! -d "$ANDROID_TC/jdk17/bin" ]; then
+		head_ "补 JDK17"
+		if ! unpack_tool "$ANDROID_DL/jdk17.zip" "$ANDROID_TC/jdk17" "JDK17"; then
+			say "  手动下载放到 .workbuddy/toolchain/dl/jdk17.zip：" "  fetch jdk17.zip manually:"
+			printf '    https://mirrors.tuna.tsinghua.edu.cn/Adoptium/17/jdk/x64/windows/OpenJDK17U-jdk_x64_windows_hotspot_17.0.21_9.zip\n'
+		fi
+	fi
+	# cmdline-tools
+	if [ ! -x "$ANDROID_CMDLINE/sdkmanager.bat" ] && [ ! -f "$ANDROID_CMDLINE/sdkmanager.bat" ]; then
+		head_ "补 cmdline-tools"
+		if ! unpack_tool "$ANDROID_DL/cmdline-tools.zip" "$ANDROID_CMDLINE" "cmdline-tools"; then
+			printf '    https://dl.google.com/android/repository/commandlinetools-win-11076708_latest.zip\n'
+		fi
+	fi
+	# SDK 组件：只补缺的（sdkmanager 在才补得动）。全在就不联网、不跑许可证步骤。
+	local sdk_missing=0 pkg
+	for pkg in platform-tools platforms/android-33 build-tools/33.0.2 ndk/25.2.9519653; do
+		[ -d "$ANDROID_SDK_DIR/$pkg" ] || sdk_missing=1
+	done
+	if [ "$sdk_missing" -eq 1 ]; then
+		if [ -f "$ANDROID_CMDLINE/sdkmanager.bat" ]; then
+			head_ "补 SDK 组件（要网络 + 许可证）"
+			local J="$ANDROID_TC/jdk17"
+			mkdir -p "$ANDROID_SDK_DIR/licenses"
+			JAVA_HOME="$J" yes 2>/dev/null | JAVA_HOME="$J" "$ANDROID_CMDLINE/sdkmanager.bat" \
+				--sdk_root="$ANDROID_SDK_DIR" --licenses >/dev/null 2>&1 || warn "许可证步骤可能没过，下面继续试"
+			JAVA_HOME="$J" "$ANDROID_CMDLINE/sdkmanager.bat" --sdk_root="$ANDROID_SDK_DIR" \
+				"platform-tools" "platforms;android-33" "build-tools;33.0.2" "ndk;25.2.9519653" \
+				>/dev/null 2>&1 && ok "SDK 组件齐全" || warn "SDK 组件没装全，检查网络后重试"
+		else
+			warn "没有 sdkmanager，SDK 组件跳过（先补 cmdline-tools）"
+		fi
+	else
+		ok "SDK 组件齐全，跳过下载"
+	fi
+	# lime 配置
+	head_ "写 lime 安卓配置"
+	if command -v haxelib >/dev/null 2>&1; then
+		haxelib run lime config ANDROID_SDK "$ANDROID_SDK_DIR" >/dev/null 2>&1
+		haxelib run lime config ANDROID_NDK_ROOT "$ANDROID_NDK_DIR" >/dev/null 2>&1
+		haxelib run lime config ANDROID_NDK_DIR "$ANDROID_SDK_DIR/ndk" >/dev/null 2>&1
+		haxelib run lime config JAVA_HOME "$ANDROID_TC/jdk17" >/dev/null 2>&1
+		haxelib run lime config ANDROID_SETUP true >/dev/null 2>&1
+		ok "lime config 写好了（~/.lime/config.xml）"
+	else
+		warn "没有 haxelib，lime 配置跳过"
+	fi
+	# QuickJS arm64 库
+	if [ ! -f "$ROOT/third_party/quickjs-ng/build/android-arm64/libquickjs-ng.a" ]; then
+		head_ "编 QuickJS arm64 静态库"
+		cmd_qjsandroid || warn "QuickJS arm64 库没编出来，安卓构建时会再试"
+	fi
+	printf '\n'
+	head_ "补齐后复查"
+	check_android_env
+}
+
 # ---------------------------------------------------------------- 环境体检
 cmd_env() {
+	local scope="${1:-desktop}"
+	if [ "$scope" = android ] || [ "$scope" = all ]; then
+		cmd_env_android 1
+		[ "$scope" = android ] && return $?
+	fi
 	BAD=0
 	setup_toolchain || true
 	if [ -n "${HAXELIB_PATH:-}" ]; then
@@ -289,8 +447,13 @@ cmd_env() {
 	fi
 	setup_msvc || true
 	head_ "其它"
-	command -v rc.exe >/dev/null 2>&1 || [ -f "$SDK_BASE/bin/$SDK_VER/x64/rc.exe" ] \
-		&& ok "rc.exe" || warn "rc.exe 不在 PATH（lime 8.3+ 编资源要用）"
+	if command -v rc.exe >/dev/null 2>&1; then
+		ok "rc.exe"
+	elif [ -n "${SDK_BASE:-}" ] && [ -n "${SDK_VER:-}" ] && [ -f "$SDK_BASE/bin/$SDK_VER/x64/rc.exe" ]; then
+		ok "rc.exe"
+	else
+		warn "rc.exe 不在 PATH（lime 8.3+ 编资源要用）"
+	fi
 	command -v python >/dev/null 2>&1 && ok "python" || warn "没有 python（只影响审计功能）"
 	# JS 运行时：源码随仓库来，静态库编译时自动生成
 	if [ -f "$QJS_SRC/quickjs.c" ]; then
@@ -886,8 +1049,13 @@ cmd_probe063() (
 
 	taskkill //F //IM realQuickJSEngine.exe > /dev/null 2>&1
 	printf 'pe063' > "$BIN/engine.txt"
+	mkdir -p "$ROOT/.workbuddy/testout"
+	# 把绝对输出路径传给探针，换机器 / 换盘符都不用改 hx 源码
+	local probe_win
+	probe_win="$(cygpath -m "$ROOT/.workbuddy/testout/pe063_probe.txt" 2>/dev/null \
+		|| printf '%s' "$ROOT/.workbuddy/testout/pe063_probe.txt")"
 	cd "$BIN" || return 1
-	PE_063_PROBE=1 ./realQuickJSEngine.exe > "$ROOT/.workbuddy/probe_run.log" 2>&1
+	PE_063_PROBE=1 PE_PROBE_OUT="$probe_win" ./realQuickJSEngine.exe > "$ROOT/.workbuddy/probe_run.log" 2>&1
 	printf 'exit=%s\n' "$?"
 
 	head_ "0.6.3 路径探针结果"
@@ -964,16 +1132,20 @@ collect_lua_funcs() {
 
 cmd_audit() {
 	head_ "Lua / HScript 兼容审计（函数名级）"
+	# 上游参照默认用仓库内的 .workbuddy/upstream/；换机器可用 PE_REF063 / PE_REF073
+	# 指到任意检出目录，不用改脚本。
+	local ref063="${PE_REF063:-$ROOT/.workbuddy/upstream/pe063/source}"
+	local ref073="${PE_REF073:-$ROOT/.workbuddy/upstream/pe073/source}"
 	local ref
 	printf '  基准树：\n'
-	printf '    1) D:/FNF/PE063-ref/source\n'
-	printf '    2) D:/FNF/PE073-ref/source\n'
+	printf '    1) %s\n' "$ref063"
+	printf '    2) %s\n' "$ref073"
 	printf '    3) 手输路径\n'
 	printf '  > '
 	read -r ref || return 0
 	case "$ref" in
-		1) ref="D:/FNF/PE063-ref/source" ;;
-		2) ref="D:/FNF/PE073-ref/source" ;;
+		1) ref="$ref063" ;;
+		2) ref="$ref073" ;;
 		3) printf '  path> '; read -r ref ;;
 	esac
 	[ -d "$ref" ] || { bad "目录不存在：$ref"; return 1; }
@@ -1021,59 +1193,101 @@ print_menu() {
 	say "  FNF-PE RealQuickJS 工具箱" "  FNF-PE RealQuickJS Toolbox"
 	printf '==============================================================\n\n'
 	if [ "$L" = "en" ]; then
-		printf '  1)  Environment check    haxe / libs / MSVC / SDK / rc.exe, auto-repairs libs\n'
-		printf '  2)  Build release        incremental, then copy+verify assets\n'
-		printf '  3)  Build debug          same, -debug\n'
-		printf '  4)  Clean rebuild        wipe obj/src first, then build\n'
-		printf '  5)  Prepare assets       copy assets/base_game into bin, verify\n'
-		printf '  6)  Verify assets only   report missing bits, touch nothing\n'
-		printf '  7)  Lua compat audit     function-name diff against an upstream tree\n'
-		printf '  8)  Rebuild import table regenerate the vanilla HScript import map\n'
-		printf '  9)  Build QuickJS-NG     rebuild the JS runtime static library (build does it too)\n'
-		printf ' 10)  Lua regression      inject entry, build, run a song, collect results\n'
-		printf ' 11)  QuickJS regression  same but through the real QuickJS runtime\n'
-		printf ' 12)  0.6.3 path probe    no game state, just Paths / atlas check\n'
-		printf ' 13)  Android build       arm64-v8a apk (toolchain in .workbuddy/toolchain)\n'
-		printf ' 14)  Android QuickJS     build libquickjs-ng.a for arm64\n'
+		printf '  1)  Environment check    desktop (auto-repair libs); sub-pick desktop/android/all\n'
+		printf '  2)  Build                release / debug / clean (old 2/3/4)\n'
+		printf '  5)  Assets              copy+verify or verify only (old 5/6)\n'
+		printf '  7)  Lua compat audit    function-name diff against an upstream tree\n'
+		printf '  8)  Rebuild import map  regenerate the vanilla HScript import table\n'
+		printf '  9)  QuickJS library     Windows or Android static lib (old 9/14)\n'
+		printf ' 10)  Regression          Lua / QuickJS / 0.6.3 probe (old 10/11/12)\n'
+		printf ' 13)  Android build       arm64-v8a apk\n'
+		printf ' 15)  Android env         check + repair toolchain (JDK/SDK/NDK/lime/QJS)\n'
 		printf '  0)  Quit\n'
+		printf '\n  Old numbers still work: 3=debug 4=clean 6=verify-only 11=qjs 12=probe 14=qjs-android\n'
 	else
-		printf '  1)  环境体检       Haxe / 库 / MSVC / SDK / rc.exe，缺库自动补\n'
-		printf '  2)  编译 release   增量编译，编完自动铺素材并校验\n'
-		printf '  3)  编译 debug     同上，debug 模式\n'
-		printf '  4)  全量重编       先清 obj/src 再编（改 Project.xml、换库之后用）\n'
-		printf '  5)  铺素材         把 assets/base_game 铺进 bin 并校验\n'
-		printf '  6)  只校验资产     不动文件，只报缺什么（发版前跑）\n'
+		printf '  1)  环境体检       桌面（缺库自动补）；进入后可选 桌面/安卓/全部\n'
+		printf '  2)  编译           release / debug / 全量重编（原 2/3/4）\n'
+		printf '  5)  素材           铺+校验 / 只校验（原 5/6）\n'
 		printf '  7)  Lua 兼容审计   拿上游源码树当基准，比 add_callback 注册的函数名\n'
 		printf '  8)  重建 import 表 扫 source_vanilla 重生成 HScript 的 import 隔离表\n'
-		printf '  9)  重建 QuickJS-NG  强制重编 JS 运行时静态库（平时编译会自动做）\n'
-		printf ' 10)  Lua 回归       注入入口 → 编译 → 开局 → 收结果 → 撤入口\n'
-		printf ' 11)  QuickJS 回归   同上，走真 QuickJS 运行时\n'
-		printf ' 12)  0.6.3 路径探针 不进游戏，只验 Paths / 图集\n'
-		printf ' 13)  安卓构建       arm64-v8a 包（工具链在 .workbuddy/toolchain）\n'
-		printf ' 14)  Android QuickJS 编 arm64 的 libquickjs-ng.a\n'
+		printf '  9)  QuickJS 静态库 Windows / Android 二选一（原 9/14）\n'
+		printf ' 10)  回归测试       Lua / QuickJS / 0.6.3 探针（原 10/11/12）\n'
+		printf ' 13)  安卓构建       arm64-v8a 包\n'
+		printf ' 15)  安卓环境       体检 + 补齐（JDK/SDK/NDK/lime/QJS arm64）\n'
 		printf '  0)  退出\n'
+		printf '\n  旧编号仍可用：3=debug 4=clean 6=只校验 11=qjs 回归 12=探针 14=安卓 QJS\n'
 	fi
 	printf '\n  > '
 }
 
+# 二级选择：合并项在交互菜单里再问一次模式。回车走默认项。
+ask_sub() {
+	local prompt="$1" default="$2" pick
+	printf '%s' "$prompt"
+	read -r pick || pick=""
+	[ -z "$pick" ] && pick="$default"
+	printf '%s' "$pick"
+}
+
+# 统一命令（带子参数）+ 旧编号别名，都落到这里。
+# 编号 1-14 保持原义不变，老脚本 / 文档 / 肌肉记忆照用。
 run_action() {
 	# shift 掉动作本身，剩下的参数透传给测试函数（歌名）
 	local act="$1"; shift
 	case "$act" in
-		1|env)         cmd_env ;;
+		# ---- 合并后的统一入口（推荐）———
+		env)
+			# 带参数（--zh env android）直接用；不带参数才交互问
+			local scope="${1:-}"
+			[ -z "$scope" ] && scope="$(ask_sub "  体检范围 [1]桌面 / [2]安卓 / [3]全部（回车=桌面）: " 1)"
+			case "$scope" in
+				2|android) cmd_env android ;;
+				3|all)     cmd_env all ;;
+				*)         cmd_env desktop ;;
+			esac ;;
+		build)
+			local mode="${1:-}"
+			[ -z "$mode" ] && mode="$(ask_sub "  编译模式 [1]release / [2]debug / [3]全量重编（回车=release）: " 1)"
+			case "$mode" in
+				2|debug) MODE=debug;   cmd_build 0 ;;
+				3|clean) MODE=release; cmd_build 1 ;;
+				*)       MODE=release; cmd_build 0 ;;
+			esac ;;
+		assets)
+			local how="${1:-}"
+			[ -z "$how" ] && how="$(ask_sub "  素材 [1]铺+校验 / [2]只校验（回车=铺+校验）: " 1)"
+			[ "$how" = 2 ] && cmd_assets 1 || cmd_assets 0 ;;
+		quickjs)
+			local plat="${1:-}"
+			[ -z "$plat" ] && plat="$(ask_sub "  QuickJS 静态库 [1]Windows / [2]Android（回车=Windows）: " 1)"
+			[ "$plat" = 2 ] && cmd_qjsandroid || cmd_quickjs ;;
+		test)
+			local which="${1:-}"
+			if [ -n "$which" ]; then shift; fi
+			[ -z "$which" ] && which="$(ask_sub "  回归 [1]Lua / [2]QuickJS / [3]0.6.3 探针（回车=Lua）: " 1)"
+			case "$which" in
+				2|qjs)   cmd_qjstest "$@" ;;
+				3|probe) cmd_probe063 ;;
+				*)       cmd_test "$@" ;;
+			esac ;;
+		android-env|env-android) cmd_env android ;;
+
+		# ---- 旧编号 / 旧名字（兼容，别删）———
+		1)             cmd_env desktop ;;
 		2|release)     MODE=release; cmd_build 0 ;;
 		3|debug)       MODE=debug;   cmd_build 0 ;;
 		4|clean)       MODE=release; cmd_build 1 ;;
-		5|assets)      cmd_assets 0 ;;
+		5|assets-full) cmd_assets 0 ;;
 		6|verify)      cmd_assets 1 ;;
 		7|audit)       cmd_audit ;;
 		8|imports)     cmd_imports ;;
-		9|quickjs)     cmd_quickjs ;;
-		10|test)       cmd_test "$@" ;;
+		9|quickjs-win) cmd_quickjs ;;
+		10|luatest)    cmd_test "$@" ;;
 		11|qjstest)    cmd_qjstest "$@" ;;
 		12|probe063)   cmd_probe063 ;;
 		13|android)    cmd_android ;;
 		14|qjsandroid) cmd_qjsandroid ;;
+		15)            cmd_env android ;;
 		0|q|Q)         return 99 ;;
 		*)             say "  没有这个编号" "  no such item"; return 2 ;;
 	esac
@@ -1088,11 +1302,29 @@ if [ -n "$ACTION" ]; then
 	exit "$rc"
 fi
 
+# 菜单里显示的编号 → 统一命令名（带二级询问）。命令行参数仍走 run_action 原编号，
+# 保证 --zh 2 / --zh 10 这些老用法行为不变。
+menu_action() {
+	case "$1" in
+		1) run_action env ;;
+		2) run_action build ;;
+		5) run_action assets ;;
+		7) run_action 7 ;;
+		8) run_action 8 ;;
+		9) run_action quickjs ;;
+		10) run_action test ;;
+		13) run_action 13 ;;
+		15) run_action 15 ;;
+		0|q|Q) return 99 ;;
+		*) run_action "$1" ;;
+	esac
+}
+
 while true; do
 	print_menu
 	read -r choice || exit 0
 	printf '\n'
-	run_action "$choice"; rc=$?
+	menu_action "$choice"; rc=$?
 	[ "$rc" -eq 99 ] && exit 0
 	printf '\n'
 	say "  回车继续…" "  press enter to continue…"

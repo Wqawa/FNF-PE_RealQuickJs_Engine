@@ -26,7 +26,11 @@ class Probe
 		Sys.println('[probe] ' + s);
 	}
 
-	static final OUT_PATH:String = 'D:/FNF/FNF-PE_RealQuickJs_Engine/.workbuddy/testout/pe063_probe.txt';
+	// manage.sh runs the game with cwd = export/<mode>/windows/bin, so four levels up
+	// is the repo root. PE_PROBE_OUT overrides it when launched from somewhere else.
+	static final OUT_PATH:String = Sys.getEnv('PE_PROBE_OUT') != null
+		? Sys.getEnv('PE_PROBE_OUT')
+		: '../../../../.workbuddy/testout/pe063_probe.txt';
 
 	public static function run():Void
 	{
