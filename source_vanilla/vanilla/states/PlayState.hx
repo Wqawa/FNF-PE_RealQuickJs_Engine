@@ -1,4 +1,8 @@
 package vanilla.states;
+
+#if MOBILE_CONTROLS
+import vanilla.mobile.objects.TouchButton;
+#end
 import vanilla.backend.Highscore;
 import vanilla.backend.StageData;
 import vanilla.backend.WeekData;
@@ -262,6 +266,9 @@ class PlayState extends MusicBeatState
 	public static var nextReloadAll:Bool = false;
 	override public function create()
 	{
+		#if MOBILE_CONTROLS
+		addMenuPad = false;
+		#end
 		//trace('Playback Rate: ' + playbackRate);
 		_lastLoadedModDirectory = Mods.currentModDirectory;
 		Paths.clearStoredMemory();
@@ -601,6 +608,17 @@ class PlayState extends MusicBeatState
 			for (event in eventNotes) event.strumTime -= eventEarlyTrigger(event);
 			eventNotes.sort(sortByTime);
 		}
+
+		#if MOBILE_CONTROLS
+		if(ClientPrefs.data.controlsAlpha > 0.05)
+		{
+			addMobileControls();
+			mobileControls.cameras = [camHUD];
+			mobileControls.visible = true;
+			mobileControls.onButtonDown.add(onButtonPress);
+			mobileControls.onButtonUp.add(onButtonRelease);
+		}
+		#end
 
 		startCallback();
 		RecalculateRating(false, false);
@@ -1563,6 +1581,9 @@ class PlayState extends MusicBeatState
 
 	override function openSubState(SubState:FlxSubState)
 	{
+		#if MOBILE_CONTROLS
+		if(mobileControls != null) mobileControls.releaseAll();
+		#end
 		stagesFunc(function(stage:BaseStage) stage.openSubState(SubState));
 		if (paused)
 		{
@@ -2390,6 +2411,9 @@ class PlayState extends MusicBeatState
 	public var transitioning = false;
 	public function endSong()
 	{
+		#if MOBILE_CONTROLS
+		if(mobileControls != null) mobileControls.visible = false;
+		#end
 		//Should kill you if you tried to cheat
 		if(!startingSong)
 		{
@@ -2776,6 +2800,35 @@ class PlayState extends MusicBeatState
 		var key:Int = getKeyFromEvent(keysArray, eventKey);
 		if(!controls.controllerMode && key > -1) keyReleased(key);
 	}
+
+	#if MOBILE_CONTROLS
+	/** Which note lane a touch button stands for, -1 if it isn't one. */
+	static function mobileNoteIndex(button:TouchButton):Int
+	{
+		if(button == null || button.IDs == null) return -1;
+		for(id in button.IDs)
+		{
+			var i:Int = id;
+			if(i >= 0 && i <= 3) return i; // NOTE_LEFT..NOTE_RIGHT
+			if(i >= 34 && i <= 37) return i - 34; // HITBOX_LEFT..HITBOX_RIGHT
+		}
+		return -1;
+	}
+
+	function onButtonPress(button:TouchButton):Void
+	{
+		var dir:Int = mobileNoteIndex(button);
+		if(dir < 0) return;
+		if(button.justPressed) keyPressed(dir);
+	}
+
+	function onButtonRelease(button:TouchButton):Void
+	{
+		var dir:Int = mobileNoteIndex(button);
+		if(dir < 0) return;
+		keyReleased(dir);
+	}
+	#end
 
 	private function keyReleased(key:Int)
 	{

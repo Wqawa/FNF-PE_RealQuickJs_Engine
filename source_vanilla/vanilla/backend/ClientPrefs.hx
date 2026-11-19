@@ -14,6 +14,8 @@ import vanilla.states.TitleState;
 	public var flashing:Bool = true;
 	public var autoPause:Bool = true;
 	public var antialiasing:Bool = true;
+	public var controlsMode:String = 'Right'; // touch controls: Right / Left / Hitbox
+	public var controlsAlpha:Float = #if (android || ios) 0.6 #else 0 #end; // touch controls visibility
 	public var noteSkin:String = 'Default';
 	public var splashSkin:String = 'Psych';
 	public var splashAlpha:Float = 0.6;

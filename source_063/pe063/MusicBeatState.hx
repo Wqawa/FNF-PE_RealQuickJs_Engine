@@ -15,6 +15,13 @@ import flixel.FlxState;
 import flixel.FlxCamera;
 import flixel.FlxBasic;
 
+#if MOBILE_CONTROLS
+import flixel.util.FlxDestroyUtil;
+import pe063.mobile.input.MobileInputManager;
+import pe063.mobile.objects.Hitbox;
+import pe063.mobile.objects.TouchPad;
+#end
+
 class MusicBeatState extends FlxUIState
 {
 	private var curSection:Int = 0;
@@ -32,10 +39,67 @@ class MusicBeatState extends FlxUIState
 	inline function get_controls():Controls
 		return PlayerSettings.player1.controls;
 
+	#if MOBILE_CONTROLS
+	public var touchPad:TouchPad;
+	public var mobileControls:MobileInputManager;
+
+	/** Set to false before super.create() to skip the default menu pad. */
+	public var addMenuPad:Bool = true;
+
+	public function addTouchPad(DPad:String, Action:String):TouchPad
+	{
+		removeTouchPad();
+		touchPad = new TouchPad(DPad, Action);
+		touchPad.cameras = [FlxG.camera];
+		touchPad.register();
+		add(touchPad);
+		return touchPad;
+	}
+
+	public function removeTouchPad():Void
+	{
+		if(touchPad == null) return;
+		touchPad.unregister();
+		remove(touchPad, true);
+		touchPad = FlxDestroyUtil.destroy(touchPad);
+		touchPad = null;
+	}
+
+	public function addMobileControls():MobileInputManager
+	{
+		removeMobileControls();
+		mobileControls = switch(ClientPrefs.controlsMode)
+		{
+			case 'Left': new TouchPad('LEFT_FULL', 'NONE');
+			case 'Hitbox': new Hitbox();
+			default: new TouchPad('RIGHT_FULL', 'NONE');
+		}
+		mobileControls.cameras = [FlxG.camera];
+		mobileControls.register();
+		add(mobileControls);
+		mobileControls.visible = false;
+		return mobileControls;
+	}
+
+	public function removeMobileControls():Void
+	{
+		if(mobileControls == null) return;
+		mobileControls.unregister();
+		remove(mobileControls, true);
+		mobileControls = FlxDestroyUtil.destroy(mobileControls);
+		mobileControls = null;
+	}
+	#end
+
 	override function create() {
 		camBeat = FlxG.camera;
 		var skip:Bool = FlxTransitionableState.skipNextTransOut;
 		super.create();
+
+		#if MOBILE_CONTROLS
+		if(addMenuPad && touchPad == null && mobileControls == null && ClientPrefs.controlsAlpha > 0.05)
+			addTouchPad('LEFT_FULL', 'A_B');
+		#end
 
 		if(!skip) {
 			openSubState(new CustomFadeTransition(0.7, true));

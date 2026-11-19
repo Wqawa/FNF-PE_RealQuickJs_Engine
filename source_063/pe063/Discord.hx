@@ -1,5 +1,9 @@
 package pe063;
 
+// 只有桌面有 hxdiscord_rpc 的原生库，安卓/iOS 编不进来。
+// 0.6.3 这棵树到处在调 DiscordClient（换歌名、编辑器里），所以留一个空壳顶上。
+#if DISCORD_ALLOWED
+
 import Sys.sleep;
 import sys.thread.Thread;
 
@@ -161,3 +165,21 @@ private final class DiscordPresence
 	inline function set_endTimestamp(value:Int):Int
 		return __presence.endTimestamp = value;
 }
+
+#else
+
+class DiscordClient
+{
+	public static var isInitialized:Bool = false;
+	public static var clientID:String = '';
+
+	public static function initialize() {}
+
+	public static function shutdown() {}
+
+	public static function changePresence(details:String, state:Null<String>, ?smallImageKey:String, ?hasStartTimestamp:Bool, ?endTimestamp:Float) {}
+
+	public static function addLuaCallbacks(lua:Dynamic) {}
+}
+
+#end

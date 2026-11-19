@@ -1,6 +1,12 @@
 package backend;
 
 import flixel.FlxSubState;
+#if MOBILE_CONTROLS
+import flixel.util.FlxDestroyUtil;
+import mobile.input.MobileInputID;
+import mobile.input.MobileInputManager;
+import mobile.objects.TouchPad;
+#end
 
 class MusicBeatSubstate extends FlxSubState
 {
@@ -24,6 +30,45 @@ class MusicBeatSubstate extends FlxSubState
 
 	inline function get_controls():Controls
 		return Controls.instance;
+
+	#if MOBILE_CONTROLS
+	public var touchPad:TouchPad;
+	public var addMenuPad:Bool = true;
+
+	public function addTouchPad(DPad:String, Action:String):TouchPad
+	{
+		removeTouchPad();
+		touchPad = new TouchPad(DPad, Action);
+		touchPad.cameras = [FlxG.camera];
+		touchPad.register();
+		add(touchPad);
+		return touchPad;
+	}
+
+	public function removeTouchPad():Void
+	{
+		if(touchPad == null) return;
+		touchPad.unregister();
+		remove(touchPad, true);
+		touchPad = FlxDestroyUtil.destroy(touchPad);
+		touchPad = null;
+	}
+
+	override function create():Void
+	{
+		super.create();
+		// an options menu already sits on a state that has a pad; don't stack two
+		var current:MobileInputManager = MobileInputManager.current;
+		if(addMenuPad && (current == null || !current.hasButton(MobileInputID.A)) && ClientPrefs.data.controlsAlpha > 0.05)
+			addTouchPad('LEFT_FULL', 'A_B');
+	}
+
+	override function destroy():Void
+	{
+		removeTouchPad();
+		super.destroy();
+	}
+	#end
 
 	override function update(elapsed:Float)
 	{

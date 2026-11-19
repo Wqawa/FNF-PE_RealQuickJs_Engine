@@ -2,6 +2,12 @@ package vanilla.backend;
 
 import flixel.FlxState;
 import vanilla.backend.PsychCamera;
+#if MOBILE_CONTROLS
+import flixel.util.FlxDestroyUtil;
+import vanilla.mobile.input.MobileInputManager;
+import vanilla.mobile.objects.Hitbox;
+import vanilla.mobile.objects.TouchPad;
+#end
 
 class MusicBeatState extends FlxState
 {
@@ -21,9 +27,72 @@ class MusicBeatState extends FlxState
 
 	var _psychCameraInitialized:Bool = false;
 
+#if MOBILE_CONTROLS
+	public var touchPad:TouchPad;
+	public var mobileControls:MobileInputManager;
+
+	/** Set to false before super.create() to skip the default menu pad. */
+	public var addMenuPad:Bool = true;
+
+	/** Small D-Pad + action buttons. Menus use this. */
+	public function addTouchPad(DPad:String, Action:String):TouchPad
+	{
+		removeTouchPad();
+		touchPad = new TouchPad(DPad, Action);
+		touchPad.cameras = [FlxG.camera];
+		touchPad.register();
+		add(touchPad);
+		return touchPad;
+	}
+
+	public function removeTouchPad():Void
+	{
+		if(touchPad == null) return;
+		touchPad.unregister();
+		remove(touchPad, true);
+		touchPad = FlxDestroyUtil.destroy(touchPad);
+		touchPad = null;
+	}
+
+	/** Gameplay pad: D-Pad on one side, or a full-screen hitbox. */
+	public function addMobileControls():MobileInputManager
+	{
+		removeMobileControls();
+		mobileControls = switch(ClientPrefs.data.controlsMode)
+		{
+			case 'Left': new TouchPad('LEFT_FULL', 'NONE');
+			case 'Hitbox': new Hitbox();
+			default: new TouchPad('RIGHT_FULL', 'NONE');
+		}
+		mobileControls.cameras = [FlxG.camera];
+		mobileControls.register();
+		add(mobileControls);
+		mobileControls.visible = false;
+		return mobileControls;
+	}
+
+	public function removeMobileControls():Void
+	{
+		if(mobileControls == null) return;
+		mobileControls.unregister();
+		remove(mobileControls, true);
+		mobileControls = FlxDestroyUtil.destroy(mobileControls);
+		mobileControls = null;
+	}
+#end
+
 	public var variables:Map<String, Dynamic> = new Map<String, Dynamic>();
 	public static function getVariables()
 		return getState().variables;
+
+	override function destroy()
+	{
+		#if MOBILE_CONTROLS
+		removeTouchPad();
+		removeMobileControls();
+		#end
+		super.destroy();
+	}
 
 	override function create() {
 		var skip:Bool = FlxTransitionableState.skipNextTransOut;
@@ -32,6 +101,11 @@ class MusicBeatState extends FlxState
 		if(!_psychCameraInitialized) initPsychCamera();
 
 		super.create();
+
+		#if MOBILE_CONTROLS
+		if(addMenuPad && touchPad == null && mobileControls == null && ClientPrefs.data.controlsAlpha > 0.05)
+			addTouchPad('LEFT_FULL', 'A_B');
+		#end
 
 		if(!skip) {
 			openSubState(new CustomFadeTransition(0.5, true));

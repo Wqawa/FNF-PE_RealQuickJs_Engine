@@ -1,6 +1,9 @@
 package pe063;
 
 import flixel.graphics.FlxGraphic;
+#if MOBILE_CONTROLS
+import pe063.mobile.objects.TouchButton;
+#end
 #if desktop
 import pe063.Discord.DiscordClient;
 #end
@@ -327,6 +330,9 @@ class PlayState extends MusicBeatState
 
 	override public function create()
 	{
+		#if MOBILE_CONTROLS
+		addMenuPad = false;
+		#end
 		//trace('Playback Rate: ' + playbackRate);
 		Paths.clearStoredMemory();
 
@@ -1385,9 +1391,49 @@ class PlayState extends MusicBeatState
 			}
 		}
 		Paths.clearUnusedMemory();
-		
+
+		#if MOBILE_CONTROLS
+		if(ClientPrefs.controlsAlpha > 0.05)
+		{
+			addMobileControls();
+			mobileControls.cameras = [camHUD];
+			mobileControls.visible = true;
+			mobileControls.onButtonDown.add(onMobileDown);
+			mobileControls.onButtonUp.add(onMobileUp);
+		}
+		#end
+
 		CustomFadeTransition.nextCamera = camOther;
 	}
+
+	#if MOBILE_CONTROLS
+	/** Which note lane a touch button stands for, -1 if it isn't one. */
+	static function mobileNoteIndex(button:TouchButton):Int
+	{
+		if(button == null || button.IDs == null) return -1;
+		for(id in button.IDs)
+		{
+			var i:Int = id;
+			if(i >= 0 && i <= 3) return i; // NOTE_LEFT..NOTE_RIGHT
+			if(i >= 34 && i <= 37) return i - 34; // HITBOX_LEFT..HITBOX_RIGHT
+		}
+		return -1;
+	}
+
+	function onMobileDown(button:TouchButton):Void
+	{
+		var dir:Int = mobileNoteIndex(button);
+		if(dir < 0 || dir >= keysArray.length) return;
+		onKeyPress(new KeyboardEvent(KeyboardEvent.KEY_DOWN, true, true, -1, keysArray[dir][0]));
+	}
+
+	function onMobileUp(button:TouchButton):Void
+	{
+		var dir:Int = mobileNoteIndex(button);
+		if(dir < 0 || dir >= keysArray.length) return;
+		onKeyRelease(new KeyboardEvent(KeyboardEvent.KEY_UP, true, true, -1, keysArray[dir][0]));
+	}
+	#end
 
 	#if (!flash && sys)
 	public var runtimeShaders:Map<String, Array<String>> = new Map<String, Array<String>>();
@@ -2758,6 +2804,9 @@ class PlayState extends MusicBeatState
 
 	override function openSubState(SubState:FlxSubState)
 	{
+		#if MOBILE_CONTROLS
+		if(mobileControls != null) mobileControls.releaseAll();
+		#end
 		if (paused)
 		{
 			if (FlxG.sound.music != null)
@@ -3922,6 +3971,9 @@ class PlayState extends MusicBeatState
 	public var transitioning = false;
 	public function endSong():Void
 	{
+		#if MOBILE_CONTROLS
+		if(mobileControls != null) mobileControls.visible = false;
+		#end
 		//Should kill you if you tried to cheat
 		if(!startingSong) {
 			notes.forEach(function(daNote:Note) {

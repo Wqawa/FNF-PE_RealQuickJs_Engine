@@ -69,6 +69,11 @@ class Main extends Sprite
 
 	private function setupGame():Void
 	{
+		// 手机上工作目录由共享层定：<应用存储>/.realQuickJSEngine
+		#if (android || ios)
+		backend.MobileStorage.init();
+		#end
+
 		var stageWidth:Int = Lib.current.stage.stageWidth;
 		var stageHeight:Int = Lib.current.stage.stageHeight;
 

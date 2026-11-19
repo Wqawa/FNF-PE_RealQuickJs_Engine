@@ -63,6 +63,9 @@ class TitleState extends MusicBeatState
 
 	override public function create():Void
 	{
+		#if MOBILE_CONTROLS
+		addMenuPad = false; // tapping anywhere already accepts
+		#end
 		Paths.clearStoredMemory();
 		super.create();
 		Paths.clearUnusedMemory();

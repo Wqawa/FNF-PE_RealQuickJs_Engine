@@ -1,9 +1,5 @@
 package body;
 
-#if android
-import android.content.Context;
-#end
-
 import debug.FPSCounter;
 
 import flixel.graphics.FlxGraphic;
@@ -79,11 +75,11 @@ class Main extends Sprite
 		backend.Native.fixScaling();
 		#end
 
-		// Credits to MAJigsaw77 (he's the og author for this code)
-		#if android
-		Sys.setCwd(Path.addTrailingSlash(Context.getExternalFilesDir()));
-		#elseif ios
-		Sys.setCwd(lime.system.System.applicationStorageDirectory);
+		// 手机上的工作目录：<应用存储>/.realQuickJSEngine（见 backend.MobileStorage）。
+		// 上游那行 android.content.Context.getExternalFilesDir() 本来就编不过 —— Haxe 侧没有
+		// android.* 的 extern。lime 能给的只有内置目录，MobileStorage 会在能识别外置目录时优先用它。
+		#if (android || ios)
+		backend.MobileStorage.init();
 		#end
 		#if VIDEOS_ALLOWED
 		hxvlc.util.Handle.init(#if (hxvlc >= "1.8.0")  ['--no-lua'] #end);

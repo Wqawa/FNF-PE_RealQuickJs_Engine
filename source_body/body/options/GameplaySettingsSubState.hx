@@ -156,6 +156,21 @@ class GameplaySettingsSubState extends BaseOptionsMenu
 			BOOL);
 		addOption(option);
 
+		#if MOBILE_CONTROLS
+		option = new Option('Touch Controls',
+			'Which layout the on-screen buttons use.',
+			'controlsMode',
+			STRING,
+			['Right', 'Left', 'Hitbox']);
+		addOption(option);
+
+		option = new Option('Touch Controls Alpha',
+			'How visible the on-screen buttons are. 0 hides them.',
+			'controlsAlpha',
+			PERCENT);
+		addOption(option);
+		#end
+
 		super();
 	}
 

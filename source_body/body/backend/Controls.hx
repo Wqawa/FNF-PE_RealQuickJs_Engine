@@ -1,6 +1,10 @@
 package backend;
 
 import flixel.input.gamepad.FlxGamepadButton;
+#if MOBILE_CONTROLS
+import mobile.input.MobileInputID;
+import mobile.input.MobileInputManager;
+#end
 import flixel.input.gamepad.FlxGamepadInputID;
 import flixel.input.gamepad.mappings.FlxGamepadMapping;
 import flixel.input.keyboard.FlxKey;
@@ -85,10 +89,50 @@ class Controls
 	//Gamepad & Keyboard stuff
 	public var keyboardBinds:Map<String, Array<FlxKey>>;
 	public var gamepadBinds:Map<String, Array<FlxGamepadInputID>>;
+
+	#if MOBILE_CONTROLS
+	/**
+	 * Which touch buttons answer to which control. Menus read ui_up / accept /
+	 * back, PlayState reads note_left..note_right, so one table covers both.
+	 */
+	static var mobileBinds:Map<String, Array<MobileInputID>> = [
+		'ui_up' => [MobileInputID.UP],
+		'ui_down' => [MobileInputID.DOWN],
+		'ui_left' => [MobileInputID.LEFT],
+		'ui_right' => [MobileInputID.RIGHT],
+		'accept' => [MobileInputID.A],
+		'back' => [MobileInputID.B],
+		'pause' => [MobileInputID.P],
+		'reset' => [MobileInputID.R],
+		'note_left' => [MobileInputID.NOTE_LEFT, MobileInputID.HITBOX_LEFT],
+		'note_down' => [MobileInputID.NOTE_DOWN, MobileInputID.HITBOX_DOWN],
+		'note_up' => [MobileInputID.NOTE_UP, MobileInputID.HITBOX_UP],
+		'note_right' => [MobileInputID.NOTE_RIGHT, MobileInputID.HITBOX_RIGHT]
+	];
+
+	/** The pad currently on screen, if any. */
+	inline public static function touchButtonPressed(key:String):Bool
+		return MobileInputManager.current != null && MobileInputManager.current.anyPressed(mobileBinds[key]);
+
+	inline public static function touchButtonJustPressed(key:String):Bool
+		return MobileInputManager.current != null && MobileInputManager.current.anyJustPressed(mobileBinds[key]);
+
+	inline public static function touchButtonJustReleased(key:String):Bool
+		return MobileInputManager.current != null && MobileInputManager.current.anyJustReleased(mobileBinds[key]);
+	#end
+
 	public function justPressed(key:String)
 	{
 		var result:Bool = (FlxG.keys.anyJustPressed(keyboardBinds[key]) == true);
 		if(result) controllerMode = false;
+
+		#if MOBILE_CONTROLS
+		if(touchButtonJustPressed(key))
+		{
+			controllerMode = false;
+			return true;
+		}
+		#end
 
 		return result || _myGamepadJustPressed(gamepadBinds[key]) == true;
 	}
@@ -98,6 +142,14 @@ class Controls
 		var result:Bool = (FlxG.keys.anyPressed(keyboardBinds[key]) == true);
 		if(result) controllerMode = false;
 
+		#if MOBILE_CONTROLS
+		if(touchButtonPressed(key))
+		{
+			controllerMode = false;
+			return true;
+		}
+		#end
+
 		return result || _myGamepadPressed(gamepadBinds[key]) == true;
 	}
 
@@ -105,6 +157,14 @@ class Controls
 	{
 		var result:Bool = (FlxG.keys.anyJustReleased(keyboardBinds[key]) == true);
 		if(result) controllerMode = false;
+
+		#if MOBILE_CONTROLS
+		if(touchButtonJustReleased(key))
+		{
+			controllerMode = false;
+			return true;
+		}
+		#end
 
 		return result || _myGamepadJustReleased(gamepadBinds[key]) == true;
 	}
