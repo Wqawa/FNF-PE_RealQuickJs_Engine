@@ -110,9 +110,9 @@ Animate 2019+ 图集、对象过桥、每首歌重建 context、vanilla 无自�
 
 ## 0.6.3 那个「lua 贴图出不来」的结论
 
-新加了探针 `source_063/pe063/debug/Probe.hx`（`PE_063_PROBE=1` 触发，
-`bash manage.sh --zh probe063` 跑）。它不进游戏、不建 state，把 `AtlasFrameMaker`
-用到的路径算出来并真的构造一次图集。实测：
+当时的探针是 `source_063/pe063/debug/Probe.hx`（`PE_063_PROBE=1` 触发）。它不进游戏、
+不建 state，把 `AtlasFrameMaker` 用到的路径算出来并真的构造一次图集。**该探针已于
+2026-11-19 删除**，下面是它当时的实测输出：
 
 ```
 --- key=cutscenes/stressPico  level=week7  mod=
@@ -148,12 +148,10 @@ Adobe Animate 2018 的单个 `spritemap.json`，碰到 2019+ 的 `spritemap1.jso
 ```bash
 bash manage.sh --zh luatest                # Lua/兼容层，含 isolation.txt（10 条）
 bash manage.sh --zh qjstest                # QuickJS 通道
-bash manage.sh --zh probe063                # 0.6.3 路径探针（不进游戏）
 ```
 
 `isolation.txt` 覆盖：`Paths.VERSION_DIR` 是 body、`vanilla.*` 类拿不到、assets 根脚本的
 `isRunning`、大小写不同的 `isRunning`、`scripts/` 目录脚本的 `isRunning`、`addHScript` 不重复建实例、
 hscript 的 `%run_v_` 版本标记（带/不带两种）、`removeHScript` 之后 `isRunning` 立刻为 false。
 
-vanilla 分支仍然没有自动入口，只能人工开机验；pe063 有探针，但它只验路径/图集，
-不跑 PlayState。
+vanilla 分支仍然没有自动入口，只能人工开机验；pe063 也一样（原路径探针已删）。

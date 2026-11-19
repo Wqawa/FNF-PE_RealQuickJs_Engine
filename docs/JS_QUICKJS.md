@@ -24,7 +24,6 @@ QuickJS 要手动开。
 ## 2. 文件分工
 
 ```
-jsruntime/QuickJS.hx        只跑一次 1+1，验证静态库链接通了；结果写 testout/quickjs_smoke.txt
 jsruntime/QuickJSHandler.hx JSRuntime/JSContext 生命周期 + C 侧桥 + 宿主函数总表（90% 的活在这）
 jsruntime/JSPlayer.hx       脚本清单、事件分发、timer/tween 归属、加载与卸载
 jsruntime/JSScriptHost.hx   IScriptHost 的实现（一个 .js 的落脚点）
@@ -251,7 +250,6 @@ bash manage.sh --zh qjstest bopeebo
 | `qjs_child.txt` | 第二个脚本（同名回调）自己写的，证明一文件一 context |
 | `qjs_selfremove.txt` | 自卸之后那一帧还活着 |
 | `qjs_js_log.txt` | 运行期 `js_log.txt` 的副本（trace / 报错 / 脚本装载记录） |
-| `quickjs_smoke.txt` | 静态库链接自检（`ok 2` 才对） |
 
 冒烟脚本覆盖：eval 生效、seedGlobals、共享变量表、属性读写、`Function_Stop` 拦下倒计时、
 `addLuaScript` / `removeLuaScript` / `isRunning`、跨脚本读全局、timer 回调、同名回调不互顶、

@@ -222,7 +222,14 @@ class MusicBeatState extends FlxState
 		// Put the level folder back to shared when leaving PlayState. Story, freeplay and the
 		// chart editor switch states directly without LoadingState, so currentLevel stayed on
 		// the last song's week folder and menu images looked there first.
-		if(!Std.isOfType(nextState, states.PlayState)) Paths.setCurrentLevel('shared');
+		//
+		// LoadingState is the exception and must keep whatever loadNextDirectory() just set:
+		// it is the state that preloads this song's week assets, and PlayState inherits the
+		// folder it leaves behind. Resetting here sent every stage lookup to
+		// assets/<ver>/shared/, so week1..week7 backgrounds (stageback, tank*, weeb/*) all
+		// came back null and flixel drew its missing-graphic instead.
+		if(!Std.isOfType(nextState, states.PlayState) && !Std.isOfType(nextState, states.LoadingState))
+			Paths.setCurrentLevel('shared');
 
 		if(FlxTransitionableState.skipNextTransIn) FlxG.switchState(nextState);
 		else startTransition(nextState);

@@ -1042,27 +1042,6 @@ cmd_qjstest() (
 	return "$fails"
 )
 
-cmd_probe063() (
-	local BIN="$ROOT/export/release/windows/bin"
-	local ORIG="$(cat "$BIN/engine.txt" 2>/dev/null || echo body)"
-	restore() { printf '%s' "$ORIG" > "$BIN/engine.txt"; }
-	trap restore EXIT
-
-	taskkill //F //IM realQuickJSEngine.exe > /dev/null 2>&1
-	printf 'pe063' > "$BIN/engine.txt"
-	mkdir -p "$ROOT/.workbuddy/testout"
-	# 把绝对输出路径传给探针，换机器 / 换盘符都不用改 hx 源码
-	local probe_win
-	probe_win="$(cygpath -m "$ROOT/.workbuddy/testout/pe063_probe.txt" 2>/dev/null \
-		|| printf '%s' "$ROOT/.workbuddy/testout/pe063_probe.txt")"
-	cd "$BIN" || return 1
-	PE_063_PROBE=1 PE_PROBE_OUT="$probe_win" ./realQuickJSEngine.exe > "$ROOT/.workbuddy/probe_run.log" 2>&1
-	printf 'exit=%s\n' "$?"
-
-	head_ "0.6.3 路径探针结果"
-	cat "$ROOT/.workbuddy/testout/pe063_probe.txt" 2>/dev/null || printf '  没有结果文件，看 .workbuddy/probe_run.log\n'
-)
-
 # ---------------------------------------------------------------- QuickJS-NG
 # JS 运行时。源码在 third_party/quickjs-ng（自己 clone 进来的，不自动下载）。
 # 只需要三个 .c：这个 fork 把 cutils.c 并进 quickjs.c 了，没有独立的 cutils.c。
@@ -1200,11 +1179,11 @@ print_menu() {
 		printf '  4)  Lua compat audit    function-name diff against an upstream tree\n'
 		printf '  5)  Rebuild import map  regenerate the vanilla HScript import table\n'
 		printf '  6)  QuickJS library     Windows / Android (sub-menu)\n'
-		printf '  7)  Regression          Lua / QuickJS / 0.6.3 probe (sub-menu)\n'
+		printf '  7)  Regression          Lua / QuickJS (sub-menu)\n'
 		printf '  8)  Android build       arm64-v8a apk\n'
 		printf '  9)  Android env         check + repair toolchain (JDK/SDK/NDK/lime/QJS)\n'
 		printf '  0)  Quit\n'
-		printf '\n  Names also work: release debug clean verify audit imports luatest qjstest probe063 android\n'
+		printf '\n  Names also work: release debug clean verify audit imports luatest qjstest android\n'
 	else
 		printf '  1)  环境体检       桌面 / 安卓 / 全部（二级菜单）\n'
 		printf '  2)  编译           release / debug / 全量重编（二级菜单）\n'
@@ -1212,11 +1191,11 @@ print_menu() {
 		printf '  4)  Lua 兼容审计   拿上游源码树当基准，比 add_callback 注册的函数名\n'
 		printf '  5)  重建 import 表 扫 source_vanilla 重生成 HScript 的 import 隔离表\n'
 		printf '  6)  QuickJS 静态库 Windows / Android 二选一（二级菜单）\n'
-		printf '  7)  回归测试       Lua / QuickJS / 0.6.3 探针（二级菜单）\n'
+		printf '  7)  回归测试       Lua / QuickJS（二级菜单）\n'
 		printf '  8)  安卓构建       arm64-v8a 包\n'
 		printf '  9)  安卓环境       体检 + 补齐（JDK/SDK/NDK/lime/QJS arm64）\n'
 		printf '  0)  退出\n'
-		printf '\n  名字也能用：release debug clean verify audit imports luatest qjstest probe063 android\n'
+		printf '\n  名字也能用：release debug clean verify audit imports luatest qjstest android\n'
 	fi
 	printf '\n  > '
 }
@@ -1265,10 +1244,9 @@ run_action() {
 		test)
 			local which="${1:-}"
 			if [ -n "$which" ]; then shift; fi
-			[ -z "$which" ] && which="$(ask_sub "  回归 [1]Lua / [2]QuickJS / [3]0.6.3 探针（回车=Lua）: " 1)"
+			[ -z "$which" ] && which="$(ask_sub "  回归 [1]Lua / [2]QuickJS（回车=Lua）: " 1)"
 			case "$which" in
 				2|qjs)   cmd_qjstest "$@" ;;
-				3|probe) cmd_probe063 ;;
 				*)       cmd_test "$@" ;;
 			esac ;;
 		env-android|android-env) cmd_env android ;;
@@ -1294,7 +1272,6 @@ run_action() {
 		qjsandroid)  cmd_qjsandroid ;;
 		luatest)     cmd_test "$@" ;;
 		qjstest)     cmd_qjstest "$@" ;;
-		probe063)    cmd_probe063 ;;
 		0|q|Q)       return 99 ;;
 		*)           say "  没有这个编号" "  no such item"; return 2 ;;
 	esac

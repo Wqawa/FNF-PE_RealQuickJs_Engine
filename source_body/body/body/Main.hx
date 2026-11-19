@@ -154,51 +154,9 @@ class Main extends Sprite
 		ClientPrefs.loadDefaultKeys();
 		#if ACHIEVEMENTS_ALLOWED Achievements.load(); #end
 
-		// QuickJS-NG link self-test (prints once, just to confirm the static lib linked)
-		trace('[quickjs-ng] smoke: ' + jsruntime.QuickJS.smokeTest());
-		// The probe runs in PlayState because getProperty('health') only means something there;
-		// during the menu health does not exist and would be null.
-		var jsProbed:Bool = false;
 		flixel.FlxG.signals.postUpdate.add(function() {
 			// Drives real scripts every frame (only does anything with jsEngine=QuickJS)
 			jsruntime.JSPlayer.update();
-			if (jsProbed) return;
-			var st:Dynamic = flixel.FlxG.state;
-			if (st == null) return;
-			var cn:Null<String> = Type.getClassName(Type.getClass(st));
-			if (cn == null || cn.indexOf('PlayState') < 0) return;
-			jsProbed = true;
-			// Do not interfere while real scripts run: this probe evals into the same context and
-			// sets camZooming to false, which looks like a bug in the mod's own script.
-			if (jsruntime.JSPlayer.active) return;
-
-			// Bridge self-test: throwaway context, discarded afterwards, never touches real scripts
-			var hProbe:Int = jsruntime.QuickJSHandler.newContext(64);
-			if (hProbe < 0) return;
-			jsruntime.QuickJSHandler.installHostFunctions(hProbe);
-			jsruntime.QuickJSHandler.eval(hProbe,
-				"globalThis.__a = getProperty('health');"
-				+ "setProperty('camZooming', 'false');"
-				+ "globalThis.__b = getProperty('camZooming');"
-				+ "globalThis.__c = getPropertyFromClass('ClientPrefs', 'downScroll');"
-				+ "globalThis.__d = playSound('scrollMenu', '0.5');"
-				+ "globalThis.__e = makeLuaSprite('__probeSpr', 'menuDesat', '100', '100');"
-				+ "globalThis.__f = addLuaSprite('__probeSpr', 'false');"
-				+ "globalThis.__g = setObjectCamera('__probeSpr', 'hud');", "<probe>");
-			try {
-				sys.FileSystem.createDirectory('./testout');
-				var bf = sys.io.File.write('./testout/js_bridge.txt', false);
-				bf.writeString('health=' + jsruntime.QuickJSHandler.globalString(hProbe, '__a')
-					+ ' camZooming=' + jsruntime.QuickJSHandler.globalString(hProbe, '__b')
-					+ ' downScroll=' + jsruntime.QuickJSHandler.globalString(hProbe, '__c')
-					+ ' playSound=' + jsruntime.QuickJSHandler.globalString(hProbe, '__d')
-					+ ' makeSprite=' + jsruntime.QuickJSHandler.globalString(hProbe, '__e')
-					+ ' addSprite=' + jsruntime.QuickJSHandler.globalString(hProbe, '__f')
-					+ ' setCam=' + jsruntime.QuickJSHandler.globalString(hProbe, '__g') + '\n');
-				bf.close();
-			} catch (e:Dynamic) {}
-			jsruntime.QuickJSHandler.dispose(hProbe);
-
 		});
 		addChild(new FlxGame(game.width, game.height, game.initialState, game.framerate, game.framerate, game.skipSplash, game.startFullscreen));
 

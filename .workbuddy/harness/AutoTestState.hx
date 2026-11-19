@@ -86,7 +86,9 @@ class AutoTestState extends MusicBeatState
 			PlayState.storyDifficulty = 2;
 			PlayState.storyWeek = 1;
 
-			Paths.setCurrentLevel('week1');
+			// 和从菜单进歌一样，先让 currentLevel 停在 shared。谁把它设成 weekN 的，只有
+			// loadNextDirectory 一条路 —— 这样测试才能看出那条路有没有被后面的 switchState 打掉。
+			Paths.setCurrentLevel('shared');
 			// 谱面名默认按难度拼后缀；mod 的难度列表不一定和本体一致，所以留一个直接指定的口子
 			var chartOverride:Null<String> = Sys.getEnv('PE_AUTOTEST_CHART');
 			var chart:String = (chartOverride != null && chartOverride.length > 0)
@@ -95,11 +97,11 @@ class AutoTestState extends MusicBeatState
 			trace('[autotest] diff=' + PlayState.storyDifficulty + ' postfix=' + Difficulty.getFilePath(PlayState.storyDifficulty) + ' chart=' + chart);
 			Song.loadFromJson(chart, song);
 
-			// 正常流程里是 LoadingState.loadNextDirectory() 把资源目录切到这首曲子的 week 目录，
-			// 这里直接进 PlayState 跳过了那一步 —— 不补的话 pixel 舞台（weeb/、philly/ 这些按 week
-			// 分目录放的素材）会全部 404。
-			LoadingState.loadNextDirectory();
-
+			// 进歌这一步要和 Freeplay 完全一致：先 prepareToSong() 收集素材，再
+			// loadAndSwitchState() 走 getNextState -> loadNextDirectory 切 week 目录 ->
+			// LoadingState 预载。以前这里是直接 switchState(new PlayState()) 再手动补一次
+			// loadNextDirectory，绕开了 LoadingState，正好把「switchState 会不会把 currentLevel
+			// 打回 shared」这个 bug 藏住了。别再改回去。
 			trace('[autotest] starting ' + song + ' (mod: ' + Mods.currentModDirectory + ', chart: ' + chart + ')');
 		}
 		catch(e:Dynamic)
@@ -146,7 +148,8 @@ class AutoTestState extends MusicBeatState
 			});
 		}
 
-		FlxG.switchState(new PlayState());
+		LoadingState.prepareToSong();
+		LoadingState.loadAndSwitchState(new PlayState());
 	}
 
 	#if desktop

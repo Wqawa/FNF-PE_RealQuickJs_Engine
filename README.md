@@ -30,7 +30,7 @@ bash manage.sh --zh debug   # 名字别名，同样跳过菜单
 
 菜单编号连续 **1–9** / 0 退出：
 1 环境体检、2 编译、3 素材、4 Lua 兼容审计、5 重建 import 表、6 QuickJS 静态库、7 回归测试、8 安卓构建、9 安卓环境补齐。
-1/2/3/6/7 进二级菜单再选子项。**编号可能再调整，稳定调用请用名字别名**：`release` / `debug` / `clean` / `verify` / `audit` / `imports` / `luatest` / `qjstest` / `probe063` / `android`。带参数可跳过二级询问：`manage.sh --zh build debug`、`--zh test qjs bopeebo`、`--zh env android`。
+1/2/3/6/7 进二级菜单再选子项。**编号可能再调整，稳定调用请用名字别名**：`release` / `debug` / `clean` / `verify` / `audit` / `imports` / `luatest` / `qjstest` / `android`。带参数可跳过二级询问：`manage.sh --zh build debug`、`--zh test qjs bopeebo`、`--zh env android`。
 
 所有脚本都收在根目录 `manage.sh`（双击 `manage.bat`），`.workbuddy/` 只放测试数据和工具链，不再有散落的 sh。带动作调用时（如 `--zh 2`）会自己裹 `conhost --headless`，从编辑器/CI/后台起也不会给 haxe/cl/link 弹黑框。
 

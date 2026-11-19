@@ -112,12 +112,13 @@ bash manage.sh debug                  # = 3 号功能
   `hscriptArray` 摘掉，分发时跳过 `isClosed()`。
 - 新增 `compat_isolation.lua`（10 条），进 Lua 回归白名单。
 - 新增 0.6.3 路径探针 `source_063/pe063/debug/Probe.hx` + manage.sh 的 12 号功能：
-  不进游戏、不建 state，只算路径 + 真构造一次图集。
+  不进游戏、不建 state，只算路径 + 真构造一次图集。**2026-11-19 已删除**（连同 body 树的
+  QuickJS 桥自检探针）：那套自检会往实机 PlayState 里加测试贴图、改 camZooming，玩家能看见。
 - 测试窗口现在会 `visible=false`，任务栏里不留格子（`PE_AUTOTEST_TASKBAR=1` 可恢复）。
 
 全量回归（2026-11-17）：`edge 10 / more 37 / v073 58 / v104 32 / jssyntax 1 / versiontag 1 /
 versionplain 1 / isolation 10`，失败 0；QuickJS 26 + 27 + 2，失败 0。
-vanilla 分支没有自动入口，只能人工开机验；pe063 有探针（只验路径/图集，不跑 PlayState）。
+vanilla 分支没有自动入口，只能人工开机验；pe063 也没有自动入口（原路径探针已删）。
 
 问题表在 `docs/SCRIPT_ISOLATION_AUDIT.md`。
 
@@ -351,7 +352,6 @@ bash manage.sh env                     # 环境体检，缺库会自动补
 ```bash
 bash manage.sh --zh luatest [song]  # Lua / 兼容层（7 号）
 bash manage.sh --zh qjstest [song]  # QuickJS 真运行时
-bash manage.sh --zh probe063        # 0.6.3 路径探针
 PE_BUILD=debug bash manage.sh --zh luatest
 NOPATCH=1 bash manage.sh --zh luatest   # 不给谱面打补丁
 ```
@@ -437,6 +437,19 @@ QuickJS 冒烟 26 项（run_qjs_test.sh）
 12. 崩溃屏、启动屏这类**要跨三棵树共用**的 state 只能用 flixel 原生控件，
     不能碰各树的 `Button` / `Alphabet`；而且 `create` 里必须
     `FlxG.cameras.reset()`，否则会带着上一个 state 的 zoom/scroll 摆版。
+13. **`MusicBeatState.switchState` 里不能无脑重置 `Paths.currentLevel`**（2026-11-19 修）。
+    `LoadingState.loadAndSwitchState()` 是 `switchState(getNextState(...))`，而
+    `getNextState` 内部刚用 `loadNextDirectory()` 把 currentLevel 设成本曲的 week 目录 ——
+    紧接着 `switchState(LoadingState)` 又把非 PlayState 一律打回 `shared`，预载和之后的
+    PlayState 全按 `assets/<ver>/shared/` 找图，week1..week7 的舞台图（stageback、tank*、
+    weeb/*）整批 404，flixel 画占位图。
+    症状：从 Freeplay/Story 进歌背景全丢、角色还在（角色本来就在 shared）；
+    日志里 `Bitmap not found: assets/body/shared/images/tankSky.png` 一串，或者只看到
+    `No animation called "lift"` / `"ID 'null'"`（atlas 静默失败）。
+    现在条件是 `!PlayState && !LoadingState`。**加任何新的中间 state 都要重新想这条。**
+    回归盲区：AutoTestState 以前直接 `FlxG.switchState(new PlayState())` 并手动补
+    `loadNextDirectory()`，正好绕开这条路径，所以测试全绿也发现不了。已改成和 Freeplay
+    一致（`prepareToSong()` + `loadAndSwitchState()`），并把初始 currentLevel 设成 `shared`。
 
 ## 6. 已知未修
 
