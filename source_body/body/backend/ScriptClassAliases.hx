@@ -385,20 +385,31 @@ class ScriptClassAliases
 	 * replacement for the explicit table: some entries are renamed
 	 * (Boyfriend -> Character, GitarooPause -> PauseSubState) and cannot be guessed.
 	 */
+	// Keep in sync with ENGINE_PACKAGES below: isEngineClass() reuses this list to decide
+	// whether a resolved class belongs to another tree. A missing package here means a
+	// cold class resolves to the same-named class in the body tree and silently pulls
+	// assets/body.
 	static final SEARCH_PACKAGES:Array<String> = [
 		'',
 		'backend.',
+		'backend.animation.',
+		'backend.ui.',
 		'objects.',
 		'states.',
+		'states.play.',
 		'states.stages.',
 		'states.stages.objects.',
 		'states.editors.',
+		'states.editors.content.',
 		'substates.',
 		'options.',
 		'psychlua.',
 		'shaders.',
 		'cutscenes.',
 		'flxanimate.',
+		'mobile.',
+		'debug.',
+		'unused.',
 		'hxcodec.',
 		'vlc.'
 	];

@@ -59,9 +59,13 @@ class LuaUtils
 	}
 
 	/** Engine classes of the body tree (packages without the vanilla. prefix). */
+	// Keep in sync with the other two trees' package lists (ScriptClassAliases in body,
+	// FunkinLua in pe063) and with IsolatedImports.ENGINE_PACKAGES. A package left out
+	// here is a class that silently resolves to the body tree instead of returning null.
 	static final ENGINE_PACKAGES:Array<String> = [
 		'backend.', 'states.', 'objects.', 'options.', 'substates.', 'psychlua.',
-		'shaders.', 'cutscenes.', 'flxanimate.', 'debug.'
+		'shaders.', 'cutscenes.', 'flxanimate.', 'debug.',
+		'mobile.', 'unused.', 'hxcodec.', 'vlc.'
 	];
 
 	public static function isOtherTreeClass(cl:Dynamic):Bool
@@ -74,9 +78,13 @@ class LuaUtils
 		return false;
 	}
 
+	// Bare-name fallback: 'vanilla.' + pkg + '.' + name. Mirrors the package families
+	// above plus the nested ones scripts actually import (stages, editors, ui).
 	static final CLASS_PACKAGES:Array<String> = [
-		'backend', 'states', 'objects', 'options', 'substates', 'psychlua',
-		'shaders', 'cutscenes', 'flxanimate', 'debug'
+		'backend', 'backend.animation', 'backend.ui', 'objects', 'states',
+		'states.stages', 'states.stages.objects', 'states.editors', 'states.editors.content',
+		'substates', 'options', 'psychlua', 'shaders', 'cutscenes', 'flxanimate',
+		'mobile', 'debug', 'unused'
 	];
 
 	public static function resolveEnum(name:String):Dynamic

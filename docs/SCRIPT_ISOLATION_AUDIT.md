@@ -15,7 +15,7 @@
 
 | # | 位置 | 问题 | 后果 | 状态 |
 |---|---|---|---|---|
-| 1.1 | `Paths.findScriptFile` (`Paths.hx:213`) | 缺 `currentLevel` 那一级 | `scripts/` 目录扫得到 `<level>/scripts/`，按名字却找不到 | 已修 |
+| 1.1 | `Paths.findScriptFile` (`Paths.hx:217`) | 缺 `currentLevel` 那一级 | `scripts/` 目录扫得到 `<level>/scripts/`，按名字却找不到 | 已修 |
 | 1.2 | `FunkinLua.findScript` (`FunkinLua.hx:1979`) | 走 `Paths.getPath`，没有 `assets/<ver>/` 根兜底 | 0.6.x 扁平布局下 `isRunning`/`addHScript` 找不到脚本 → 判重失效 → 重复加载 | 已修 |
 | 1.3 | 同上 | 扩展名判断区分大小写 | `'X.LUA'` 被拼成 `'X.LUA.lua'`，直接报不存在 | 已修 |
 | 1.4 | `PlayState.create` 的 scripts 目录扫描 | 手工拼 `folder + file`，绕过 `findScriptFile` **且完全不判重** | 同一脚本"放在 scripts/ 里 + 再 addHScript 一次"必然两份 | 已修（统一判重） |
@@ -30,11 +30,11 @@
 
 | # | 位置 | 问题 | 后果 | 状态 |
 |---|---|---|---|---|
-| 2.1 | `ScriptClassAliases.resolveDeep` (`:358`) | 兜底只按 `backend./objects./states./…` 这些 **body 包名**去猜 | vanilla 模式下未知裸名拿到 body 类 → 那个类的 `Paths` 指向 `assets/body` | 已修（vanilla 模式只认 `vanilla.` 前缀） |
+| 2.1 | `ScriptClassAliases.resolveDeep` (`:420`) | 兜底只按 `backend./objects./states./…` 这些 **body 包名**去猜 | vanilla 模式下未知裸名拿到 body 类 → 那个类的 `Paths` 指向 `assets/body` | 已修（vanilla 模式只认 `vanilla.` 前缀） |
 | 2.2 | `ScriptClassAliases.resolve` (`:276`) | 不过滤解析结果属于哪棵树 | body 模式能拿到 `vanilla.*`；vanilla 模式表里映射失败时能悄悄拿 body 类 | 已修（`isForeignTree`） |
 | 2.3 | `ScriptClassAliases.init` | 只往 `Iris.proxyImports` 里塞，不清理 | 进程级静态表里的别树条目会让那个名字永远拿错类，且和注册顺序有关 | 已修（`sweepForeignImports`） |
-| 2.4 | vanilla `CustomInterp.resolve` (`HScript.hx:570`) | 未知标识符直接报 `EUnknownVariable`，没有兜底；而 `import` 那条一旦落空就回 `Type.resolveClass` → body 类 | vanilla 模式下 hscript 静默用 body 的类，资源从 `assets/body` 出 | 已修（兜底走 `LuaUtils.resolveClass`，只认 `vanilla.*`） |
-| 2.5 | `vanilla.psychlua.IsolatedImports` | 是 `manage.sh` 功能 10 **扫目录生成**的静态表（239 条），不是运行时枚举 | 新增 vanilla 类后忘了重跑生成 → hscript `import` 落回 body | 已修（正确性不再依赖这张表：2.9 的 override 拦在 `import` 的落点上，表退化成缓存） |
+| 2.4 | vanilla `CustomInterp.resolve` (`HScript.hx:592`) | 未知标识符直接报 `EUnknownVariable`，没有兜底；而 `import` 那条一旦落空就回 `Type.resolveClass` → body 类 | vanilla 模式下 hscript 静默用 body 的类，资源从 `assets/body` 出 | 已修（兜底走 `LuaUtils.resolveClass`，只认 `vanilla.*`） |
+| 2.5 | `vanilla.psychlua.IsolatedImports` | 是 `manage.sh` 功能 8 **扫目录生成**的静态表（约 240 条），不是运行时枚举 | 新增 vanilla 类后忘了重跑生成 → hscript `import` 落回 body | 已修（正确性不再依赖这张表：2.9 的 override 拦在 `import` 的落点上，表退化成缓存；生成器模板 2026-11-19 补回清扫守卫，重跑不会倒退） |
 | 2.6 | `IsolatedImports.register` (`:262`) | 简单名注册时 `if exists(simple) continue`，撞名就跳过 | 同名两个类时只映射一个（有意的，但没日志） | 设计 |
 | 2.7 | pe063 `FunkinLua.resolveClass` (`:101`) | 命中 body 类就 `return null`，不再试扁平同名类 | `objects.Note` → 明明有 `pe063.Note` 却返回 nil，脚本拿到 nil 后 `setProperty` 写成 0 | 已修（先剥包名再试 `pe063.<简单名>`） |
 | 2.8 | HScript | 没有 `%run_v_0.7.3` 版本伪装，只有 Lua/JS 有 | 按引擎版本分支的 `.hx` 脚本永远看到真实版本 | 已修（`version` 全局，`HScript.parseVersionTag`） |

@@ -121,10 +121,12 @@ class FunkinLua {
 		return null;
 	}
 
-	/** Engine packages of the other two trees: resolving into these means the wrong tree. */
+	/** Engine packages of the other two trees: resolving into these means the wrong tree.
+	 *  Keep in sync with ScriptClassAliases (body) and LuaUtils / IsolatedImports (vanilla). */
 	static final ENGINE_PACKAGES:Array<String> = [
 		'backend.', 'states.', 'objects.', 'options.', 'substates.', 'psychlua.',
-		'shaders.', 'cutscenes.', 'flxanimate.', 'debug.'
+		'shaders.', 'cutscenes.', 'flxanimate.', 'debug.',
+		'mobile.', 'unused.', 'hxcodec.', 'vlc.'
 	];
 
 	static function isOtherTreeClass(cl:Dynamic):Bool

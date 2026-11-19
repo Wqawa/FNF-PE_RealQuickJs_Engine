@@ -606,7 +606,7 @@ EOF
 EOF
 	} > "$out"
 	ok "$out（$n 个类/枚举）"
-	cmd_build 0 >/dev/null 2>&1 || warn "表已更新，但编译没通过，自己跑一次 4 号"
+	say "  表更新了，重新编译才会生效（跑 2 号）" "  table updated; rebuild (item 2) to pick it up"
 	return 0
 }
 
@@ -798,7 +798,9 @@ cmd_qjstest() (
 	local BIN="$ROOT/export/$MODE/windows/bin"
 	local MODS="$BIN/mods/body"
 	local SONG="${1:-bopeebo}"
-	local OUT="$ROOT/.workbuddy/testout/$$"
+	# 游戏里的 .js 把结果写死到 testout/ 根（@@ROOT@@ 替换后就是这里），不能用
+	# 带 PID 的子目录，否则这边去子目录找、那边写在根上，全判成「没生成」。
+	local OUT="$ROOT/.workbuddy/testout"
 	local ORIG_ENGINE WINROOT GAME_PID f fails=0
 
 	cleanup() {
@@ -807,13 +809,14 @@ cmd_qjstest() (
 		      "$MODS/qjs_roundtrip.txt" "$MODS/shaders/qjstest.frag"
 		rmdir "$MODS/scripts" "$MODS/qjstest" "$MODS/shaders" 2>/dev/null
 		printf '%s' "$ORIG_ENGINE" > "$BIN/engine.txt"
-		rm -rf "$OUT"
 	}
 	trap cleanup EXIT
 
 	taskkill //F //IM realQuickJSEngine.exe > /dev/null 2>&1
 	sleep 1
 	mkdir -p "$OUT"
+	# 只清 qjs_*，别碰 Lua 回归的 result（两条线可能先后跑）
+	for f in "$OUT"/qjs_*.txt "$OUT"/quickjs_smoke.txt; do [ -e "$f" ] && rm -f "$f"; done
 	rm -f "$BIN/testout/js_log.txt" "$BIN/testout/quickjs_smoke.txt"
 
 	ORIG_ENGINE="$(cat "$BIN/engine.txt" 2>/dev/null || echo body)"
@@ -880,8 +883,6 @@ cmd_qjstest() (
 	head_ "js_log.txt"
 	[ -f "$OUT/qjs_js_log.txt" ] && cat "$OUT/qjs_js_log.txt" || printf '  js_log.txt 没生成\n'
 
-	rm -f "$ROOT/.workbuddy/qjs_testout_path.txt"
-	printf '%s' "$OUT" > "$ROOT/.workbuddy/qjs_testout_path.txt"
 	return "$fails"
 )
 

@@ -36,7 +36,9 @@ class MobileControlSelectSubState extends MusicBeatSubstate
 		super();
 
 		// the preview pad is for looking at, not for pressing
+		#if MOBILE_CONTROLS
 		addMenuPad = false;
+		#end
 
 		for (i in 0...MODES.length)
 			if (MODES[i] == ClientPrefs.data.controlsMode)
