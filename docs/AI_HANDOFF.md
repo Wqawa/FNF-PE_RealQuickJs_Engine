@@ -63,13 +63,13 @@ mod 同样分组：`mods/body`、`mods/1.0.4`、`mods/0.6.3`，各版本只读�
 ```bash
 bash manage.sh release                # 增量（= 2 号功能）
 bash manage.sh env                    # 环境体检（= 1 号功能）
-bash .workbuddy/build.sh -debug       # 薄壳，会自己裹 conhost --headless
+bash manage.sh debug                  # = 3 号功能
 ```
 
 从没有控制台的环境（编辑器 / CI / 后台任务）启动编译时，Windows 会给 haxe/cl/link
-各分配一个控制台窗口，屏幕上一排黑框闪。`.workbuddy/build.sh` 已经用
-`conhost --headless` 包好了 —— 它会把子进程退出码吃成 0，所以真结果走临时文件带出来。
-直接调 `manage.sh` 时记得自己裹一层。
+各分配一个控制台窗口，屏幕上一排黑框闪。`manage.sh` 在「带动作调用」时自己用
+`conhost --headless` 包一层 —— 它会把子进程退出码吃成 0，所以真结果走临时文件带出来。
+交互菜单（双击 manage.bat）不包，那时有控制台，且 headless 下读不到 stdin。
 
 跑游戏/跑测试一律不弹窗：`AutoTestState` 会把窗口最小化 + 挪到屏幕外 + 静音，
 只有设 `PE_AUTOTEST_SHOW=1` 才显示画面。
@@ -110,8 +110,8 @@ bash .workbuddy/build.sh -debug       # 薄壳，会自己裹 conhost --headless
   那张生成表；`HScript` 补 `version` 全局（`%run_v_x.x.x` 对 `.hx` 也生效）。
 - 离开 PlayState 时把 `Paths.currentLevel` 挂回 `shared`；`removeHScript` 之后从
   `hscriptArray` 摘掉，分发时跳过 `isClosed()`。
-- 新增 `compat_isolation.lua`（10 条），进 `run_test.sh` 白名单。
-- 新增 0.6.3 路径探针 `source_063/pe063/debug/Probe.hx` + `.workbuddy/run_063_probe.sh`：
+- 新增 `compat_isolation.lua`（10 条），进 Lua 回归白名单。
+- 新增 0.6.3 路径探针 `source_063/pe063/debug/Probe.hx` + manage.sh 的 12 号功能：
   不进游戏、不建 state，只算路径 + 真构造一次图集。
 - 测试窗口现在会 `visible=false`，任务栏里不留格子（`PE_AUTOTEST_TASKBAR=1` 可恢复）。
 
@@ -333,28 +333,27 @@ bash manage.sh release                 # 增量 release（= 2 号功能，约 1 
 bash manage.sh debug                   # debug
 bash manage.sh clean                   # 全量重编（先清 obj/src）
 bash manage.sh env                     # 环境体检，缺库会自动补
-bash .workbuddy/build.sh [-debug|-clean]   # 薄壳：翻译参数 + 裹 conhost --headless
 ```
 
-`manage.sh` 现在是唯一的脚本（以前散在 `building/`、`tools/` 里的都并进来了）：
-环境体检 → 补库 → `lime build windows` → 铺 `assets/base_game` 并校验。
+`manage.sh` 是唯一的脚本（以前散在 `building/`、`tools/`、`.workbuddy/*.sh` 里的都并进来了，
+2026-11-19 收拢）：环境体检 → 补库 → `lime build windows` → 铺 `assets/base_game` 并校验。
 **直接 `haxelib run lime build` 会失败**，缺 MSVC/SDK 的环境变量。
 
 - hxcpp 缓存在 `.cache/hxcpp`，命中时直接拷 `.obj`
 - `assets/base_game` 是编译**之后**才铺进 bin 的（`BASE_GAME_FILES` 故意留在 `Project.xml` 的 officialBuild 段）
-- 无控制台环境（编辑器 / CI / 后台任务）要裹 `conhost --headless`，否则 haxe、cl、link
-  各弹一个黑框。`.workbuddy/build.sh` 已经包好了，并且用临时文件把退出码带出来
-  —— `conhost` 会把子进程退出码吃成 0
+- 无控制台环境（编辑器 / CI / 后台任务）带动作调用时会自动裹 `conhost --headless`，
+  否则 haxe、cl、link 各弹一个黑框；真退出码走临时文件带出来（`conhost` 会把退出码吃成 0）
 - 跑游戏/跑测试一律不弹窗：`AutoTestState` 把窗口最小化 + 挪屏幕外 + 静音，
   只有 `PE_AUTOTEST_SHOW=1` 才显示画面
 
 回归（两条，别混）：
 
 ```bash
-bash .workbuddy/run_test.sh [song]        # Lua / 兼容层
-bash .workbuddy/run_qjs_test.sh [song]    # QuickJS 真运行时
-PE_BUILD=debug bash .workbuddy/run_test.sh
-NOPATCH=1 bash .workbuddy/run_test.sh     # 不给谱面打补丁
+bash manage.sh --zh 10 [song]       # Lua / 兼容层
+bash manage.sh --zh 11 [song]       # QuickJS 真运行时
+bash manage.sh --zh 12              # 0.6.3 路径探针
+PE_BUILD=debug bash manage.sh --zh 10
+NOPATCH=1 bash manage.sh --zh 10    # 不给谱面打补丁
 ```
 
 - 测试入口 `AutoTestState.hx` 由 `harness/apply_hook.py on/off` 临时拷进 `source_body/body/`，跑完自动撤

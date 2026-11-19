@@ -40,7 +40,7 @@ import backend.MusicBeatState;
 //
 // Android: export/<mode>/android/obj sits at the same depth as windows/obj, so the two
 // relative paths above still hold. Only the artifact differs — NDK clang links a
-// libquickjs-ng.a (arm64-v8a), not the MSVC .lib. Built by `.workbuddy/build_qjs_android.sh`.
+// libquickjs-ng.a (arm64-v8a), not the MSVC .lib. Built by `manage.sh --zh 14`.
 //
 // Do NOT wrap @:buildXml in #if: hxcpp collects every buildXml on the class and appends
 // them all (both branches ended up in Build.xml, so the link line got a .lib and a bare

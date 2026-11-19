@@ -31,7 +31,7 @@
 ## 一条命令出包
 
 ```bash
-bash .workbuddy/build_android.sh
+bash manage.sh --zh 13
 ```
 
 产物：`export/release/android/bin/app/build/outputs/apk/debug/realQuickJSEngine-debug.apk`
@@ -111,7 +111,7 @@ haxelib run lime config ANDROID_SETUP true
 curl -L -o gradle-7.4.2-bin.zip https://mirrors.cloud.tencent.com/gradle/gradle-7.4.2-bin.zip
 ```
 
-QuickJS 的 arm64 静态库由 `bash .workbuddy/build_qjs_android.sh` 编（`build_android.sh` 发现缺会自动调）。
+QuickJS 的 arm64 静态库由 `bash manage.sh --zh 14` 编（13 号安卓构建发现缺会自动调）。
 它不依赖 lime，只要 NDK 在默认位置，或者用 `PE_ANDROID_NDK` 指一个。
 
 ## 跟桌面构建的区别
@@ -123,7 +123,7 @@ QuickJS 的 arm64 静态库由 `bash .workbuddy/build_qjs_android.sh` 编（`bui
   代价是包很大：现在 **565M**（body+base_game 879 项、1.0.4 278 项、0.6.3 681 项）。
 - `*.mp3` 在三棵树里都不打（`exclude="*.mp3" unless="web"`），和桌面一致：native 只认 ogg。
 - QuickJS 是另一份产物：`third_party/quickjs-ng/build/android-arm64/libquickjs-ng.a`，
-  由 `.workbuddy/build_qjs_android.sh` 用 NDK clang 编。`QuickJSHandler.hx` / `QuickJS.hx`
+  由 `manage.sh --zh 14` 用 NDK clang 编。`QuickJSHandler.hx` / `QuickJS.hx`
   的 `@:buildXml` 用 `if="windows"` / `unless="windows"` 分流，别改成 `#if` ——
   hxcpp 会把两个分支都收进 Build.xml，链接时同时出现 `.lib` 和裸库名。
 - MODS / LUA / HSCRIPT 在安卓上也是开的（跟桌面同构）。锁成 desktop-only 反而会让

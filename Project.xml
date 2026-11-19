@@ -42,7 +42,7 @@
 	<section if="officialBuild">
 		<define name="TITLE_SCREEN_EASTER_EGG"/>
 		<!-- 故意留在这个段里：开了之后 lime 会把 470M 基础素材打进包，
-		     而我们是用 .workbuddy/prep_assets.sh 事后铺进 bin/assets/<版本>/。 -->
+		     而我们是用 manage.sh --zh 5 事后铺进 bin/assets/<版本>/。 -->
 		<define name="BASE_GAME_FILES" />
 	</section>
 

@@ -25,22 +25,26 @@ JS 那侧的 FunkinJS 转译器和存档是个故意留着的装置 —— 针�
 ```bash
 bash manage.sh            # 菜单：先选中文/英文，再按编号
 bash manage.sh --zh 2     # 跳过菜单，直接编译 release
-bash .workbuddy/build.sh -debug
+bash manage.sh --zh 3     # debug
 ```
 
-菜单 1–9 / 0 退出：1 环境体检（缺库自动补）、2 release、3 debug、4 全量重编、5 铺素材、6 只校验资产、7 Lua 兼容审计、8 重建 import 表、9 强制重建 QuickJS-NG 静态库。
+菜单 1–14 / 0 退出：1 环境体检（缺库自动补）、2 release、3 debug、4 全量重编、5 铺素材、6 只校验资产、7 Lua 兼容审计、8 重建 import 表、9 强制重建 QuickJS-NG 静态库、10 Lua 回归、11 QuickJS 回归、12 0.6.3 路径探针、13 安卓构建、14 Android QuickJS 静态库。
 
-编译产物 `export/<release|debug>/windows/bin/PsychEngine.exe`，日志 `.cache/build-<mode>.log`。从没有控制台的地方（编辑器 / CI / 后台任务）起编译时用 `.workbuddy/build.sh`，它裹了 `conhost --headless`，不然 Windows 会给 haxe/cl/link 各弹一个黑框。
+所有脚本都收在根目录 `manage.sh`（双击 `manage.bat`），`.workbuddy/` 只放测试数据和工具链，不再有散落的 sh。带动作调用时（如 `--zh 2`）会自己裹 `conhost --headless`，从编辑器/CI/后台起也不会给 haxe/cl/link 弹黑框。
+
+编译产物 `export/<release|debug>/windows/bin/realQuickJSEngine.exe`，日志 `.cache/build-<mode>.log`。
 
 编译前会自动用本机 MSVC 编 `third_party/quickjs-ng`，产物不入库，第一次十几秒，之后命中缓存跳过。Haxe 本体从零装照 `docs/BUILDING.md` 走一次。
 
 ### 跑测试
 
 ```bash
-bash .workbuddy/run_test.sh [song]        # Lua / 兼容层，自动开局、收结果、清测试脚本
-bash .workbuddy/run_qjs_test.sh [song]    # QuickJS 桥
-bash .workbuddy/run_063_probe.sh          # 0.6.3 路径探针，不进游戏
+bash manage.sh --zh 10 [song]   # Lua / 兼容层，自动开局、收结果、清测试脚本
+bash manage.sh --zh 11 [song]   # QuickJS 桥
+bash manage.sh --zh 12          # 0.6.3 路径探针，不进游戏
 ```
+
+调试构建加 `PE_BUILD=debug`，跳过谱面补丁用 `NOPATCH=1`；这两个环境变量对 10/11 都生效。
 
 跑游戏/跑测试不弹窗：窗口最小化 + 挪出屏幕 + 静音，不抢焦点。`PE_AUTOTEST_SHOW=1` 才显示画面。
 
@@ -232,12 +236,10 @@ python -c "from functools import reduce; s=open('source_body/body/psychlua/JavaS
 ## 目录
 
 ```
-manage.sh / manage.bat                 唯一的安装式入口：体检 / 补库 / 编译 / 铺素材 / 校验 / 审计
-.workbuddy/build.sh                    编译薄壳，conhost --headless 消黑框
-.workbuddy/prep_assets.sh              铺 base_game 素材
-.workbuddy/run_test.sh                 Lua 回归
-.workbuddy/run_qjs_test.sh             QuickJS 回归
-.workbuddy/run_063_probe.sh            0.6.3 路径探针
+manage.sh / manage.bat                 唯一的脚本入口：体检 / 补库 / 编译 / 铺素材 / 校验 / 审计 / 三条回归 / 安卓构建
+.workbuddy/harness/                    测试入口注入（apply_hook.py）
+.workbuddy/luatest/                    Lua / JS / HScript 测试脚本与谱面补丁
+.workbuddy/toolchain/                  安卓 JDK17 + SDK + NDK（不入库）
 .workbuddy/upstream/                   上游参照（pe063 / pe073 / pe104 / novaflare）
 .workbuddy/memory/                     逐日流水账
 

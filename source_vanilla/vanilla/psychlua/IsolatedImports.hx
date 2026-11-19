@@ -262,7 +262,8 @@ class IsolatedImports
 	/** Engine classes (the per-tree prefixed families). flixel / openfl do not count. */
 	static final ENGINE_PACKAGES:Array<String> = [
 		'backend.', 'states.', 'objects.', 'options.', 'substates.', 'psychlua.',
-		'shaders.', 'cutscenes.', 'flxanimate.', 'debug.', 'unused.'
+		'shaders.', 'cutscenes.', 'flxanimate.', 'debug.', 'unused.',
+		'mobile.', 'hxcodec.', 'vlc.'
 	];
 
 	static function isEngineClass(fqn:String):Bool
