@@ -42,14 +42,8 @@ class HScript extends Iris implements IScriptHost
 	#if LUA_ALLOWED
 	public var parentLua:FunkinLua;
 
-	/**
-	 * Reports an HScript error.
-	 *
-	 * 0.6.3's executeAuto failing every frame reported every frame and nobody cared; on
-	 * 1.0 a script like ECR that references an undefined variable in onUpdatePost prints 60
-	 * lines a second and the debug text becomes useless. Dedupes on script + message by
-	 * default, sharing ClientPrefs.data.moreLuaErrors with luaTrace (on = no merging).
-	 */
+	// Deduped by script + message; moreLuaErrors turns merging off
+
 	public static function reportHaxeError(parent:FunkinLua, message:String, ?funcName:String):Void
 	{
 		var key:String = (parent != null ? parent.scriptName : '?') + '|' + message;
@@ -63,8 +57,8 @@ class HScript extends Iris implements IScriptHost
 		// without digging through a console. JSPlayer.beginSong() clears it per song.
 		#if sys
 		try {
-			sys.FileSystem.createDirectory('./testout');
-			var f = sys.io.File.append('./testout/js_log.txt', false);
+			sys.FileSystem.createDirectory(backend.ScriptConstants.LOG_DIR);
+			var f = sys.io.File.append(backend.ScriptConstants.SCRIPT_LOG, false);
 			// Also dumps a few things from the scene, so an "Invalid access" needs no guessing:
 			//   game / bf / dad - whether PlayState.instance actually has them
 			//   hsGame          - what `game` points at in the HScript variables
@@ -593,11 +587,8 @@ class HScript extends Iris implements IScriptHost
 	public function scriptMod():String return modFolder;
 	public function isClosed():Bool return closed;
 
-	/**
-	 * Errors raised by this instance (not wrapped by runHaxeCode) go through here so the
-	 * Show HScript Errors switch applies. Under Lua it uses parentLua's script name and
-	 * dedupe table; a standalone .hx script goes straight to Iris.
-	 */
+	// Errors from this instance - applies the Show HScript Errors switch.
+	// With a parent Lua script, reuse its name + dedupe table.
 	public function reportError(message:String, ?funcName:String):Void
 	{
 		#if LUA_ALLOWED
@@ -618,8 +609,8 @@ class HScript extends Iris implements IScriptHost
 
 		#if sys
 		try {
-			sys.FileSystem.createDirectory('./testout');
-			var f = sys.io.File.append('./testout/js_log.txt', false);
+			sys.FileSystem.createDirectory(backend.ScriptConstants.LOG_DIR);
+			var f = sys.io.File.append(backend.ScriptConstants.SCRIPT_LOG, false);
 			f.writeString('[hscript] ' + key + '\n');
 			f.close();
 		} catch(e:Dynamic) {}
@@ -632,17 +623,8 @@ class HScript extends Iris implements IScriptHost
 		Iris.error(message, interp != null ? interp.posInfos() : pos);
 	}
 
-	/**
-	 * What a script should see as "the current play state".
-	 *
-	 * 0.6.3 did `interp.variables.set('game', PlayState.instance)` unconditionally.
-	 * 1.0 used FlxG.state, which during create or mid state switch can still be
-	 * LoadingState; looking for boyfriend there gives null and an
-	 * "Invalid access to field".
-	 *
-	 * So prefer PlayState.instance, falling back to FlxG.state only when it does not exist
-	 * yet (menu scripts and the like).
-	 */
+	// PlayState.instance, not FlxG.state - during a switch FlxG.state may still be
+	// LoadingState, which has no boyfriend and throws on the lookup.
 	public static function currentGame():Dynamic
 	{
 		if (PlayState.instance != null) return PlayState.instance;
@@ -767,12 +749,8 @@ class CustomInterp extends crowplexus.hscript.Interp
 		return Reflect.callMethod(o, f, args);
 	}
 
-	/**
-	 * Where `import` lands: by default proxyImports, then Type.resolveClass.
-	 * The three trees have identical FQNs for the same class (objects.Character in body,
-	 * vanilla.objects.Character in the original). Body mode must not resolve the prefixed
-	 * ones: their hardcoded Paths.VERSION_DIR pulls assets from the other tree.
-	 */
+	// import first hits proxyImports, then Type.resolveClass - same FQNs in all trees.
+	// Re-resolve under body rules and drop other-tree classes.
 	override function getOrImportClass(name:String):Dynamic
 	{
 		var cls:Dynamic = super.getOrImportClass(name);

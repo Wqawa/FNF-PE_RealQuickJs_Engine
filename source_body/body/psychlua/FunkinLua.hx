@@ -66,10 +66,7 @@ class FunkinLua implements IScriptHost {
 	// FunkinJS uses it to feed transpiled .js source into the Lua interpreter.
 	public var rawCode:String = null;
 
-	/**
-	 * Extracts (%run_v_x.x.x) from a script path, null when absent.
-	 * Only this form is recognised; other parentheses in the name do not matter.
-	 */
+		// // (%run_v_x.x.x) from a path, null when absent.
 	public static function parseVersionTag(path:String):String
 	{
 		if(path == null) return null;
@@ -1891,18 +1888,7 @@ class FunkinLua implements IScriptHost {
 		return null;
 	}
 
-	/**
-	 * 1.0 moved healthBar / iconP1 / scoreTxt / timeBar into PlayState.uiGroup (a FlxSpriteGroup),
-	 * but the ordering helpers (getObjectOrder / setObjectOrder) still assume those objects sit
-	 * directly in PlayState.members. Resolve the container an object really lives in first.
-	 */
-	/**
-	 * Returns a container's member array.
-	 *
-	 * FlxTypedSpriteGroup.members is a getter forwarding to group.members, and reading it
-	 * through Dynamic gives null because hxcpp reflection does not call getters. That is
-	 * what made 0.7.3's getObjectOrder throw Null Object Reference on HUD elements.
-	 */
+	// UI children aren't in members; group.members via Dynamic is null on hxcpp - read the real field
 	public static function memberArray(container:Dynamic):Array<Dynamic>
 	{
 		if(container == null) return null;
@@ -1928,18 +1914,15 @@ class FunkinLua implements IScriptHost {
 	// used to collapse repeated warnings/errors, see ClientPrefs.data.moreLuaErrors
 	static var reportedTrace:Map<String, Bool> = new Map<String, Bool>();
 
-	/**
-	 * Temporary diagnostic: writes stage script object creation / insert order to
-	 * testout/stage_dbg.txt. pe063 has a matching one prefixed [063]; diffing both shows
-	 * which sprite was never created or landed in the wrong layer. Safe to delete later.
-	 */
+	// stage object order trace, diff with the [063] log
+
 	public static function stageDbg(msg:String):Void
 	{
 		#if sys
 		try {
-			sys.FileSystem.createDirectory('./testout');
+			sys.FileSystem.createDirectory(backend.ScriptConstants.LOG_DIR);
 			var song:String = (PlayState.SONG != null) ? PlayState.SONG.song : '?';
-			var f = sys.io.File.append('./testout/stage_dbg.txt', false);
+			var f = sys.io.File.append(backend.ScriptConstants.STAGE_DEBUG_LOG, false);
 			f.writeString('[body] ' + song + ' | ' + msg + '\n');
 			f.close();
 		} catch(e:Dynamic) {}

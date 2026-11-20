@@ -6,13 +6,7 @@ import flixel.FlxSprite;
 import pe063.mobile.input.MobileInputID;
 import pe063.mobile.input.MobileInputManager;
 
-/**
- * Four full-height lanes, tap anywhere in a lane to hit that note.
- *
- * Based on the Mobile Porting Team's Hitbox (MIT), minus the gradient shapes:
- * openfl gradients on cpp are unreliable, so the lanes are plain tinted
- * rectangles and the only visible part is a thin bar at the bottom.
- */
+// Four tap lanes, one per note. Tinted rects - gradients on cpp are flaky.
 class Hitbox extends MobileInputManager
 {
 	public var buttonLeft:TouchButton;

@@ -8,22 +8,10 @@ import flixel.text.FlxText;
 import flixel.text.FlxText.FlxTextBorderStyle;
 import flixel.util.FlxColor;
 
-/**
- * Engine switch screen for the 0.6.3 side.
- *
- * Same logic as the body and vanilla screens: selecting writes engine.txt into the bin
- * root and exits; the next launch picks a tree from that file.
- *
- * A separate copy exists because each tree has its own ClientPrefs / Paths / Alphabet:
- * 0.6.3's ClientPrefs is still static fields, not 1.0.4's data structure.
- */
+// Engine switch: writes engine.txt and exits. One copy per tree, ClientPrefs/Paths differ.
 class EngineSelectSubState extends MusicBeatSubstate
 {
-	var options:Array<String> = [
-		'Body (Current Fork)',
-		'Vanilla Psych Engine 1.0.4',
-		'Psych Engine 0.6.3'
-	];
+	var options:Array<String> = Engine.LABELS.copy();
 	var keys:Array<String> = [Engine.BODY, Engine.VANILLA, Engine.PE063];
 
 	var grpOptions:FlxTypedGroup<Alphabet>;

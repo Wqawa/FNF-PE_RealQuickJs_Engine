@@ -64,18 +64,14 @@ class FunkinLua {
 	public static var Function_Continue:Dynamic = 0;
 	public static var Function_StopLua:Dynamic = 2;
 
-	/**
-	 * Temporary diagnostic: writes stage script object creation / insert order to
-	 * testout/stage_dbg.txt. Body has a matching one prefixed [body]; diffing both shows
-	 * which sprite was never created or landed in the wrong layer. Safe to delete later.
-	 */
+	// stage object order trace, diff with the [body] log
 	public static function stageDbg(msg:String):Void
 	{
 		#if sys
 		try {
-			sys.FileSystem.createDirectory('./testout');
+			sys.FileSystem.createDirectory(backend.ScriptConstants.LOG_DIR);
 			var song:String = (PlayState.SONG != null) ? PlayState.SONG.song : '?';
-			var f = sys.io.File.append('./testout/stage_dbg.txt', false);
+			var f = sys.io.File.append(backend.ScriptConstants.STAGE_DEBUG_LOG, false);
 			f.writeString('[063] ' + song + ' | ' + msg + '\n');
 			f.close();
 		} catch(e:Dynamic) {}
@@ -89,22 +85,13 @@ class FunkinLua {
 	public var camTarget:FlxCamera;
 	public var scriptName:String = '';
 
-	/**
-	 * Bare class name -> full pe063.* name.
-	 *
-	 * This tree is prefixed with pe063., but scripts still use the 0.6.3 bare names:
-	 *   getPropertyFromClass('ClientPrefs', 'healthBarAlpha')
-	 * Type.resolveClass('ClientPrefs') is always null here, so the property reads as nil and
-	 * setProperty('xxx.alpha', nil) writes 0 - the sprite never appears, not even flixel's
-	 * placeholder box, while frames are actually fine.
-	 */
+	// 0.6.3 scripts use bare names; Type.resolveClass needs pe063.*
 	static public function resolveClass(name:String):Dynamic
 	{
 		if (name == null || name.length == 0) return null;
 
 		var cls:Dynamic = Type.resolveClass(name);
-		// Hitting a body engine class must not return null right away: 0.6.3 usually has a
-		// flat class of the same name (objects.Note -> pe063.Note). This used to give up, so the
+		// body class might have a flat 0.6.3 twin (objects.Note -> pe063.Note)
 		if (cls != null && !isOtherTreeClass(cls)) return cls;
 
 		if (name.indexOf('pe063.') == 0) return Type.resolveClass(name);
@@ -121,7 +108,7 @@ class FunkinLua {
 		return null;
 	}
 
-	/** Engine classes of another tree. Single source in the shared layer. */
+	// other tree's engine class -> shared check
 	static function isOtherTreeClass(cl:Dynamic):Bool
 	{
 		if (cl == null) return false;
@@ -2928,12 +2915,7 @@ class FunkinLua {
 		return PlayState.instance.modchartTexts.exists(name) ? PlayState.instance.modchartTexts.get(name) : Reflect.getProperty(PlayState.instance, name);
 	}
 
-	/**
-	 * Parses 'RRGGBB' / 'AARRGGBB' / '0xAARRGGBB' into a FlxColor.
-	 *
-	 * Std.parseInt cannot be used: on cpp it saturates to IntMax (0x7FFFFFFF) on overflow, so
-	 * any 8 digit hex colour parses to white. Accumulate per digit and let 32 bit ints wrap.
-	 */
+	// parseInt saturates on cpp for 8-digit hex, so accumulate per digit
 	public static function parseHexColor(hex:String):FlxColor
 	{
 		if(hex == null) return FlxColor.WHITE;

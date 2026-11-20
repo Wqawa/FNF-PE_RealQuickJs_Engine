@@ -28,16 +28,7 @@ class LuaUtils
 	public static inline var Function_StopHScript:String = backend.ScriptConstants.Function_StopHScript;
 	public static inline var Function_StopAll:String = backend.ScriptConstants.Function_StopAll;
 
-	/**
-	 * Logs which mod a script belongs to on load. All three channels use one format so
-	 *
-	 *   [script] lua      mod=estll      mods/body/estll/scripts/a.lua
-	 *   [script] hscript  mod=<global>   mods/body/scripts/b.hx
-	 *   [script] js->lua  mod=NYA        mods/body/NYA/scripts/c.js
-	 *
-	 * `<global>` means no mod (mods/body/scripts root, shared, assets).
-	 * Written to testout/js_log.txt, truncated at the start of every song (JSPlayer.beginSong).
-	 */
+		// One log line per script load, all channels:/n/t// [script] lua|hscript|js->lua  mod=<name or <global>>  path
 	public static function logScriptSource(channel:String, path:String, mod:String):Void
 	{
 		var owner:String = (mod == null || mod.length == 0) ? '<global>' : mod;
@@ -45,8 +36,8 @@ class LuaUtils
 		trace(line);
 		#if sys
 		try {
-			sys.FileSystem.createDirectory('./testout');
-			var f = sys.io.File.append('./testout/js_log.txt', false);
+			sys.FileSystem.createDirectory(backend.ScriptConstants.LOG_DIR);
+			var f = sys.io.File.append(backend.ScriptConstants.SCRIPT_LOG, false);
 			f.writeString(line + '\n');
 			f.close();
 		} catch (e:Dynamic) {}

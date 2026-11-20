@@ -11,19 +11,8 @@ import openfl.events.UncaughtErrorEvent;
 import lime.system.Clipboard;
 #end
 
-/**
- * Crash handler shared by all three trees.
- *
- * This used to live in the body Main and only covered that branch: switching to 1.0.4
- * or 0.6.3 meant the window just vanished (or openfl swallowed it, with no dump). It now
- * runs before Main.main() forks, so all trees share one path: write a dump, show the screen.
- *
- * It does not Sys.exit immediately: openfl's uncaught error only dispatches and keeps
- * running, so the process is alive and can switch states. Only when even that fails does
- *
- * it fall back to exiting. Ctrl+Alt+Shift+Q triggers it manually without throwing: throwing
- * from preUpdate can corrupt the current frame's flixel state.
- */
+// Crash handler for all three trees, installed before Main.main() forks.
+// openfl keeps running after an uncaught error, so switch states instead of exiting.
 class EngineCrash
 {
 	public static var installed:Bool = false;
@@ -66,10 +55,7 @@ class EngineCrash
 	}
 	#end
 
-	/**
-	 * Formats an exception for humans: stack first, message last.
-	 * If the stack is gone (hxcpp ate it), keep the message and do not blow up again.
-	 */
+		// Human-readable exception: stack first, message last. Survives a missing stack.
 	public static function describe(err:Dynamic):String
 	{
 		var out:String = '';
@@ -99,11 +85,7 @@ class EngineCrash
 		return out;
 	}
 
-	/**
-	 * Records a crash and queues the screen switch.
-	 * It does not switchState inside the exception handler: that frame's flixel state is half
-	 * built. Waiting for the next preUpdate is far safer.
-	 */
+		// Queue the screen switch for next preUpdate: this frame's flixel state is half built.
 	public static function report(reason:String, ?manual:Bool):Void
 	{
 		var head:String = '[engine] ' + Engine.current() + '   ' + Date.now().toString() + '\n';

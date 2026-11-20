@@ -7,20 +7,15 @@ import sys.io.File;
 
 using StringTools;
 
-/**
- * Startup engine selection.
- *
- * Reads engine.txt next to the executable (bin root):
- *   body    -> this fork
- *   vanilla -> original Psych Engine 1.0.4 (source_vanilla)
- * Missing file, read failure or an unknown value falls back to body.
- */
+// engine.txt next to the exe picks the tree; anything else falls back to body
 class Engine
 {
 	public static inline var FILE_NAME:String = 'engine.txt';
 	public static inline var BODY:String = 'body';
 	public static inline var VANILLA:String = 'vanilla';
 	public static inline var PE063:String = 'pe063';
+
+	public static final LABELS:Array<String> = ['Body (Current Fork)', 'Vanilla Psych Engine 1.0.4', 'Psych Engine 0.6.3'];
 
 	public static function current():String
 	{
@@ -87,7 +82,7 @@ class Engine
 	public static function writePath():String
 	{
 		#if android
-		// apk 所在目录只读，写到工作目录（.realQuickJSEngine/engine.txt）
+		// apk dir is read-only; write next to the cwd instead
 		var cwd:String = normalCwd();
 		if (cwd != null) return join(cwd, FILE_NAME);
 		#end

@@ -119,13 +119,7 @@ class Paths
 		currentLevel = name.toLowerCase();
 	}
 
-	/**
-	 * Whether a file exists: disk first, compile-time manifest second.
-	 *
-	 * Checking OpenFlAssets alone reports mods/ assets and anything copied into bin after
-	 * building as missing (they never enter the manifest). Lua's texture mode
-	 * (AtlasFrameMaker) starts with fileExists, so one wrong answer kills the whole sprite.
-	 */
+	// disk first: mods/bin copies never enter the manifest
 	static public function existsOnDiskOrManifest(path:String, ?type:AssetType = null):Bool
 	{
 		#if MODS_ALLOWED
@@ -322,14 +316,7 @@ class Paths
 		#end
 	}
 
-	/**
-	 * Atlas descriptions (.xml / .txt) are read from disk when a copy exists there.
-	 *
-	 * FlxAtlasFrames checks OpenFlAssets.exists() on the string as an asset id first, then
-	 * parses the string as XML. Passing a disk path meant that when the manifest lacked it,
-	 * the path was parsed as XML, every frame was lost and the sprite never drew.
-	 * Reading it into a string avoids this.
-	 */
+	// read atlas xml off disk: FlxAtlasFrames would parse the path itself as XML
 	inline static public function readTextOrPath(path:String):String
 	{
 		#if (MODS_ALLOWED && sys)

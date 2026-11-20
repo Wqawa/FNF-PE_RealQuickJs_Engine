@@ -86,14 +86,13 @@ import states.TitleState;
 	// true = every single occurrence gets printed, useful when debugging
 	public var moreLuaErrors:Bool = false;
 
-	/** Whether HScript errors reach the screen. Off means testout/js_log.txt only. */
+	// HScript errors on screen, or just in the log
 	public var hscriptErrors:Bool = false;
 
-	/** Which engine runs .js: 'troll' = the transpile-to-Lua joke, 'quickjs' = QuickJS-NG. */
+	// .js engine: 'Troll' = transpile to Lua, 'QuickJS' = QuickJS-NG
 	public var jsEngine:String = 'Troll';
 
-	// ------------------------------------------------------------------
-	// Version behaviour switches. Body tree only; the vanilla tree ignores them.
+	// Version behaviour switches. Body tree only; vanilla ignores them.
 	// All default to false (1.0.4 behaviour); turning one on restores the 0.6.3 way.
 	// ------------------------------------------------------------------
 	/** 0.6.3 style HUD: flatten uiGroup into plain members (old scripts index into it). */

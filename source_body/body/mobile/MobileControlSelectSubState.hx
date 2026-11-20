@@ -5,15 +5,7 @@ import mobile.objects.Hitbox;
 import mobile.objects.TouchButton;
 import mobile.objects.TouchPad;
 
-/**
- * Pick a touch layout, and for 'Custom' drag the buttons to wherever they sit
- * comfortably under your thumbs.
- *
- * The Android ports keep four layouts in json and put the editor on its own
- * screen with sprite-group collision to keep buttons apart. Here the layouts
- * already live in MobileLayouts, so the pad in the middle of the screen is the
- * preview: what you drag is what you get in a song.
- */
+// Pick a touch layout; 'Custom' lets you drag buttons into place. Middle pad is the preview.
 class MobileControlSelectSubState extends MusicBeatSubstate
 {
 	static var MODES:Array<String> = ['Right', 'Left', 'Custom', 'Hitbox'];

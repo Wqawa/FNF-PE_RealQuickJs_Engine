@@ -70,13 +70,7 @@ class FPSCounter extends TextField
 			textColor = 0xFFFF0000;
 	}
 
-	/**
-	 * Where you are: <version>/<state class>, plus the song name inside PlayState.
-	 *
-	 * Rendered into the same TextField as FPS so size, colour and update rate match;
-	 * a separate TextField would crowd Memory and miss the low-fps red tint.
-	 * The song name is read through Reflect to avoid importing PlayState.
-	 */
+	// Where you are + song name, in the same TextField as FPS. Reflect keeps this tree-free.
 	static function whereAmI():String
 	{
 		var state:Dynamic = FlxG.state;

@@ -1,22 +1,9 @@
 package vanilla.options;
 
-/**
- * Engine switch screen for the vanilla side.
- *
- * Same logic as the body screen: selecting writes engine.txt into the bin root and
- * exits; the next launch picks body or 1.0.4 from that file.
- *
- * A separate copy exists because ClientPrefs / Paths differ per tree.
- * In vanilla mode body's ClientPrefs is not loaded and its data is empty, so reading
- * antialiasing gives null. Living under vanilla/ lets import.hx pick the right classes.
- */
+// Engine switch: writes engine.txt and exits. One copy per tree, ClientPrefs/Paths differ.
 class EngineSelectSubState extends MusicBeatSubstate
 {
-	var options:Array<String> = [
-		'Body (Current Fork)',
-		'Vanilla Psych Engine 1.0.4',
-		'Psych Engine 0.6.3'
-	];
+	var options:Array<String> = Engine.LABELS.copy();
 	var keys:Array<String> = [Engine.BODY, Engine.VANILLA, Engine.PE063];
 
 	var grpOptions:FlxTypedGroup<Alphabet>;

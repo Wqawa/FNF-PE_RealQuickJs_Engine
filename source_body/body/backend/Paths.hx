@@ -34,13 +34,8 @@ class Paths
 			dumpExclusions.push(key);
 	}
 
-	/**
-	 * Version directory for assets and mods.
-	 *
-	 * Runtime assets come from assets/<VERSION_DIR>/..., mods from mods/<VERSION_DIR>/...
-	 * Body uses `body`; the original tree has its own copy in vanilla.backend.Paths with
-	 * `1.0.4`. Adding 0.6.3 later is just another directory.
-	 */
+	// assets/<VERSION_DIR> and mods/<VERSION_DIR>, one dir per tree
+
 	public static var VERSION_DIR:String = 'body';
 
 	public static var dumpExclusions:Array<String> = ['assets/$VERSION_DIR/shared/music/freakyMenu.$SOUND_EXT'];
@@ -181,16 +176,8 @@ class Paths
 		return getSharedPath(file);
 	}
 
-	/**
-	 * Whether a file exists.
-	 *
-	 * This used to check OpenFlAssets.exists() only, i.e. the compile-time manifest.
-	 * Assets can be dropped into bin/assets after building (base_game, quick tests), and
-	 * those exist on disk but not in the manifest, so they were reported missing:
-	 * level images gone means missing backgrounds; icon-xxx missing meant every icon fell
-	 *
-	 * back to icon-face. cacheBitmap already checked disk first; this matches it.
-	 */
+	// disk first: base_game / quick-test files land in bin after the build, never in
+	// the manifest. cacheBitmap already did this.
 	public static function existsOnDiskOrManifest(path:String, ?type:AssetType = null):Bool
 	{
 		#if MODS_ALLOWED
@@ -199,21 +186,8 @@ class Paths
 		return OpenFlAssets.exists(path, type);
 	}
 
-	/**
-	 * Unified script lookup: mods -> level folder -> assets/shared -> assets root.
-	 *
-	 * 0.6.x base assets sit directly under assets/ (shared/ arrived in 0.7), hence the
-	 * root fallback. startLuasNamed, the .js fallback and startHScriptsNamed each copied
-	 * this order before; changing one meant forgetting the other two.
-	 *
-	 * The level folder was added later: getPath() always honoured assets/<ver>/<level>/,
-	 * this did not, so scripts scanned from scripts/ could not be found by name and the
-	 * two paths picked different files.
-	 *
-	 * The first four levels are relative and assume CWD is bin (all of Paths does).
-	 * Launched from a shortcut the CWD may differ, so sys targets retry anchored at the
-	 * exe directory and return an absolute path when that hits.
-	 */
+	// mods -> level -> shared -> root; 0.6.x keeps base assets at the root.
+	// On sys, retry from the exe dir when CWD is not bin, and return an absolute path.
 	public static function findScriptFile(file:String):String
 	{
 		#if MODS_ALLOWED
@@ -444,13 +418,7 @@ class Paths
 		return parentFrames;
 	}
 
-	/**
-	 * Atlas description files (.xml / .txt) are read from disk when possible.
-	 *
-	 * Passing the path straight to FlxAtlasFrames made flixel treat it as an asset id and
-	 * look in the openfl manifest; atlases copied into bin/assets after building were not
-	 * found, xml became null, and xml.getXml() in fromSparrow dereferenced it (phillyStreets).
-	 */
+		// atlas xml: read off disk, FlxAtlasFrames would parse the path as an asset id
 	static function readTextOrPath(path:String):String
 	{
 		#if MODS_ALLOWED
@@ -580,17 +548,8 @@ class Paths
 	}
 	#end
 
-	/**
-	 * Works out which mod a script path belongs to, null when unknown.
-	 *
-	 * Upstream does `path.split('/')[0] + '/' == Paths.mods()`, assuming flat mods/<mod>/.
-	 * This build inserts a version directory (mods/body/<mod>/), so 'mods/' never equals
-	 * 'mods/body/' and modFolder stayed null for both Lua and HScript - breaking modFolder,
-	 * getModSetting and every relative path built from it.
-	 *
-	 *
-	 * Also handles the absolute paths findScriptFile returns via applicationDirectory.
-	 */
+		// Which mod a script belongs to. mods/<version>/<mod>/ here, not flat mods/<mod>/.
+	// Also takes absolute paths from findScriptFile.
 	public static function modFromScriptPath(path:String):String
 	{
 		if(path == null || path.length == 0) return null;
@@ -620,13 +579,8 @@ class Paths
 		return null;
 	}
 
-	/**
-	 * Dedupe key for script paths: forward slashes, lower case.
-	 *
-	 * Windows FileSystem.exists is case insensitive but returns the string you passed in.
-	 * So `Scripts/Hud.lua` and `scripts/hud.lua` both exist yet differ as strings, and a
-	 * direct compare loads the same script twice. Lua / HScript / JS all use this.
-	 */
+		// Dedupe key: slashes + lower case. Windows exists() is case-insensitive
+	// but returns what you passed, so string compare would load a script twice.
 	public static function scriptKey(path:String):String
 	{
 		if(path == null) return null;

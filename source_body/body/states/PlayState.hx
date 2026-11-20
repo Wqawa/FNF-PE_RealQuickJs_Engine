@@ -2560,13 +2560,8 @@ class PlayState extends MusicBeatState
 	}
 	#end
 
-	/**
-	 * Every script alive in this state, in dispatch order: JS -> Lua -> HScript,
-	 * matching the three blocks callOnScripts used to have.
-	 *
-	 * A new script channel only needs to implement IScriptHost and be added here;
-	 * the rest of PlayState does not change.
-	 */
+		// Live scripts in dispatch order: JS -> Lua -> HScript. New channels implement
+	// IScriptHost and get added here; the rest of PlayState stays put.
 	public function allScripts():Array<IScriptHost>
 	{
 		var out:Array<IScriptHost> = [];

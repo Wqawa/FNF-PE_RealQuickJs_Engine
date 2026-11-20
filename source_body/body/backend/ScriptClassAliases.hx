@@ -4,19 +4,7 @@ package backend;
 import crowplexus.iris.Iris;
 #end
 
-/**
- * Psych 0.6.3 and older shipped a completely flat source tree, so every script written
- * back then uses bare class names:
- *
- *   import Boyfriend;
- *   getPropertyFromClass('ClientPrefs', 'downScroll')
- *   getPropertyFromClass('GitarooPause', 'instance')
- *
- * From 0.7 on those classes live in packages (objects.Character, backend.ClientPrefs, ...),
- * which makes every one of those calls fail. This table puts the old names back and is
- * consumed by two places: HScript looks them up through Iris.proxyImports, the Lua
- * reflection API goes through resolve() below.
- */
+// Old 0.6.3 scripts use bare class names; map them back onto the packaged ones.
 class ScriptClassAliases
 {
 	public static var initialized:Bool = false;
@@ -231,13 +219,7 @@ class ScriptClassAliases
 		else sweepForeignImports();
 	}
 
-	/**
-	 * Drops proxyImports entries that point at another tree, in body mode.
-	 *
-	 * The table is process wide: Iris checks it first for `import`, then falls back to
-	 * Type.resolveClass. One stale entry means that name always resolves to the wrong
-	 * class, depending on registration order - the hardest kind to reproduce.
-	 */
+// proxyImports is global, first writer wins. Drop other-tree entries before ours go in.
 	static function sweepForeignImports():Void
 	{
 		#if HSCRIPT_ALLOWED
@@ -263,12 +245,7 @@ class ScriptClassAliases
 		#end
 	}
 
-	/**
-	 * In vanilla mode, swaps the whole table for the `vanilla.*` classes.
-	 * Also registers the body FQNs in proxyImports: hscript's `import states.PlayState`
-	 * goes through Interp.getOrImportClass, which checks proxyImports first; without
-	 * that entry it would get the body class.
-	 */
+// vanilla mode: point the whole table at vanilla.* classes, FQNs included.
 	static function remapToVanilla():Void
 	{
 		if(remapped) return;
@@ -297,15 +274,7 @@ class ScriptClassAliases
 
 	static var remapped:Bool = false;
 
-	/**
-	 * Never hand out a class from another tree.
-	 *
-	 * Three trees ship in one exe: objects.Character (body) and vanilla.objects.Character
-	 * (original) both exist while scripts write the same string. Resolving the wrong one
-	 * means that class's hardcoded Paths.VERSION_DIR pulls assets from the other tree's
-	 * directory - and assets/body holds the 1.0.4 official assets, so it loads fine and
-	 * just returns the wrong image. Only refusing at resolve time catches this.
-	 */
+// No classes from another tree: their Paths point at the wrong assets.
 	public static function isForeignTree(cl:Dynamic):Bool
 	{
 		if (cl == null) return false;
@@ -318,16 +287,13 @@ class ScriptClassAliases
 		return StringTools.startsWith(fqn, 'vanilla.') || StringTools.startsWith(fqn, 'pe063.');
 	}
 
-	/** Engine classes of another tree. Single source in the shared layer. */
+	// other tree's engine class? shared list decides
 	static function isEngineClass(fqn:String):Bool
 	{
 		return backend.ScriptConstants.isEngineClass(fqn);
 	}
 
-	/**
-	 * Resolve a class by name. Old bare names win, everything else falls through to the
-	 * normal haxe class lookup so modern scripts keep working.
-	 */
+// Old bare names win, then fall through to the normal class lookup.
 	public static function resolve(className:String):Dynamic
 	{
 		if(className == null || className.length < 1) return null;
@@ -352,14 +318,7 @@ class ScriptClassAliases
 		return isForeignTree(cls) ? null : cls;
 	}
 
-	/**
-	 * Copies the whole table into an HScript's variable scope.
-	 * `import` only makes types usable, but 0.6.x scripts also use class names as values
-	 * (`Type.getClassName(Boyfriend)`, `GitarooPause.instance`), which need variables.
-	 *
-	 * Dotted keys (stages.Spooky) are module paths resolved as field expressions and never
-	 * hit the variable scope, so they are skipped.
-	 */
+// Scripts use class names as values too, so copy the table into their scope.
 	public static function applyToHScript(interp:Dynamic):Void
 	{
 		init();
@@ -373,22 +332,8 @@ class ScriptClassAliases
 	public static function exists(className:String):Bool
 		return resolve(className) != null;
 
-	/**
-	 * 0.6.3's runHaxeCode used executeAuto(code, resolveClass), handing unknown
-	 * identifiers to resolveClass: Type.resolveClass(name) first, then
-	 * Type.resolveClass('pe063.' + name) - the tree was flat, so there was one prefix.
-	 * 1.0 classes are packaged with no single prefix, so try the package list instead.
-	 *
-	 * Only a fallback for unknown identifiers (from CustomInterp.resolve). It is not a
-	 * replacement for the explicit table: some entries are renamed
-	 * (Boyfriend -> Character, GitarooPause -> PauseSubState) and cannot be guessed.
-	 */
-	// Package search order for bare names a script passes to getPropertyFromClass /
-	// addHaxeLibrary (resolveDeep below). The first entry is the empty prefix so a
-	// genuinely flat class still resolves. Finer sub-packages come before their parent
-	// only where a top-level class of the same name exists - order matters here.
-	// This is a *search* list; "is this class from another tree" is answered by
-	// ScriptConstants.isEngineClass(), which lives in the shared layer.
+// Search order for bare names (getPropertyFromClass / addHaxeLibrary).
+	// Some names are renamed, not guessed.
 	static final SEARCH_PACKAGES:Array<String> = [
 		'',
 		'backend.',
@@ -414,7 +359,7 @@ class ScriptClassAliases
 		'vlc.'
 	];
 
-	/** Names known to be missing, so the package list is not scanned every frame. */
+	// cache misses, don't scan the package list every time
 	static var misses:Map<String, Bool> = new Map<String, Bool>();
 
 	public static function resolveDeep(className:String):Dynamic
@@ -445,7 +390,7 @@ class ScriptClassAliases
 		return null;
 	}
 
-	/** Cleared on song change so last song's resolutions do not leak in. */
+	// cleared on song change
 	public static function resetMissCache():Void
 		misses = new Map<String, Bool>();
 }

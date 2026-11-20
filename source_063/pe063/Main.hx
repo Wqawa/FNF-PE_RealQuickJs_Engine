@@ -69,7 +69,7 @@ class Main extends Sprite
 
 	private function setupGame():Void
 	{
-		// 手机上工作目录由共享层定：<应用存储>/.realQuickJSEngine
+		// Mobile cwd is set by the shared layer: <app storage>/.realQuickJSEngine
 		#if (android || ios)
 		backend.MobileStorage.init();
 		#end
@@ -82,8 +82,7 @@ class Main extends Sprite
 			var ratioX:Float = stageWidth / gameWidth;
 			var ratioY:Float = stageHeight / gameHeight;
 			zoom = Math.min(ratioX, ratioY);
-			// flixel 5.6's FlxGame no longer takes a zoom; FlxG.scaleMode (RatioScaleMode) handles it.
-			// The ratio is computed for reference only; do not derive gameWidth/gameHeight or the HUD
+			// flixel 5.6 handles zoom via scaleMode; keep gameWidth/gameHeight as-is
 		}
 	
 		ClientPrefs.loadDefaultKeys();

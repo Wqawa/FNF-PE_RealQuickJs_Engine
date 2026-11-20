@@ -1,13 +1,6 @@
 package vanilla.mobile.input;
 
-/**
- * ID of every virtual button the touch controls can produce.
- *
- * Ported from the Mobile Porting Team's Psych Engine Android port
- * (source/mobile/input/MobileInputID.hx, MIT). Their `FlxMacroUtil.buildMap`
- * lookup was replaced with plain arithmetic/switches so it compiles on hxcpp
- * without macro tricks, and the letters stay contiguous (4..29).
- */
+// Virtual button IDs (MIT port). Plain ints, no macro lookup.
 enum abstract MobileInputID(Int) from Int to Int
 {
 	var ANY = -2;

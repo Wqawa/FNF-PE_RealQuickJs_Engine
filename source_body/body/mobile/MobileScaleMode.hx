@@ -2,14 +2,7 @@ package mobile;
 
 import flixel.system.scaleModes.BaseScaleMode;
 
-/**
- * Flixel's default scale mode keeps the 1280x720 canvas intact and letterboxes
- * it, which leaves black bars on tall phones. 'Wide Screen' stretches the
- * canvas over the whole display instead.
- *
- * Installed once at startup and left alone: with wideScreen off it does exactly
- * what the default mode does, so the option only flips a flag.
- */
+// Flixel's default letterboxes; 'Wide Screen' stretches over the whole display.
 class MobileScaleMode extends BaseScaleMode
 {
 	public static var allowWideScreen(default, set):Bool = true;
@@ -45,7 +38,7 @@ class MobileScaleMode extends BaseScaleMode
 			super.updateGamePosition();
 	}
 
-	/** Re-applies the mode, for when the option changes at runtime. */
+	// Re-applies the mode, for when the option changes at runtime.
 	@:noCompletion
 	static function set_allowWideScreen(value:Bool):Bool
 	{

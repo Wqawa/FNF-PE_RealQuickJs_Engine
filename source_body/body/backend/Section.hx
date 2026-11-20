@@ -1,10 +1,7 @@
 package backend;
 
-/**
- * 0.6.3 had Section as a real class (a chart section); 1.0 only keeps the SwagSection typedef.
- * Old HScript doing `import Section;` / `new Section()` could not find it, hence this shell.
- * It can be constructed and read from; the engine still uses SwagSection for real data.
- */
+// 0.6.3 had a real Section class; 1.0 only keeps the SwagSection typedef.
+// This shell lets old scripts import/new it; real data is still SwagSection.
 class Section
 {
 	public var sectionNotes:Array<Dynamic> = [];

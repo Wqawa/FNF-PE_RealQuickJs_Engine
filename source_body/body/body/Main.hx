@@ -75,9 +75,9 @@ class Main extends Sprite
 		backend.Native.fixScaling();
 		#end
 
-		// 手机上的工作目录：<应用存储>/.realQuickJSEngine（见 backend.MobileStorage）。
-		// 上游那行 android.content.Context.getExternalFilesDir() 本来就编不过 —— Haxe 侧没有
-		// android.* 的 extern。lime 能给的只有内置目录，MobileStorage 会在能识别外置目录时优先用它。
+		// Mobile cwd: <app storage>/.realQuickJSEngine (see backend.MobileStorage).
+		// Upstream's android.content.Context.getExternalFilesDir() has no Haxe extern.
+		// lime only gives the internal dir; MobileStorage prefers external when it can find it.
 		#if (android || ios)
 		backend.MobileStorage.init();
 		#end

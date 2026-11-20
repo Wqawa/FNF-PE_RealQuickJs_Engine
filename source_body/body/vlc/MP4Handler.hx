@@ -3,10 +3,7 @@ package vlc;
 #if VIDEOS_ALLOWED
 import hxcodec.flixel.FlxVideo;
 
-/**
- * 0.6.x called the video player `vlc.MP4Handler` (hxcodec 2.x).
- * hxvlc is underneath now; this shell keeps `import vlc.MP4Handler;` working.
- */
+// 0.6.x vlc.MP4Handler, now backed by hxvlc. Keeps old imports alive.
 @:keep
 class MP4Handler extends FlxVideo
 {

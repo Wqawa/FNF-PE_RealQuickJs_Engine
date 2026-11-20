@@ -2,14 +2,7 @@ package jsruntime;
 
 import psychlua.IScriptHost;
 
-/**
- * Where a .js file lives inside QuickJS.
- *
- * JSPlayer used to keep handle and path in two parallel arrays, with ownership,
- * dedupe and dispatch all index-aligned: adding a script meant touching three arrays.
- * As an object each script carries its own handle, path and owning mod, matching
- * the one-file-one-lua_State shape on the Lua side.
- */
+// One object per .js file: handle, path and owning mod together, like Lua's lua_State.
 class JSScriptHost implements IScriptHost
 {
 	public var handle:Int;
@@ -37,11 +30,8 @@ class JSScriptHost implements IScriptHost
 		if (!closed) QuickJSHandler.setGlobal(handle, name, value);
 	}
 
-	/**
-	 * Reads a global of this script. Numbers/booleans/strings come back typed; undefined is null.
-	 * Like Lua, this is script-local state, not MusicBeatState.variables
-	 * (that is the shared setVar/getVar space the host functions use).
-	 */
+		// Global of this script: typed values, undefined = null. Script-local, not
+	// MusicBeatState.variables (the shared setVar/getVar space).
 	public function getVar(name:String):Dynamic
 	{
 		if (closed || !QuickJSHandler.isReady(handle)) return null;

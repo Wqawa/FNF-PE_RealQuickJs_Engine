@@ -10,11 +10,7 @@ import psychlua.*;
 import psychlua.LuaUtils;
 import crowplexus.hscript.Expr.Error as IrisError;
 
-/**
- * Song events (precache, firing, ordering), moved out of PlayState.hx. Logic is copied
- * line for line; only PlayState member references became ps.xxx. Needs @:access, and
- * PlayState keeps same-named forwards so callers and overrides are unaffected.
- */
+// Song events, split out of PlayState. Uses ps.xxx + @:access; PlayState keeps forwards.
 @:access(states.PlayState)
 @:access(backend.MusicBeatState)
 class PlayStateEvents

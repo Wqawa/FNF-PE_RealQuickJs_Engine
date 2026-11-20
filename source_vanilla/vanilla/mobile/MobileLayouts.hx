@@ -1,13 +1,7 @@
 package vanilla.mobile;
 
-/**
- * Button tables for the touch pads.
- *
- * The Android ports read these from assets/shared/mobile/DPadModes/*.json. We
- * keep them in code instead: on Android the assets live inside the apk, so
- * FileSystem can't list that folder without unpacking everything to external
- * storage first. Coordinates are for the 1280x720 game canvas.
- */
+// Button tables. Ports read these from DPadModes/*.json; apk assets can't be listed.
+// Coordinates are for the 1280x720 canvas.
 typedef ButtonLayout =
 {
 	button:String, // field name on TouchPad

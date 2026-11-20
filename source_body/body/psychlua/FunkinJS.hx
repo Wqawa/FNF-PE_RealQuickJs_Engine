@@ -12,26 +12,14 @@ class FunkinJS
 	/** Extension this host claims. */
 	public static inline var EXTENSION:String = '.js';
 
-	// ───────────────────────────────────────────────────────────────────────────
-	//  JavaScriptUtils.hx integrity check
-	//
-	//  That file holds the issue archive - it is evidence. If anyone edits it, even
-	//  a space or a line ending, the game exits on boot. No warning, no fallback.
-	//
-	//  To edit it legitimately, update UTILS_FNV below:
-	//      python .workbuddy/hash_utils.py
-	//  (recompute FNV-1a 31 over the file, newlines normalised to LF).
-	// ───────────────────────────────────────────────────────────────────────────
+	// JavaScriptUtils.hx is evidence: editing it (even whitespace) exits on boot.
+	// To change it, recompute the hash: python .workbuddy/hash_utils.py
 	static inline var UTILS_FNV:Int = 0x1CF604D9;
 	// Resolved against CWD at runtime. It moved once (source/ -> source_body/body/);
 	// a stale path here makes the check skip silently instead of failing loudly.
 	static inline var UTILS_REL:String = 'source_body/body/psychlua/JavaScriptUtils.hx';
 
-	/**
-	 * Verifies JavaScriptUtils.hx has not been touched.
-	 * A missing source file is allowed: release builds do not ship the source tree,
-	 * so there is nothing to compare against.
-	 */
+	// Hash-check the evidence file; release builds have no source tree, so skip there.
 	public static function verifyUtilsIntegrity():Void
 	{
 		var path:String = findUtilsSource();
@@ -94,22 +82,8 @@ class FunkinJS
 		return h & 0x7FFFFFFF;
 	}
 
-	/**
-	 * Turns JS into Lua.
-	 *
-	 * Several passes in order, one syntax each. Strings and comments are skipped untouched:
-	 *
-	 *   1. template strings  `hi ${name}`  -> ("hi " .. tostring(name))
-	 *   2. arrow functions   (a) => a * 2  -> function(a) return a * 2 end
-	 *   3. C style for   for (i = 0; i < 4; i++) -> do local i = 0 while i < 4 do ... end end
-	 *   4. object literals   {a: 1, b: 2}  -> {a = 1, b = 2}
-	 *   5. operators     === / !==         -> == / ~=
-	 *   6. let / const  let x = 1           → local x = 1
-	 *   7. braces      { ... }           -> ... end (block) / as-is (object)
-	 *
-	 * Every pass scans and rewrites, never regex-replaces, so `=>` in a string and `{`
-	 * in a comment are left alone. `class` is kept as-is so Lua reports a syntax error.
-	 */
+	// JS -> Lua, one pass per syntax (strings/comments skipped, never regex-replaced).
+	// 'class' is left alone so Lua reports the syntax error.
 	public static function transpile(code:String):String
 	{
 		if(code == null) return null;
@@ -534,10 +508,7 @@ class FunkinJS
 		return out;
 	}
 
-	/**
-	 * Rewrites top level `key:` into `key =`, expands shorthand `{a, b}` to `{a = a, b = b}`.
-	 * Nested objects are handled recursively.
-	 */
+		// key: -> key =, and {a, b} -> {a = a, b = b}; nested objects recurse.
 	static function rewriteObjectBody(body:String):String
 	{
 		var out:String = '';
@@ -879,13 +850,7 @@ class FunkinJS
 		return kw == 'else' || kw == 'try' || kw == 'do' || kw == 'finally';
 	}
 
-	/**
-	 * Keyword to insert before a block. `if (x) {` is `if (x) then` in Lua,
-	 * `while (x) {` is `while (x) do`; function / else / try need none.
-	 *
-	 * Only the word before the parenthesis is read, so `else if (x) {` still counts as if.
-	 * Parentheses inside strings in an expression are not handled - good enough.
-	 */
+	// 'if (x) {' -> 'if (x) then', 'while' -> 'do'. Only the word before '(' is read.
 	static function blockOpener(code:String, bracePos:Int):String
 	{
 		var i:Int = bracePos - 1;
@@ -950,10 +915,7 @@ class FunkinJS
 		return true;
 	}
 
-	/**
-	 * Loads and runs a .js script.
-	 * Resolves the path, dedupes, transpiles, then runs the result as Lua.
-	 */
+	// Resolve, dedupe, transpile, then run the Lua result.
 	public static function start(jsPath:String, ?playState:states.PlayState):FunkinLua
 	{
 		#if MODS_ALLOWED

@@ -5,26 +5,17 @@ import flixel.util.FlxSignal.FlxTypedSignal;
 import haxe.ds.Map;
 import mobile.objects.TouchButton;
 
-/**
- * A group of TouchButtons plus the lookup table used for input queries.
- *
- * Port of the Mobile Porting Team's MobileInputManager (MIT). Two additions:
- *  - `onButtonDown` / `onButtonUp` live here, so anything holding a pad can
- *    listen without knowing whether it's a D-Pad or a hitbox.
- *  - `register()` / `unregister()` keep a stack of the pads currently on
- *    screen; `backend.Controls` asks `current` when it needs to know whether a
- *    control is held, which is how menu navigation and note holds work.
- */
+// A pad: TouchButtons + ID lookup. Signals and register/unregister stack the pads.
 class MobileInputManager extends FlxTypedSpriteGroup<TouchButton>
 {
 	public static var current(default, null):MobileInputManager;
 	static var stack:Array<MobileInputManager> = [];
 
-	/** Fired on press, release and slide-out of any button in this pad. */
+	// Fired on press, release and slide-out of any button in this pad.
 	public var onButtonDown:FlxTypedSignal<TouchButton->Void> = new FlxTypedSignal<TouchButton->Void>();
 	public var onButtonUp:FlxTypedSignal<TouchButton->Void> = new FlxTypedSignal<TouchButton->Void>();
 
-	/** Every button of this pad, indexed by the IDs it answers to. */
+	// Every button of this pad, indexed by the IDs it answers to.
 	public var trackedButtons:Map<MobileInputID, TouchButton> = new Map<MobileInputID, TouchButton>();
 
 	public function new()
@@ -45,7 +36,7 @@ class MobileInputManager extends FlxTypedSpriteGroup<TouchButton>
 		current = stack.length > 0 ? stack[stack.length - 1] : null;
 	}
 
-	/** Wire a button's events to this pad's signals and add it to the group. */
+	// Wire a button's events to this pad's signals and add it to the group.
 	public function bind(button:TouchButton):TouchButton
 	{
 		button.onDown.callback = () -> onButtonDown.dispatch(button);
@@ -54,11 +45,11 @@ class MobileInputManager extends FlxTypedSpriteGroup<TouchButton>
 		return button;
 	}
 
-	/** Whether this pad has a button answering to `id` (menu pads have A, note pads don't). */
+	// Whether this pad has a button answering to `id` (menu pads have A, note pads don't).
 	public function hasButton(id:MobileInputID):Bool
 		return trackedButtons.exists(id);
 
-	/** First button whose tag matches, e.g. 'UP'. The layout editor needs this. */
+	// First button whose tag matches, e.g. 'UP'. The layout editor needs this.
 	public function byTag(tag:String):TouchButton
 	{
 		for (button in members)
@@ -91,7 +82,7 @@ class MobileInputManager extends FlxTypedSpriteGroup<TouchButton>
 	inline public function anyReleased(buttons:Array<MobileInputID>):Bool
 		return checkButtonArrayState(buttons, RELEASED);
 
-	/** Drop every hold, e.g. when a pause menu opens on top of the pad. */
+	// Drop every hold, e.g. when a pause menu opens on top of the pad.
 	public function releaseAll():Void
 	{
 		for (button in members)

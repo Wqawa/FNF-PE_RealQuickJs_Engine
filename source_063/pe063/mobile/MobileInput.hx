@@ -4,11 +4,8 @@ import pe063.mobile.input.MobileInputID;
 import pe063.mobile.input.MobileInputManager;
 import haxe.ds.Map;
 
-/**
- * Thin bridge between the 0.6.3 input actions and the touch pad that happens to
- * be on screen. Note IDs also answer for their hitbox lane, so `NOTE_LEFT`
- * is pressed whether the player uses the D-Pad or taps the lane.
- */
+// Bridges 0.6.3 input actions to whatever pad is on screen. Note IDs also answer
+// for their hitbox lane, so a tap on the lane counts as NOTE_LEFT too.
 class MobileInput
 {
 	static var cache:Map<Int, Array<MobileInputID>> = new Map<Int, Array<MobileInputID>>();

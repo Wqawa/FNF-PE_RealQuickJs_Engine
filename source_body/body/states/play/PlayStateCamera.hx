@@ -8,11 +8,8 @@ import states.stages.objects.*;
 import psychlua.*;
 import crowplexus.hscript.Expr.Error as IrisError;
 
-/**
- * Camera and background follow (section camera moves, zoom tweens), moved out of PlayState.hx.
- * Copied line for line; member references became ps.xxx. Needs @:access, and PlayState
- * keeps same-named forwards so callers and overrides are unaffected.
- */
+// Camera + background follow, split out of PlayState. Uses ps.xxx + @:access;
+// PlayState keeps forwards so callers are unaffected.
 @:access(states.PlayState)
 @:access(backend.MusicBeatState)
 class PlayStateCamera

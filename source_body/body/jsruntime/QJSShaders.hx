@@ -10,16 +10,8 @@ import flixel.FlxSprite;
 import flixel.addons.display.FlxRuntimeShader;
 import openfl.filters.ShaderFilter;
 
-/**
- * Runtime shader table for the JS channel.
- *
- * Mirrors FunkinLua.initLuaShader / ShaderFunctions: same path order (current mod ->
- * mods/body -> shared), .frag and .vert read separately, either one counts as found.
- * The only difference is nothing hangs off a lua_State: a context is per file.
- *
- * Camera filters deliberately share ShaderFunctions.storedFilters with Lua, so JS can drop
- * what Lua added and vice versa. Separate tables make a tag invisible across channels.
- */
+// JS shader table: same path order as Lua, but no lua_State to hang things off.
+// Shares storedFilters with Lua so a tag is visible from both channels.
 class QJSShaders
 {
 	public static var runtimeShaders:Map<String, Array<String>> = new Map();

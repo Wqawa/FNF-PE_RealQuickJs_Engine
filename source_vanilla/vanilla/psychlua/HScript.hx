@@ -567,17 +567,8 @@ class CustomInterp extends crowplexus.hscript.Interp
 		return Reflect.callMethod(o, f, args);
 	}
 
-	/**
-	 * Where `import` lands.
-	 *
-	 * The default is proxyImports, then Tools.getClass -> Type.resolveClass(name), and the
-	 * three trees share identical FQNs, so it hits the body copy.
-	 * IsolatedImports is a generated static snapshot: miss one name and this hole opens.
-	 *
-	 * This no longer trusts the table: if the result belongs to another tree's engine
-	 * classes, LuaUtils.resolveClass re-resolves it under vanilla.*, and null is returned
-	 * rather than a class whose Paths points at assets/body.
-	 */
+	// import: proxyImports first, then Type.resolveClass - same FQNs in all trees.
+	// Re-resolve under vanilla.* and drop other-tree classes.
 	override function getOrImportClass(name:String):Dynamic
 	{
 		var cls:Dynamic = super.getOrImportClass(name);

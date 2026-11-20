@@ -91,10 +91,7 @@ class Controls
 	public var gamepadBinds:Map<String, Array<FlxGamepadInputID>>;
 
 	#if MOBILE_CONTROLS
-	/**
-	 * Which touch buttons answer to which control. Menus read ui_up / accept /
-	 * back, PlayState reads note_left..note_right, so one table covers both.
-	 */
+		// Touch ID -> control map. Menus read ui_up/accept/back, PlayState reads note_*.
 	static var mobileBinds:Map<String, Array<MobileInputID>> = [
 		'ui_up' => [MobileInputID.UP],
 		'ui_down' => [MobileInputID.DOWN],

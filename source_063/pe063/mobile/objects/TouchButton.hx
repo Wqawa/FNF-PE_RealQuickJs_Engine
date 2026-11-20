@@ -16,27 +16,17 @@ import pe063.mobile.input.MobileInputID;
 import flixel.input.mouse.FlxMouseButton;
 #end
 
-/**
- * A sprite that behaves like a touch button: it owns a set of MobileInputIDs
- * and fires onDown / onUp / onOver / onOut.
- *
- * Port of the Mobile Porting Team's TouchButton (MIT, by Karim Akra and
- * Homura Akemi). Two changes for this engine:
- *   - the brightness shader is gone, status is shown with alpha only. An extra
- *     fragment shader per button is not free on phones, and alpha reads fine.
- *   - on desktop it listens to the mouse button instead of FlxG.touches, so the
- *     layout can be tested in a window with -DMOBILE_CONTROLS.
- */
+// Touch button: owns IDs, fires onDown/Up/Over/Out. Alpha instead of a shader.
 class TouchButton extends TypedTouchButton<FlxSprite>
 {
 	public static inline var NORMAL:Int = 0;
 	public static inline var HIGHLIGHT:Int = 1;
 	public static inline var PRESSED:Int = 2;
 
-	/** Graphic name in upper case, used by the layout tables. */
+	// Graphic name in upper case, used by the layout tables.
 	public var tag:String;
 
-	/** IDs this button answers to. */
+	// IDs this button answers to.
 	public var IDs:Array<MobileInputID> = [];
 
 	public function new(X:Float = 0, Y:Float = 0, ?IDs:Array<MobileInputID> = null)
@@ -54,10 +44,10 @@ class TypedTouchButton<T:FlxSprite> extends FlxSprite implements IFlxInput
 {
 	public var label(default, set):T;
 
-	/** Press the button by dragging a finger over it instead of tapping it. */
+	// Press the button by dragging a finger over it instead of tapping it.
 	public var allowSwiping:Bool = true;
 
-	/** Allow more than one finger on this button (hitbox hints need it). */
+	// Allow more than one finger on this button (hitbox hints need it).
 	public var multiTouch:Bool = false;
 
 	public var onUp(default, null):TouchButtonEvent;
@@ -67,13 +57,13 @@ class TypedTouchButton<T:FlxSprite> extends FlxSprite implements IFlxInput
 
 	public var status(default, set):Int;
 
-	/** Alpha for NORMAL / HIGHLIGHT / PRESSED. Filled from parentAlpha. */
+	// Alpha for NORMAL / HIGHLIGHT / PRESSED. Filled from parentAlpha.
 	public var statusAlphas:Array<Float> = [1.0, 0.95, 0.55];
 
-	/** Added to the label alpha so the glyph stays readable over the pad. */
+	// Added to the label alpha so the glyph stays readable over the pad.
 	public var labelStatusDiff:Float = 0.05;
 
-	/** Set this to the group alpha, like TouchPad does. */
+	// Set this to the group alpha, like TouchPad does.
 	public var parentAlpha(default, set):Float = 1;
 
 	public var justReleased(get, never):Bool;
@@ -86,7 +76,7 @@ class TypedTouchButton<T:FlxSprite> extends FlxSprite implements IFlxInput
 	var _spriteLabel:FlxSprite;
 	var input:FlxInput<Int>;
 
-	/** The pointer currently holding this button, if any. */
+	// The pointer currently holding this button, if any.
 	var currentInput:IFlxInput;
 
 	public function new(X:Float = 0, Y:Float = 0):Void
@@ -354,10 +344,7 @@ class TypedTouchButton<T:FlxSprite> extends FlxSprite implements IFlxInput
 		return input.justPressed;
 }
 
-/**
- * Callback holder for a TouchButton event. Sounds were dropped, nothing here
- * played one.
- */
+// Callback holder for a TouchButton event.
 private class TouchButtonEvent implements IFlxDestroyable
 {
 	public var callback:Void->Void;

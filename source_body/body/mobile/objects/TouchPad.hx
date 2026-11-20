@@ -5,14 +5,7 @@ import mobile.MobileLayouts.ButtonLayout;
 import mobile.input.MobileInputID;
 import mobile.input.MobileInputManager;
 
-/**
- * The on-screen D-Pad plus action buttons.
- *
- * Port of the Mobile Porting Team's TouchPad (MIT, by Karim Akra and Homura
- * Akemi). Layouts come from MobileLayouts instead of the json files the ports
- * ship, and every button carries both a menu ID (UP/DOWN/...) and a note ID
- * (NOTE_UP/...) so one pad serves menus and gameplay.
- */
+// On-screen D-Pad + action buttons. Layouts from MobileLayouts, no json.
 class TouchPad extends MobileInputManager
 {
 	public var buttonLeft:TouchButton;
@@ -27,10 +20,8 @@ class TouchPad extends MobileInputManager
 	public var buttonX:TouchButton;
 	public var buttonY:TouchButton;
 
-	/**
-	 * @param DPad     RIGHT_FULL / LEFT_FULL / UP_DOWN / LEFT_RIGHT
-	 * @param Action   A / B / A_B / A_B_E / ... see MobileLayouts.action
-	 */
+	// DPad: RIGHT_FULL / LEFT_FULL / UP_DOWN / LEFT_RIGHT
+	// Action: A / B / A_B / A_B_E / ... see MobileLayouts.action
 	public function new(DPad:String, Action:String)
 	{
 		super();
@@ -108,7 +99,7 @@ class TouchPad extends MobileInputManager
 		return button;
 	}
 
-	/** 'Dynamic Controls Color': arrows take the note colors from the settings. */
+	// 'Dynamic Controls Color': arrows take the note colors from the settings.
 	public static function applyDynamicColor(button:TouchButton):Void
 	{
 		if (!ClientPrefs.data.dynamicColors)

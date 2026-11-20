@@ -34,10 +34,7 @@ class Paths
 			dumpExclusions.push(key);
 	}
 
-	/**
-	 * Version directory for assets and mods. This tree uses 1.0.4, body uses body.
-	 * Runtime assets come from assets/<VERSION_DIR>/..., mods from mods/<VERSION_DIR>/...
-	 */
+	// assets/<VERSION_DIR> and mods/<VERSION_DIR>, one dir per tree
 	public static var VERSION_DIR:String = '1.0.4';
 
 	public static var dumpExclusions:Array<String> = ['assets/$VERSION_DIR/shared/music/freakyMenu.$SOUND_EXT'];
@@ -178,15 +175,7 @@ class Paths
 		return getSharedPath(file);
 	}
 
-	/**
-	 * Whether a file exists: disk first, compile-time manifest second.
-	 *
-	 * OpenFlAssets.exists only sees the manifest lime generates at compile time. Assets reach
-	 * bin two ways: those in the repo at compile time (in the manifest) and those manage.sh
-	 * copies in afterwards (base_game, never in the manifest). The latter were reported
-	 * missing, getPath rewrote week4/images/gore/*.png to a shared path, the atlas failed to
-	 * load and Limo's update hit animation.curAnim == null.
-	 */
+	// disk first: base_game is copied in after the build, never in the manifest
 	public static function existsOnDiskOrManifest(path:String, ?type:AssetType = null):Bool
 	{
 		#if MODS_ALLOWED
@@ -195,13 +184,7 @@ class Paths
 		return OpenFlAssets.exists(path, type);
 	}
 
-	/**
-	 * Atlas descriptions (.xml / .txt) are read from disk when possible.
-	 *
-	 * FlxAtlasFrames checks OpenFlAssets.exists() on the string as an asset id, then parses the
-	 * string as XML. Passing a disk path that the manifest lacks meant the path itself was
-	 * parsed as XML and blew up. Read the file and pass the content instead.
-	 */
+	// read atlas xml off disk; FlxAtlasFrames would parse the path itself as XML
 	inline static public function readTextOrPath(path:String):String
 	{
 		#if MODS_ALLOWED
@@ -504,16 +487,8 @@ class Paths
 	inline static public function modsImagesJson(key:String)
 		return modFolders('images/' + key + '.json');
 
-	/**
-	 * Works out which mod a script path belongs to, null when unknown.
-	 *
-	 * Upstream checks `path.split('/')[0] + '/' == Paths.mods()`, which assumes a flat
-	 * mods/<mod>/ layout. This build has mods/<version>/<mod>/, so 'mods/' never equals
-	 * 'mods/1.0.4/' and modFolder stayed null for every script: modFolder, getModSetting
-	 * and any relative path built from it were broken in the vanilla tree.
-	 *
-	 * Also handles the absolute paths findScriptFile returns via applicationDirectory.
-	 */
+	// Which mod a script belongs to. mods/<version>/<mod>/ here, not the flat
+	// mods/<mod>/ upstream expects. Also takes absolute paths from findScriptFile.
 	public static function modFromScriptPath(path:String):String
 	{
 		if(path == null || path.length == 0) return null;

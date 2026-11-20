@@ -12,11 +12,8 @@ import psychlua.*;
 import psychlua.LuaUtils;
 import crowplexus.hscript.Expr.Error as IrisError;
 
-/**
- * Judgement and input (keys, hits, misses, rating popups), moved out of PlayState.hx.
- * Logic is copied line for line; only PlayState member references became ps.xxx. Needs
- * @:access for private fields, and PlayState keeps same-named forwards so callers and
- */
+// Judgement + input, split out of PlayState. Uses ps.xxx + @:access;
+// PlayState keeps forwards so callers and overrides are unaffected.
 @:access(states.PlayState)
 @:access(backend.MusicBeatState)
 class PlayStateJudge

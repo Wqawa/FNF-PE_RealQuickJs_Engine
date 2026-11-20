@@ -8,13 +8,7 @@ import hxvlc.openfl.Video;
 import lime.app.Event;
 import openfl.display.BitmapData;
 
-/**
- * Compatibility shell for hxcodec 3.x's FlxVideo.
- *
- * 1.0 switched the player to hxvlc, while old mods still write
- * `new FlxVideo()` + `play(path, loop)` + `video.bitmapData`，
- * hxvlc's Video takes the same calls here, so scripts need no changes.
- */
+// hxcodec 3.x FlxVideo shell over hxvlc. Same play(path, loop) + bitmapData calls.
 @:keep
 class FlxVideo extends FlxSprite
 {

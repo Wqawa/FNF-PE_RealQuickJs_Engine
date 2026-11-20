@@ -216,14 +216,7 @@ class MusicBeatState extends FlxUIState
 		MusicBeatState.switchState(FlxG.state);
 	}
 
-	/**
-	 * Use this to switch states from inside a substate.
-	 *
-	 * flixel 5's switchState destroys the current state while the substate is still in its
-	 * update, throwing "Attempting to resetState while the current state is destroyed".
-	 * 0.6.3's flixel had no such guard, so the original code switches directly everywhere.
-	 * Fix: close the substate first, switch next frame.
-	 */
+	// switchState from a substate kills the state mid-update; close then defer
 	public static function safeSwitch(?next:FlxState):Void
 	{
 		var cur:Dynamic = FlxG.state;

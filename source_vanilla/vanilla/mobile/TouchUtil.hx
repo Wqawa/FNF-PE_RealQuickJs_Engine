@@ -3,12 +3,7 @@ package vanilla.mobile;
 import flixel.FlxObject;
 import flixel.input.touch.FlxTouch;
 
-/**
- * "Did the player tap anywhere" helpers.
- *
- * Port of the Mobile Porting Team's TouchUtil (MIT). On desktop it reports the
- * left mouse button instead of a finger so menus stay testable in a window.
- */
+// 'Did the player tap anywhere' helpers (MIT port). Mouse stands in on desktop.
 class TouchUtil
 {
 	public static var pressed(get, never):Bool;
@@ -16,14 +11,14 @@ class TouchUtil
 	public static var justReleased(get, never):Bool;
 	public static var released(get, never):Bool;
 
-	/** The finger currently down, or the first one the driver knows about. */
+	// The finger currently down, or the first one the driver knows about.
 	public static var touch(get, never):FlxTouch;
 
-	/** Where that finger is, in game coordinates. Mouse on desktop. */
+	// Where that finger is, in game coordinates. Mouse on desktop.
 	public static var pointerX(get, never):Float;
 	public static var pointerY(get, never):Float;
 
-	/** Is any finger inside this object. Used by the layout editor's buttons. */
+	// Is any finger inside this object. Used by the layout editor's buttons.
 	public static function overlaps(object:FlxObject, ?camera:FlxCamera):Bool
 	{
 		#if desktop

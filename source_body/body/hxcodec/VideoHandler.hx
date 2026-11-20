@@ -3,10 +3,7 @@ package hxcodec;
 #if VIDEOS_ALLOWED
 import hxcodec.flixel.FlxVideo;
 
-/**
- * hxcodec 2.6's class name. 0.6/0.7 mods commonly `import hxcodec.VideoHandler;`,
- * renamed to `hxcodec.flixel.FlxVideo` in 3.0. This keeps the old name working.
- */
+// Old hxcodec 2.6 class name, renamed to FlxVideo in 3.0. Keeps old imports alive.
 @:keep
 class VideoHandler extends FlxVideo
 {

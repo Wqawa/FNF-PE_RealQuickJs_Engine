@@ -7,22 +7,15 @@ import flixel.FlxState;
 import flixel.text.FlxText;
 import flixel.util.FlxColor;
 
-/**
- * Crash screen.
- *
- * Deliberately does not use the engine's Button / Alphabet / PsychUI: a crash means the
- * game is in an undefined state and "the UI still works" is the worst assumption. Plain
- * flixel rects and FlxText let all three trees share one screen.
- *
- * Text is English: FlxText's default font has no CJK glyphs.
- */
+// Crash screen: plain flixel rects + FlxText, no engine UI (nothing is safe here).
+// English only - FlxText's font has no CJK glyphs.
 class CrashState extends FlxState
 {
 	static inline var BTN_W:Int = 150;
 	static inline var BTN_H:Int = 40;
 	static inline var BTN_GAP:Int = 18;
 
-	/** Characters shown on screen; the middle is cut beyond this. Full text is copied/dumped. */
+	// on-screen limit; full text still goes to the dump
 	static inline var VISIBLE_MAX:Int = 1800;
 
 	var detail:String;

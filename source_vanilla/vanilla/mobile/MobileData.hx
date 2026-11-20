@@ -5,14 +5,7 @@ import flixel.util.FlxSave;
 import vanilla.mobile.objects.TouchButton;
 import vanilla.mobile.objects.TouchPad;
 
-/**
- * Where the player dragged the buttons in 'Custom' mode.
- *
- * Kept in its own save file instead of ClientPrefs: it's two floats per button
- * and the editor rewrites all of them at once, no point dragging the settings
- * blob along. Positions are stored as tag/x/y triples, so a layout that gained
- * or lost a button still lines up with the old save.
- */
+// Saved button positions for 'Custom'. Own save file, tag/x/y triples.
 class MobileData
 {
 	static var save:FlxSave;
@@ -27,7 +20,7 @@ class MobileData
 		bound = true;
 	}
 
-	/** Move the pad's buttons to where they were left last time. */
+	// Move the pad's buttons to where they were left last time.
 	public static function applyPositions(pad:TouchPad):Void
 	{
 		if (pad == null)
@@ -53,7 +46,7 @@ class MobileData
 		}
 	}
 
-	/** Remember where the buttons are right now. */
+	// Remember where the buttons are right now.
 	public static function storePositions(pad:TouchPad):Void
 	{
 		if (pad == null)

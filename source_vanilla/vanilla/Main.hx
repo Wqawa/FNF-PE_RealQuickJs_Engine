@@ -70,8 +70,8 @@ class Main extends Sprite
 		vanilla.backend.Native.fixScaling();
 		#end
 
-		// 手机上的工作目录：<应用存储>/.realQuickJSEngine（见 backend.MobileStorage）。
-		// 原来是 android.content.Context.getExternalFilesDir()，Haxe 侧没有 android.* extern。
+		// Mobile cwd: <app storage>/.realQuickJSEngine (see backend.MobileStorage).
+		// No Haxe extern for android.content.Context.getExternalFilesDir().
 		#if (android || ios)
 		backend.MobileStorage.init();
 		#end

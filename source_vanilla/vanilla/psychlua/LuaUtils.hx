@@ -19,23 +19,15 @@ typedef LuaTweenOptions = {
 
 class LuaUtils
 {
-	// Aliases into the shared layer: one definition, no drift with the body / JS hosts.
+	// stop sentinels, one copy in ScriptConstants
 	public static inline var Function_Stop:String = backend.ScriptConstants.Function_Stop;
 	public static inline var Function_Continue:String = backend.ScriptConstants.Function_Continue;
 	public static inline var Function_StopLua:String = backend.ScriptConstants.Function_StopLua;
 	public static inline var Function_StopHScript:String = backend.ScriptConstants.Function_StopHScript;
 	public static inline var Function_StopAll:String = backend.ScriptConstants.Function_StopAll;
 
-	/**
-	 * After the move to vanilla.*, Lua/HScript still reflect by the old package names
-	 * (states.PlayState and friends). The body tree has the same names in one exe, so try
-	 * vanilla.* first or vanilla mods quietly operate on body classes.
-	 *
-	 * 1.0.4 classes live in packages (backend. / states. / objects. ...) while scripts use bare
-	 * names such as getPropertyFromClass('ClientPrefs', 'healthBarAlpha'). Prefixing only
-	 * 'vanilla.' cannot build vanilla.backend.ClientPrefs, so it returned null, the property read
-	 * as nil and e.g. the health bar skin's alpha became 0 (the atlas was fine).
-	 */
+	// Mods still use bare names ('ClientPrefs'). Try vanilla.* then
+	// vanilla.<pkg>.<name>, or the body copy answers with assets/body.
 	public static function resolveClass(name:String):Dynamic
 	{
 		if (name == null || name.length == 0) return null;
@@ -53,13 +45,12 @@ class LuaUtils
 			}
 		}
 
-		// If the fallback resolves to the body equivalent (backend.PlayState etc), return null:
-		// one exe, three trees, and the wrong tree is harder to trace than an error.
+		// body class? drop it - its Paths point at assets/body
 		var fallback:Dynamic = Type.resolveClass(name);
 		return isOtherTreeClass(fallback) ? null : fallback;
 	}
 
-	/** Engine classes of another tree. Single source in the shared layer. */
+	// other tree's engine class? ask the shared list
 	public static function isOtherTreeClass(cl:Dynamic):Bool
 	{
 		if (cl == null) return false;
@@ -68,8 +59,7 @@ class LuaUtils
 		return backend.ScriptConstants.isEngineClass(clsName);
 	}
 
-	// Bare-name fallback: 'vanilla.' + pkg + '.' + name. Mirrors the package families
-	// above plus the nested ones scripts actually import (stages, editors, ui).
+	// packages scripts actually import, for the bare-name fallback
 	static final CLASS_PACKAGES:Array<String> = [
 		'backend', 'backend.animation', 'backend.ui', 'objects', 'states',
 		'states.stages', 'states.stages.objects', 'states.editors', 'states.editors.content',

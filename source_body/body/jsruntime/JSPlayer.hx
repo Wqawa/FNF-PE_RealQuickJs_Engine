@@ -5,23 +5,9 @@ import backend.Conductor;
 import flixel.FlxG;
 import psychlua.LuaUtils;
 
-/**
- * Runtime state for .js scripts. One context per file, mirroring one interpreter per Lua file.
- *
- * Loading starts at psychlua.FunkinJS.start() (PlayState calls it for every .js it finds),
- * which branches on Gameplay -> JS Engine: QuickJS goes to loadFile() here,
- * otherwise the old transpile-to-Lua path is used.
- *
- * Callbacks ride PlayState.callOnScripts(), the one place every event already goes through,
- * and are forwarded to each context here; no hooks scattered around PlayState.
- *
- * Contexts are isolated: one script defining onCreatePost does not shadow another's,
- * and globals are per script (getGlobalFromScript / setGlobalFromScript locate by handleOf).
- * Everything is disposed on beginSong() and rebuilt for the next song.
- *
- * 2026-11 rework: handle and path were two parallel arrays; now one Array<JSScriptHost>,
- * each entry carrying its owning mod, so PlayState sends events through IScriptHost.
- */
+// One context per .js file. PlayState calls FunkinJS.start(), which picks QuickJS here
+// or the old transpile-to-Lua path. Events come through callOnScripts, globals stay per script,
+// and beginSong() rebuilds every context for the next song.
 class JSPlayer
 {
 	public static var active:Bool = false;
@@ -33,11 +19,7 @@ class JSPlayer
 	/** timer_xxx / tween_xxx -> the script that created it; callbacks go to it only. */
 	static var owners:Map<String, JSScriptHost> = [];
 
-	/**
-	 * Handles waiting for JS_FreeContext on the next frame.
-	 * When a script unloads another (or itself) from a callback, that context is still on
-	 * the C stack; freeing it there is a use-after-free and did crash. Defer one frame.
-	 */
+		// Free a context one frame late: unloading from a callback still has it on the C stack.
 	static var pendingFree:Array<Int> = [];
 
 	public static function beginSong():Void
@@ -132,11 +114,7 @@ class JSPlayer
 	}
 
 	// ---------------------------------------------------------------- dispatch
-	/**
-	 * Events forwarded from PlayState.callOnScripts(), sent to every script.
-	 * Returns the first non-Continue value so callers see Function_Stop - otherwise
-	 * "JS asked to stop" never worked (this used to be dropped).
-	 */
+		// Events from callOnScripts. Returns the first non-Continue so Function_Stop still works.
 	public static function forward(name:String, args:Array<Dynamic>):Dynamic
 	{
 		if (!active) return null;
@@ -152,15 +130,8 @@ class JSPlayer
 		return ret;
 	}
 
-	/**
-	 * Sends to a single script. The bridge carries strings and numbers only, so arguments
-	 * are dispatched in the shapes it supports: zero args, (number), (string), (string,
-	 * number), (string, number, number) and (string, string). Anything past the third
-	 * argument is dropped; objects never cross.
-	 *
-	 * The return value is whatever the script returned: sentinels come back as strings,
-	 * true/false/numbers are coerced back, and no return means null.
-	 */
+		// One script: args go over the string/number bridge in a few fixed shapes, max three.
+	// Sentinels come back as strings; no return is null.
 	public static function emitTo(host:JSScriptHost, name:String, args:Array<Dynamic>):Dynamic
 	{
 		if (!active || host == null || host.closed || !QuickJSHandler.isReady(host.handle)) return null;
@@ -238,11 +209,7 @@ class JSPlayer
 		if (host != null) owners.set(key, host);
 	}
 
-	/**
-	 * Unloads a .js (removeLuaScript / removeHScript).
-	 * One context per file makes this possible: unbind, drop timer/tween ownership, free it.
-	 * The one trap is unloading yourself from a callback; hand it to pendingFree for a frame.
-	 */
+		// Unload: unbind, drop ownership, free. Self-unload waits a frame via pendingFree.
 	public static function unloadFile(name:String):Bool
 	{
 		var host:JSScriptHost = find(name);

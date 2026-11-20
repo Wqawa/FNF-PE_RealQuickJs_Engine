@@ -13,38 +13,10 @@ import flixel.util.FlxTimer;
 import states.PlayState;
 import backend.MusicBeatState;
 
-/**
- * QuickJS-NG runtime and the JS/Haxe bridge.
- *
- * Shape: one trampoline plus numeric function ids.
- *   JS side:  __host(idx, a, b, c, d, e, f), called by wrappers Haxe evals once
- *   C side:   qjs_host reads the id and six strings, calls back into hostDispatch
- *   Haxe:     switch on the id
- * Adding a function touches the Haxe switch and the WRAPPERS string, never C.
- *
- * One trampoline per function and JS_SetOpaque holding names were both tried and
- * dropped: the first explodes the code size, the second is unreliable for CFunction.
- *
- * Other rules:
- * - runtime/context are file static in C++; no raw pointers in Dynamic (the GC moves them).
- * - Errors only trace and log to testout/js_log.txt: one bad script must not take the game down.
- */
-// Why the hardcoded path depth:
-//   hxcpp compiles and links in export/<mode>/windows/obj and generates .cpp under
-//   obj/src/jsruntime/, therefore:
-//     libpath is relative to obj: ../../../../third_party/quickjs-ng/build
-//     #include is relative to the cpp: ../../../../../../third_party/quickjs-ng/quickjs.h
-//   buildXml's <include> does not produce -I on this hxcpp version (tried, no effect),
-//   so headers use quoted relative includes.
-//   Benefit: moving the repo or changing machines needs no edits; manage.sh builds the lib.
-//
-// Android: export/<mode>/android/obj sits at the same depth as windows/obj, so the two
-// relative paths above still hold. Only the artifact differs — NDK clang links a
-// libquickjs-ng.a (arm64-v8a), not the MSVC .lib. Built by `manage.sh --zh 14`.
-//
-// Do NOT wrap @:buildXml in #if: hxcpp collects every buildXml on the class and appends
-// them all (both branches ended up in Build.xml, so the link line got a .lib and a bare
-// lib name). Conditions belong inside the XML, where hxcpp evaluates them.
+// QuickJS-NG runtime + JS/Haxe bridge. __host(id, ...) is the only way in; ids match WRAPPERS.
+// No raw pointers in Dynamic (the GC moves them). A bad script only traces, never kills the game.
+// Paths below are relative to hxcpp's obj/ so the repo can move; manage.sh builds the lib.
+// Keep the conditions inside the XML: hxcpp appends every @:buildXml branch it sees.
 @:buildXml('
 <target id="haxe">
 	<libpath name="../../../../third_party/quickjs-ng/build" if="windows" />
@@ -256,13 +228,13 @@ class QuickJSHandler
 	// ---------------------------------------------------------------- file log
 	// trace only goes to stdout, and double-clicked builds have no console, so it is lost.
 	// Script output is written to testout/js_log.txt as well, so it can be read afterwards.
-	static var LOG_PATH:String = './testout/js_log.txt';
+	static var LOG_PATH:String = backend.ScriptConstants.SCRIPT_LOG;
 
 	public static function log(msg:String):Void
 	{
 		#if sys
 		try {
-			sys.FileSystem.createDirectory('./testout');
+			sys.FileSystem.createDirectory(backend.ScriptConstants.LOG_DIR);
 			var f = sys.io.File.append(LOG_PATH, false);
 			f.writeString(msg + '\n');
 			f.close();
@@ -275,7 +247,7 @@ class QuickJSHandler
 	{
 		#if sys
 		try {
-			sys.FileSystem.createDirectory('./testout');
+			sys.FileSystem.createDirectory(backend.ScriptConstants.LOG_DIR);
 			var f = sys.io.File.write(LOG_PATH, false);
 			f.writeString(header + '\n');
 			f.close();
@@ -357,10 +329,7 @@ class QuickJSHandler
 		return out;
 	}
 
-	/**
-	 * Reads a global with its type. undefined / null mean missing and return null.
-	 * Objects and functions only stringify; this is a string bridge.
-	 */
+	// Typed global: undefined/null = missing; objects/functions only stringify.
 	public static function getGlobal(h:Int, name:String):Dynamic
 	{
 		if (!isReady(h) || name == null || name.length == 0) return null;
@@ -503,10 +472,7 @@ class QuickJSHandler
 		return t == 'true' || t == '1' || t == 'yes';
 	}
 
-	/**
-	 * JS wrappers all go through __host(id, a, b, c, d, e, f).
-	 * Ids must match the hostDispatch cases one to one.
-	 */
+	// Every JS wrapper calls __host(id, ...); ids match hostDispatch one to one.
 	static inline var WRAPPERS:String = '
 		const __h = (i, a, b, c, d, e, f) => __host(i,
 			a === undefined ? "" : String(a), b === undefined ? "" : String(b),

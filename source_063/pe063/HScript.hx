@@ -86,14 +86,7 @@ class HScript
 		return interp.execute(HScript.parser.parseString(codeToRun));
 	}
 
-	/**
-	 * On an Unknown variable error, add the global class and run again.
-	 *
-	 * globals is a short hand-written list in new() (FlxG / PlayState / ClientPrefs ...), and
-	 * anything outside it errored, so mods had to addHaxeLibrary('Name', 'package') by hand,
-	 * package included. This pulls the name out of the error and hands it to resolveClass
-	 * (with its pe063. fallback), up to 8 per run, and only rethrows when that fails.
-	 */
+	// Unknown global -> resolveClass -> retry (up to 8)
 	public function executeAuto(codeToRun:String, resolver:String->Dynamic):Dynamic
 	{
 		var tries:Int = 0;
