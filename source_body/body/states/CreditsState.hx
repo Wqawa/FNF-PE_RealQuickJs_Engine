@@ -112,6 +112,11 @@ class CreditsState extends MusicBeatState
 		intendedColor = bg.color;
 		changeSelection();
 		super.create();
+
+		#if MOBILE_CONTROLS
+		// 这个界面只有上下翻人，A 打开链接，B 返回，用不上左右
+		addTouchPad('UP_DOWN', 'A_B');
+		#end
 	}
 
 	var quitting:Bool = false;

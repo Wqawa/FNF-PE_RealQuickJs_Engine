@@ -190,12 +190,26 @@ class FreeplayState extends MusicBeatState
 		changeSelection();
 		updateTexts();
 		super.create();
+
+		#if MOBILE_CONTROLS
+		// 多一个 C 键用来开修改器菜单
+		addTouchPad('LEFT_FULL', 'A_B_C');
+		#end
 	}
+
+	#if mobile
+	// 子菜单 close 的那一帧，closeSubState 会把 persistentUpdate 设回 true，
+	// 父 state 继续往下跑就会把同一次 B 当成自己的，直接回主菜单
+	var justClosedSub:Bool = false;
+	#end
 
 	override function closeSubState()
 	{
 		changeSelection(0, false);
 		persistentUpdate = true;
+		#if mobile
+		justClosedSub = true;
+		#end
 		super.closeSubState();
 	}
 
@@ -301,7 +315,11 @@ class FreeplayState extends MusicBeatState
 			}
 		}
 
+		#if mobile
+		if (controls.BACK && subState == null && !justClosedSub)
+		#else
 		if (controls.BACK)
+		#end
 		{
 			if (player.playingMusic)
 			{
@@ -324,7 +342,12 @@ class FreeplayState extends MusicBeatState
 			}
 		}
 
+		#if mobile
+		// 桌面是 Ctrl，手机上换成 C 键
+		if(Controls.touchButtonJustPressed('ctrl_menu') && !player.playingMusic)
+		#else
 		if(FlxG.keys.justPressed.CONTROL && !player.playingMusic)
+		#end
 		{
 			persistentUpdate = false;
 			openSubState(new GameplayChangersSubstate());
@@ -462,6 +485,10 @@ class FreeplayState extends MusicBeatState
 
 		updateTexts(elapsed);
 		super.update(elapsed);
+
+		#if mobile
+		justClosedSub = false;
+		#end
 	}
 	
 	function getVocalFromCharacter(char:String)

@@ -101,6 +101,8 @@ class Controls
 		'back' => [MobileInputID.B],
 		'pause' => [MobileInputID.P],
 		'reset' => [MobileInputID.R],
+		// Freeplay / Story 里原本用 Ctrl 呼出的修改器菜单
+		'ctrl_menu' => [MobileInputID.C],
 		'note_left' => [MobileInputID.NOTE_LEFT, MobileInputID.HITBOX_LEFT],
 		'note_down' => [MobileInputID.NOTE_DOWN, MobileInputID.HITBOX_DOWN],
 		'note_up' => [MobileInputID.NOTE_UP, MobileInputID.HITBOX_UP],

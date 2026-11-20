@@ -12,6 +12,10 @@ class Main
 		backend.EngineCrash.install();
 
 		#if (android || ios)
+		// 先把 cwd 定下来。Engine 读 engine.txt 用的是当前目录，而写入发生在游戏跑起来
+		// 之后（那时 cwd 已经是 MobileStorage 设的），两边对不上就会「切了没反应」。
+		backend.MobileStorage.init();
+
 		// 兜底键盘的悬浮球。挂在 stage 上，跟树无关，所以三棵树都能用
 		backend.DebugKeyboard.install();
 		#end
