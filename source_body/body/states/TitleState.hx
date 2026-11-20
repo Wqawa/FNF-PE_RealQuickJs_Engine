@@ -79,9 +79,13 @@ class TitleState extends MusicBeatState
 			Language.reloadPhrases();
 		}
 
-		// introText.txt could be empty (bad mod, missing asset) - beatHit reads [0] and [1]
+		#if mobile
+		// apk 里 introText 读不到时这里是空数组，beatHit 的 [0]/[1] 会直接越界
 		var introTexts:Array<Array<String>> = getIntroTextShit();
 		curWacky = introTexts.length > 0 ? FlxG.random.getObject(introTexts) : ['Psych Engine', 'by Shadow Mario'];
+		#else
+		curWacky = FlxG.random.getObject(getIntroTextShit());
+		#end
 
 		if(!initialized)
 		{
@@ -529,10 +533,11 @@ class TitleState extends MusicBeatState
 			{
 				case 1:
 					//FlxG.sound.music.stop();
-					var titleMusic = Paths.music('freakyMenu');
-					FlxG.sound.playMusic(titleMusic, 0);
-					// android: a missing/undecodable track leaves sound.music null, don't poke it
+					FlxG.sound.playMusic(Paths.music('freakyMenu'), 0);
+					#if mobile
+					// 音轨解不出来的时候 sound.music 是 null，别直接点
 					if(FlxG.sound.music != null)
+					#end
 						FlxG.sound.music.fadeIn(4, 0, 0.7);
 				case 2:
 					createCoolText(['Psych Engine by'], 40);

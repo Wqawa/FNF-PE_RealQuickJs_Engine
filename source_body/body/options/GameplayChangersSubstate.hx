@@ -143,8 +143,10 @@ class GameplayChangersSubstate extends MusicBeatSubstate
 	var holdTime:Float = 0;
 	var holdValue:Float = 0;
 
-	// same as BaseOptionsMenu: the menu opens on a held ACCEPT, don't act until it's up
+	#if mobile
+	// 和 BaseOptionsMenu 一样：这个菜单是靠按住 A 打开的，手指抬起前不要响应
 	var acceptLatch:Bool = true;
+	#end
 
 	override function update(elapsed:Float)
 	{
@@ -154,8 +156,10 @@ class GameplayChangersSubstate extends MusicBeatSubstate
 		if (controls.UI_DOWN_P)
 			changeSelection(1);
 
+		#if mobile
 		if (acceptLatch && !controls.ACCEPT)
 			acceptLatch = false;
+		#end
 
 		if (controls.BACK)
 		{
@@ -164,7 +168,11 @@ class GameplayChangersSubstate extends MusicBeatSubstate
 			FlxG.sound.play(Paths.sound('cancelMenu'));
 		}
 
+		#if mobile
 		if(nextAccept <= 0 && !acceptLatch)
+		#else
+		if(nextAccept <= 0)
+		#end
 		{
 			var usesCheckbox:Bool = (curOption.type == BOOL);
 			if(usesCheckbox)

@@ -115,10 +115,11 @@ class BaseOptionsMenu extends MusicBeatSubstate
 	var holdTime:Float = 0;
 	var holdValue:Float = 0;
 
-	// The screen opens on a held ACCEPT, so ACCEPT reads as pressed on the frames right
-	// after create(). Without waiting for the finger to come up, a BOOL option flips every
-	// frame while it's still down - the on/off flicker you see on Gameplay Settings.
+	#if mobile
+	// 手机上这个界面是靠按住 A 打开的，ACCEPT 在 create 之后那几帧还是按下的状态。
+	// 不等手指抬起来，BOOL 项就会每帧翻一次 —— Gameplay 里开关连环闪就是这个。
 	var acceptLatch:Bool = true;
+	#end
 
 	var bindingKey:Bool = false;
 	var holdingEsc:Float = 0;
@@ -144,15 +145,21 @@ class BaseOptionsMenu extends MusicBeatSubstate
 			changeSelection(1);
 		}
 
+		#if mobile
 		if (acceptLatch && !controls.ACCEPT)
 			acceptLatch = false;
+		#end
 
 		if (controls.BACK) {
 			close();
 			FlxG.sound.play(Paths.sound('cancelMenu'));
 		}
 
+		#if mobile
 		if(nextAccept <= 0 && !acceptLatch)
+		#else
+		if(nextAccept <= 0)
+		#end
 		{
 			switch(curOption.type)
 			{

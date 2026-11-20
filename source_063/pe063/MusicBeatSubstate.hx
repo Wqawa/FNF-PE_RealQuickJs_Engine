@@ -36,6 +36,10 @@ class MusicBeatSubstate extends FlxSubState
 	public var touchPad:TouchPad;
 	public var addMenuPad:Bool = true;
 
+	// 父菜单那个 pad。subState 只画自己的成员，父的留在下面又看不见，
+	// 所以进来先藏掉，出去再放回来。
+	var parentPad:MobileInputManager;
+
 	public function addTouchPad(DPad:String, Action:String):TouchPad
 	{
 		removeTouchPad();
@@ -58,15 +62,23 @@ class MusicBeatSubstate extends FlxSubState
 	override function create():Void
 	{
 		super.create();
-		// an options menu already sits on a state that has a pad; don't stack two
-		var current:MobileInputManager = MobileInputManager.current;
-		if(addMenuPad && (current == null || !current.hasButton(MobileInputID.A)) && ClientPrefs.controlsAlpha > 0.05)
+		// 父菜单的 pad 不会跟着 subState 画出来，自己挂一套，顺便把父的藏掉
+		parentPad = MobileInputManager.current;
+		if(parentPad != null && parentPad != touchPad)
+			parentPad.visible = false;
+
+		if(addMenuPad && touchPad == null && ClientPrefs.controlsAlpha > 0.05)
 			addTouchPad('LEFT_FULL', 'A_B');
 	}
 
 	override function destroy():Void
 	{
 		removeTouchPad();
+		if(parentPad != null)
+		{
+			parentPad.visible = true;
+			parentPad = null;
+		}
 		super.destroy();
 	}
 	#end

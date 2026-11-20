@@ -111,9 +111,12 @@ class OptionsState extends MusicBeatState
 			}
 			else MusicBeatState.switchState(new MainMenuState());
 		}
-		// ACCEPT is held on mobile, so without the subState guard the substate gets reopened
-		// every frame it is open
+		#if mobile
+		// ACCEPT 在手机上是按住状态，不加判断子界面会被每帧重开
 		else if (controls.ACCEPT && subState == null) openSelectedSubstate(options[curSelected]);
+		#else
+		else if (controls.ACCEPT) openSelectedSubstate(options[curSelected]);
+		#end
 	}
 	
 	function changeSelection(change:Int = 0)

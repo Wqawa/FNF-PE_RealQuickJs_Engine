@@ -12,10 +12,11 @@ class EngineSelectSubState extends MusicBeatSubstate
 	var curSelected:Int = 0;
 	var errorText:FlxText;
 
-	// Opened with ACCEPT held (mobile), and the parent keeps updating: without a latch
-	// confirmSelection() fires on frame one against the current engine, closes, and the
-	// parent reopens on the held key. Looks like a flash. Only act after ACCEPT is released.
+	#if mobile
+	// 手机上这个界面是按住 A 打开的：不等手指抬起来，confirmSelection 会在第一帧
+	// 就拿当前引擎确认掉，然后父菜单又把界面开回来，看起来就是闪一下
 	var acceptLatch:Bool = true;
+	#end
 
 	override function create()
 	{
@@ -73,11 +74,13 @@ class EngineSelectSubState extends MusicBeatSubstate
 	{
 		super.update(elapsed);
 
+		#if mobile
 		if (acceptLatch)
 		{
 			if (!controls.ACCEPT) acceptLatch = false;
 			return;
 		}
+		#end
 
 		if (controls.UI_UP_P)
 			changeSelection(-1);
