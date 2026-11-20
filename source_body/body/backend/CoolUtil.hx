@@ -43,12 +43,7 @@ class CoolUtil
 
 	inline public static function coolTextFile(path:String):Array<String>
 	{
-		var daList:String = null;
-		#if (sys && MODS_ALLOWED)
-		if(FileSystem.exists(path)) daList = File.getContent(path);
-		#else
-		if(Assets.exists(path)) daList = Assets.getText(path);
-		#end
+		var daList:String = Paths.getTextFile(path);
 		return daList != null ? listFromString(daList) : [];
 	}
 

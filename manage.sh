@@ -296,12 +296,25 @@ setup_msvc() {
 }
 
 # ---------------------------------------------------------------- 安卓环境体检 / 补齐
-# 工具链全在 .workbuddy/toolchain/，不写系统 PATH、不装全局。检查项和补齐方式：
+# 工具链不写系统 PATH、不装全局。检查项和补齐方式：
 #   JDK17 / cmdline-tools : dl/ 里有 zip 就解压补，没有就打印获取命令
 #   SDK 组件 / NDK        : cmdline-tools 的 sdkmanager 装（要网络 + 许可证）
 #   lime 配置             : lime config 写进 ~/.lime/config.xml
 #   QuickJS arm64 库      : 直接调 cmd_qjsandroid 现场编
-ANDROID_TC="$ROOT/.workbuddy/toolchain"
+#
+# 路径不能带空格：sdkmanager.bat 里 %JAVA_HOME% 没引号，cmd 会把
+# "D:\FNF\FNF code\..." 截成 D:\FNF 然后报"不是内部或外部命令"。
+# 项目在干净路径就用项目内的 toolchain/，带空格就落到盘符根的 android-tc/。
+# 想指定位置设 PE_ANDROID_TC 覆盖。
+if [ -n "${PE_ANDROID_TC:-}" ]; then
+	ANDROID_TC="$PE_ANDROID_TC"
+elif [[ "$ROOT" == *" "* ]]; then
+	# ROOT 形如 /d/FNF/FNF code/...：去掉前导 / 后取第一段就是盘符
+	_rest="${ROOT#/}"
+	ANDROID_TC="/${_rest%%/*}/android-tc"
+else
+	ANDROID_TC="$ROOT/.workbuddy/toolchain"
+fi
 ANDROID_SDK_DIR="$ANDROID_TC/android-sdk"
 ANDROID_NDK_DIR="$ANDROID_SDK_DIR/ndk/25.2.9519653"
 ANDROID_DL="$ANDROID_TC/dl"
@@ -349,8 +362,10 @@ unpack_tool() {
 		[ -n "$top" ] || { rm -rf "$tmp"; warn "JDK17：zip 里找不到 jdk* 目录"; return 1; }
 		rm -rf "$dest"; mv "$top" "$dest"
 	else
-		# cmdline-tools：zip 顶层是 cmdline-tools/bin，要摆成 sdk/cmdline-tools/latest/bin
-		rm -rf "$dest"; mkdir -p "$ANDROID_SDK_DIR/cmdline-tools"
+		# cmdline-tools：zip 顶层是 cmdline-tools/bin，要摆成 sdk/cmdline-tools/latest/bin。
+		# 得先删掉 latest 整个目录：mv 碰到已存在的目标会塞进去，变成 latest/cmdline-tools/bin。
+		rm -rf "$ANDROID_SDK_DIR/cmdline-tools/latest"
+		mkdir -p "$ANDROID_SDK_DIR/cmdline-tools"
 		mv "$tmp/cmdline-tools" "$ANDROID_SDK_DIR/cmdline-tools/latest" 2>/dev/null \
 			|| mv "$tmp" "$ANDROID_SDK_DIR/cmdline-tools/latest"
 	fi
@@ -371,7 +386,7 @@ cmd_env_android() {
 	if [ ! -d "$ANDROID_TC/jdk17/bin" ]; then
 		head_ "补 JDK17"
 		if ! unpack_tool "$ANDROID_DL/jdk17.zip" "$ANDROID_TC/jdk17" "JDK17"; then
-			say "  手动下载放到 .workbuddy/toolchain/dl/jdk17.zip：" "  fetch jdk17.zip manually:"
+			say "  手动下载放到 $ANDROID_DL/jdk17.zip：" "  fetch jdk17.zip to $ANDROID_DL:"
 			printf '    https://mirrors.tuna.tsinghua.edu.cn/Adoptium/17/jdk/x64/windows/OpenJDK17U-jdk_x64_windows_hotspot_17.0.21_9.zip\n'
 		fi
 	fi
@@ -757,15 +772,21 @@ EOF
 }
 
 # ---------------------------------------------------------------- Android 构建
-# 工具链全在 .workbuddy/toolchain/，不碰系统环境：Gradle 7.4.2 只认 JDK 17，
-# NDK 25 的 host 布局老（hxcpp 4.3.2 探测不到，得手传 ANDROID_HOST）。
+# 工具链在 $ANDROID_TC（见文件上部，含空格路径时不在项目内），不碰系统环境：
+# Gradle 7.4.2 只认 JDK 17，NDK 25 的 host 布局老（hxcpp 4.3.2 探测不到，得手传 ANDROID_HOST）。
 setup_android_env() {
-	local TC="$ROOT/.workbuddy/toolchain"
-	export JAVA_HOME="$TC/jdk17"
-	export ANDROID_SDK="$TC/android-sdk"
+	local TC="$ANDROID_TC" W
+	# java / gradle / clang 都是原生程序，认不了 Git Bash 的 /d/... 形式
+	if command -v cygpath >/dev/null 2>&1; then
+		W="$(cygpath -m "$TC")"
+	else
+		W="$TC"
+	fi
+	export JAVA_HOME="$W/jdk17"
+	export ANDROID_SDK="$W/android-sdk"
 	export ANDROID_NDK_ROOT="$ANDROID_SDK/ndk/25.2.9519653"
 	export ANDROID_SETUP=true
-	export PATH="$ANDROID_NDK_ROOT/toolchains/llvm/prebuilt/windows-x86_64/bin:$JAVA_HOME/bin:$ANDROID_SDK/platform-tools:$PATH"
+	export PATH="$TC/android-sdk/ndk/25.2.9519653/toolchains/llvm/prebuilt/windows-x86_64/bin:$TC/jdk17/bin:$TC/android-sdk/platform-tools:$PATH"
 
 	# gradle 走本机代理；JDK 的 cacerts 不认代理证书链，改用 Windows 证书库
 	if [ -n "${HTTPS_PROXY:-}" ]; then
@@ -789,7 +810,9 @@ cmd_qjsandroid() {
 	if command -v cygpath >/dev/null 2>&1; then R="$(cygpath -m "$R")"; fi
 	SRC="$R/third_party/quickjs-ng"
 	OUT="$SRC/build/android-arm64"
-	NDK="${PE_ANDROID_NDK:-$R/.workbuddy/toolchain/android-sdk/ndk/25.2.9519653}"
+	NDK="${PE_ANDROID_NDK:-$ANDROID_SDK_DIR/ndk/25.2.9519653}"
+	# clang.exe 是原生程序，--sysroot 必须是 D:/... 而不是 /d/...
+	if command -v cygpath >/dev/null 2>&1; then NDK="$(cygpath -m "$NDK")"; fi
 	TOOLCHAIN="$NDK/toolchains/llvm/prebuilt/windows-x86_64"
 	CC="$TOOLCHAIN/bin/clang.exe"
 	AR="$TOOLCHAIN/bin/llvm-ar.exe"

@@ -79,14 +79,15 @@ class Mods
 	{
 		var foldersToCheck:Array<String> = [];
 		//Main folder
-		if(FileSystem.exists(path + fileToFind))
+		// base files live inside the apk on android, so check the manifest too
+		if(Paths.existsOnDiskOrManifest(path + fileToFind))
 			foldersToCheck.push(path + fileToFind);
 
 		// Week folder
 		if(Paths.currentLevel != null && Paths.currentLevel != path)
 		{
 			var pth:String = Paths.getFolderPath(fileToFind, Paths.currentLevel);
-			if(!foldersToCheck.contains(pth) && FileSystem.exists(pth))
+			if(!foldersToCheck.contains(pth) && Paths.existsOnDiskOrManifest(pth))
 				foldersToCheck.push(pth);
 		}
 

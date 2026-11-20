@@ -51,7 +51,8 @@ class MobileStorage
 	{
 		#if android
 		// lime's documentsDirectory is usually getExternalFilesDir() on Android, but it
-		// can point at public Documents - check the path itself, else use internal storage.
+		// can point at public Documents - check the path itself, else ask the system
+		// directly, else fall back to internal storage.
 		try
 		{
 			var ext:String = lime.system.System.documentsDirectory;
@@ -59,10 +60,43 @@ class MobileStorage
 				return ext;
 		}
 		catch (e:Dynamic) {}
+
+		var own:String = externalFilesDir();
+		if (own != null)
+			return own;
 		#end
 
 		return lime.system.System.applicationStorageDirectory;
 	}
+
+	#if android
+	// Context.getExternalFilesDir(null) -> /storage/emulated/0/Android/data/<pkg>/files
+	// That's the directory adb and file managers can reach, so mods and saves stay
+	// copyable. It needs no runtime permission. Some ROMs hand back the internal dir
+	// from lime's documentsDirectory, hence the JNI call.
+	static function externalFilesDir():String
+	{
+		try
+		{
+			var getContext:Dynamic = lime.system.JNI.createStaticMethod("org/libsdl/app/SDLActivity", "getContext", "()Landroid/content/Context;");
+			var ctx:Dynamic = getContext();
+			if (ctx == null) return null;
+
+			var getDir:Dynamic = lime.system.JNI.createMemberMethod("android/content/Context", "getExternalFilesDir", "(Ljava/lang/String;)Ljava/io/File;");
+			var file:Dynamic = getDir(ctx, null);
+			if (file == null) return null;
+
+			var getPath:Dynamic = lime.system.JNI.createMemberMethod("java/io/File", "getAbsolutePath", "()Ljava/lang/String;");
+			var path:String = getPath(file);
+			return (path != null && path.length > 0) ? path : null;
+		}
+		catch (e:Dynamic)
+			trace('MobileStorage: getExternalFilesDir failed ($e), using internal storage');
+
+		return null;
+	}
+	#end
+	#end
 
 	static inline function withSlash(path:String):String
 	{
@@ -72,5 +106,4 @@ class MobileStorage
 		var last:String = path.charAt(path.length - 1);
 		return (last == '/' || last == '\\') ? path : path + '/';
 	}
-	#end
 }

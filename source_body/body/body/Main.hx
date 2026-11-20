@@ -162,7 +162,15 @@ class Main extends Sprite
 
 		#if mobile
 		// letterboxes exactly like RatioScaleMode until 'Wide Screen' is turned on
-		FlxG.scaleMode = new mobile.MobileScaleMode();
+		// FlxGame.create() hangs off addedToStage, and this sprite isn't on the stage yet,
+		// so _state is still null here. set_scaleMode pokes onResize -> resizeGame ->
+		// _state.onResize, which is a null deref on Android. Wait one frame.
+		var applyMobileScale:Event->Void = null;
+		applyMobileScale = function(_) {
+			removeEventListener(Event.ENTER_FRAME, applyMobileScale);
+			FlxG.scaleMode = new mobile.MobileScaleMode();
+		};
+		addEventListener(Event.ENTER_FRAME, applyMobileScale);
 		#end
 
 		#if !mobile

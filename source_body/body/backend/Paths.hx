@@ -186,6 +186,17 @@ class Paths
 		return OpenFlAssets.exists(path, type);
 	}
 
+	// Same idea for text: read the file if it's really there (mods, dropped-in files),
+	// otherwise pull it out of the apk. Android has no assets on disk at all.
+	public static function getTextFile(path:String, ?type:AssetType = TEXT):String
+	{
+		#if MODS_ALLOWED
+		if(FileSystem.exists(path)) return File.getContent(path);
+		#end
+		if(OpenFlAssets.exists(path, type)) return OpenFlAssets.getText(path);
+		return null;
+	}
+
 	// mods -> level -> shared -> root; 0.6.x keeps base assets at the root.
 	// On sys, retry from the exe dir when CWD is not bin, and return an absolute path.
 	public static function findScriptFile(file:String):String
@@ -207,7 +218,9 @@ class Paths
 		var root:String = 'assets/$VERSION_DIR/$file';
 		if(existsOnDiskOrManifest(root)) return root;
 
-		#if sys
+		// android: applicationDirectory is a read-only apk path and touching it this early
+		// null-derefs inside liblime, so this desktop-only retry stays out of the apk build
+		#if (sys && !android)
 		var appDir:String = lime.system.System.applicationDirectory;
 		if(appDir != null)
 		{
@@ -338,11 +351,7 @@ class Paths
 	inline static public function getTextFromFile(key:String, ?ignoreMods:Bool = false):String
 	{
 		var path:String = getPath(key, TEXT, !ignoreMods);
-		#if sys
-		return (FileSystem.exists(path)) ? File.getContent(path) : null;
-		#else
-		return (OpenFlAssets.exists(path, TEXT)) ? Assets.getText(path) : null;
-		#end
+		return getTextFile(path);
 	}
 
 	inline static public function font(key:String)
@@ -491,10 +500,12 @@ class Paths
 			#if sys
 			if(FileSystem.exists(file))
 				currentTrackedSounds.set(file, Sound.fromFile(file));
-			#else
+			else
+			#end
+			// android: base assets live inside the apk, so the disk check above always
+			// misses them. fall through to the manifest before giving up.
 			if(OpenFlAssets.exists(file, SOUND))
 				currentTrackedSounds.set(file, OpenFlAssets.getSound(file));
-			#end
 			else if(beepOnNull)
 			{
 				trace('SOUND NOT FOUND: $key, PATH: $path');

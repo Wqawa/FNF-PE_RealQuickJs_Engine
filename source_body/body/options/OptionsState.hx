@@ -112,7 +112,9 @@ class OptionsState extends MusicBeatState
 			}
 			else MusicBeatState.switchState(new MainMenuState());
 		}
-		else if (controls.ACCEPT) openSelectedSubstate(options[curSelected]);
+		// ACCEPT is held on mobile, so without the subState guard the substate gets reopened
+		// every frame it is open
+		else if (controls.ACCEPT && subState == null) openSelectedSubstate(options[curSelected]);
 	}
 	
 	function changeSelection(change:Int = 0)

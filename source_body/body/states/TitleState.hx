@@ -79,7 +79,9 @@ class TitleState extends MusicBeatState
 			Language.reloadPhrases();
 		}
 
-		curWacky = FlxG.random.getObject(getIntroTextShit());
+		// introText.txt could be empty (bad mod, missing asset) - beatHit reads [0] and [1]
+		var introTexts:Array<Array<String>> = getIntroTextShit();
+		curWacky = introTexts.length > 0 ? FlxG.random.getObject(introTexts) : ['Psych Engine', 'by Shadow Mario'];
 
 		if(!initialized)
 		{
@@ -527,8 +529,11 @@ class TitleState extends MusicBeatState
 			{
 				case 1:
 					//FlxG.sound.music.stop();
-					FlxG.sound.playMusic(Paths.music('freakyMenu'), 0);
-					FlxG.sound.music.fadeIn(4, 0, 0.7);
+					var titleMusic = Paths.music('freakyMenu');
+					FlxG.sound.playMusic(titleMusic, 0);
+					// android: a missing/undecodable track leaves sound.music null, don't poke it
+					if(FlxG.sound.music != null)
+						FlxG.sound.music.fadeIn(4, 0, 0.7);
 				case 2:
 					createCoolText(['Psych Engine by'], 40);
 				case 4:

@@ -12,6 +12,12 @@ class EngineSelectSubState extends MusicBeatSubstate
 	var curSelected:Int = 0;
 	var errorText:FlxText;
 
+	// This screen is opened with ACCEPT and the parent keeps updating, so ACCEPT is true on
+	// this frame and every frame after. Without a latch confirmSelection() fires on frame one,
+	// curSelected still points at the current engine, it closes, the parent reopens on the held
+	// key: you see a flash and stay on Options. Only act once ACCEPT is really released.
+	var acceptLatch:Bool = true;
+
 	override function create()
 	{
 		super.create();
@@ -67,6 +73,12 @@ class EngineSelectSubState extends MusicBeatSubstate
 	override function update(elapsed:Float)
 	{
 		super.update(elapsed);
+
+		if (acceptLatch)
+		{
+			if (!controls.ACCEPT) acceptLatch = false;
+			return;
+		}
 
 		if (controls.UI_UP_P)
 			changeSelection(-1);
