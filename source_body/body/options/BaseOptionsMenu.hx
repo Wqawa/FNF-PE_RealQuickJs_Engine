@@ -115,6 +115,11 @@ class BaseOptionsMenu extends MusicBeatSubstate
 	var holdTime:Float = 0;
 	var holdValue:Float = 0;
 
+	// The screen opens on a held ACCEPT, so ACCEPT reads as pressed on the frames right
+	// after create(). Without waiting for the finger to come up, a BOOL option flips every
+	// frame while it's still down - the on/off flicker you see on Gameplay Settings.
+	var acceptLatch:Bool = true;
+
 	var bindingKey:Bool = false;
 	var holdingEsc:Float = 0;
 	var bindingBlack:FlxSprite;
@@ -139,12 +144,15 @@ class BaseOptionsMenu extends MusicBeatSubstate
 			changeSelection(1);
 		}
 
+		if (acceptLatch && !controls.ACCEPT)
+			acceptLatch = false;
+
 		if (controls.BACK) {
 			close();
 			FlxG.sound.play(Paths.sound('cancelMenu'));
 		}
 
-		if(nextAccept <= 0)
+		if(nextAccept <= 0 && !acceptLatch)
 		{
 			switch(curOption.type)
 			{

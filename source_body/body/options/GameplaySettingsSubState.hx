@@ -177,6 +177,13 @@ class GameplaySettingsSubState extends BaseOptionsMenu
 		addOption(option);
 
 		#if mobile
+		option = new Option('Pause Method',
+			'How to pause during a song. Button = the key in the top right, Back = the system back key.',
+			'pauseMethod',
+			STRING,
+			['Both', 'Button', 'Back']);
+		addOption(option);
+
 		option = new Option('Wide Screen',
 			'Stretch the game over the whole screen instead of keeping the 16:9 canvas.',
 			'wideScreen',

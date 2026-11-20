@@ -219,6 +219,11 @@ class PlayState extends MusicBeatState
 	public var iconP2:HealthIcon;
 	public var camHUD:FlxCamera;
 	public var camGame:FlxCamera;
+
+	#if mobile
+	var pauseButton:FlxSprite;
+	var pauseIcon:FlxText;
+	#end
 	public var camOther:FlxCamera;
 	public var cameraSpeed:Float = 1;
 
@@ -696,6 +701,23 @@ class PlayState extends MusicBeatState
 
 		startCallback();
 		RecalculateRating(false, false);
+
+		#if mobile
+		// 右上角暂停键。手机上没有 ESC，返回键又被系统吃掉，没这个就没法暂停。
+		if (ClientPrefs.data.pauseMethod != 'Back')
+		{
+			pauseButton = new FlxSprite(FlxG.width - 70, 10).makeGraphic(58, 58, 0x99000000);
+			pauseButton.cameras = [camHUD];
+			pauseButton.scrollFactor.set();
+			add(pauseButton);
+
+			pauseIcon = new FlxText(pauseButton.x, pauseButton.y + 13, 58, 'II', 24);
+			pauseIcon.setFormat(Paths.font('vcr.ttf'), 24, FlxColor.WHITE, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
+			pauseIcon.cameras = [camHUD];
+			pauseIcon.scrollFactor.set();
+			add(pauseIcon);
+		}
+		#end
 
 		FlxG.stage.addEventListener(KeyboardEvent.KEY_DOWN, onKeyPress);
 		FlxG.stage.addEventListener(KeyboardEvent.KEY_UP, onKeyRelease);
@@ -1703,6 +1725,22 @@ class PlayState extends MusicBeatState
 			}
 		}
 
+		#if mobile
+		// pause button. visible only while playing; the substate draws over this state
+		if (pauseButton != null)
+		{
+			pauseButton.visible = true;
+			if (pauseIcon != null) pauseIcon.visible = true;
+
+			if (FlxG.mouse.justPressed && FlxG.mouse.overlaps(pauseButton)
+				&& startedCountdown && canPause && !endingSong && !inCutscene)
+			{
+				var ret:Dynamic = callOnScripts('onPause', null, true);
+				if(ret != LuaUtils.Function_Stop) openPauseMenu();
+			}
+		}
+		#end
+
 		if(!endingSong && !inCutscene && allowDebugKeys)
 		{
 			if (controls.justPressed('debug_1'))
@@ -1912,6 +1950,12 @@ class PlayState extends MusicBeatState
 		persistentUpdate = false;
 		persistentDraw = true;
 		paused = true;
+
+		#if mobile
+		// the substate draws on top of this state, hide the button so it isn't in the menu
+		if (pauseButton != null) pauseButton.visible = false;
+		if (pauseIcon != null) pauseIcon.visible = false;
+		#end
 
 		if(FlxG.sound.music != null) {
 			FlxG.sound.music.pause();

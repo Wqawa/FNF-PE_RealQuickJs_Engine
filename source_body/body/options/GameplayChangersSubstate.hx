@@ -142,6 +142,10 @@ class GameplayChangersSubstate extends MusicBeatSubstate
 	var nextAccept:Int = 5;
 	var holdTime:Float = 0;
 	var holdValue:Float = 0;
+
+	// same as BaseOptionsMenu: the menu opens on a held ACCEPT, don't act until it's up
+	var acceptLatch:Bool = true;
+
 	override function update(elapsed:Float)
 	{
 		if (controls.UI_UP_P)
@@ -150,6 +154,9 @@ class GameplayChangersSubstate extends MusicBeatSubstate
 		if (controls.UI_DOWN_P)
 			changeSelection(1);
 
+		if (acceptLatch && !controls.ACCEPT)
+			acceptLatch = false;
+
 		if (controls.BACK)
 		{
 			close();
@@ -157,7 +164,7 @@ class GameplayChangersSubstate extends MusicBeatSubstate
 			FlxG.sound.play(Paths.sound('cancelMenu'));
 		}
 
-		if(nextAccept <= 0)
+		if(nextAccept <= 0 && !acceptLatch)
 		{
 			var usesCheckbox:Bool = (curOption.type == BOOL);
 			if(usesCheckbox)
