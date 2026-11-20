@@ -86,6 +86,10 @@ class PsychUIInputText extends FlxSpriteGroup
 		this.text = text;
 
 		FlxG.stage.addEventListener(KeyboardEvent.KEY_DOWN, onKeyDown);
+
+		#if (android || ios)
+		bindIme();
+		#end
 	}
 	
 	public var selectIndex:Int = -1;
@@ -386,8 +390,54 @@ class PsychUIInputText extends FlxSpriteGroup
 			if(focusOn.unfocus != null) focusOn.unfocus();
 			focusOn.resetCaret();
 		}
+
+		#if (android || ios)
+		toggleSoftKeyboard(v);
+		#end
+
 		return (focusOn = v);
 	}
+
+	#if (android || ios)
+	static var imeBound:Bool = false;
+
+	// openfl 自己不碰输入法，得手动让 lime 的 window 把软键盘叫起来，
+	// 顺便把输入框的位置报过去，不然键盘会盖住正在打的那个框
+	static function toggleSoftKeyboard(v:PsychUIInputText):Void
+	{
+		var app = openfl.Lib.application;
+		if (app == null || app.window == null) return;
+
+		if (v == null)
+		{
+			app.window.textInputEnabled = false;
+			return;
+		}
+
+		var pos = v.getScreenPosition();
+		app.window.setTextInputRect(new lime.math.Rectangle(pos.x, pos.y, v.width, v.height));
+		app.window.textInputEnabled = true;
+	}
+
+	// 输入法送来的是整段文字（中文、emoji 都在这），不是按键，只能直接插到末尾
+	static function bindIme():Void
+	{
+		if (imeBound) return;
+		imeBound = true;
+
+		var app = openfl.Lib.application;
+		if (app == null) return;
+
+		app.window.onTextInput.add(function(s:String)
+		{
+			if (focusOn == null || !focusOn.exists) return;
+			if (s == null || s.length == 0) return;
+
+			focusOn.text = focusOn.text + s;
+			focusOn.caretIndex = focusOn.text.length;
+		});
+	}
+	#end
 
 	override function update(elapsed:Float)
 	{
