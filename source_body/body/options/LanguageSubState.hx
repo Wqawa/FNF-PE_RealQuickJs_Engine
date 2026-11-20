@@ -95,6 +95,16 @@ class LanguageSubState extends MusicBeatSubstate
 	}
 
 	var changedLanguage:Bool = false;
+
+	#if MOBILE_CONTROLS
+	override function create():Void
+	{
+		super.create();
+		// 上下翻语言，A 选，B 退
+		addTouchPad('UP_DOWN', 'A_B');
+	}
+	#end
+
 	override function update(elapsed:Float)
 	{
 		super.update(elapsed);

@@ -19,6 +19,7 @@ class TouchPad extends MobileInputManager
 	public var buttonP:TouchButton;
 	public var buttonX:TouchButton;
 	public var buttonY:TouchButton;
+	public var buttonR:TouchButton;
 
 	// DPad: RIGHT_FULL / LEFT_FULL / UP_DOWN / LEFT_RIGHT
 	// Action: A / B / A_B / A_B_E / ... see MobileLayouts.action
@@ -53,6 +54,7 @@ class TouchPad extends MobileInputManager
 			case 'buttonP': buttonP = button;
 			case 'buttonX': buttonX = button;
 			case 'buttonY': buttonY = button;
+			case 'buttonR': buttonR = button;
 			default:
 		}
 
@@ -74,6 +76,7 @@ class TouchPad extends MobileInputManager
 			case 'buttonP': [MobileInputID.P];
 			case 'buttonX': [MobileInputID.X];
 			case 'buttonY': [MobileInputID.Y];
+			case 'buttonR': [MobileInputID.R];
 			default: [MobileInputID.NONE];
 		}
 	}

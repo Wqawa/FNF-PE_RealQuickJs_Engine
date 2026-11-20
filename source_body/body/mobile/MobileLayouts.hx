@@ -53,6 +53,11 @@ class MobileLayouts
 					{button: 'buttonA', graphic: 'a', x: 1156, y: 596, color: 0xFF0000},
 					{button: 'buttonB', graphic: 'b', x: 1032, y: 596, color: 0xFFCB00}
 				];
+			// 颜色界面：B 退出，R 摆在方向键正中间用来重置
+			case 'B_R': [
+					{button: 'buttonB', graphic: 'b', x: 1032, y: 596, color: 0xFFCB00},
+					{button: 'buttonR', graphic: 'r', x: 98, y: 500, color: 0xFFFFFFFF}
+				];
 			case 'B_C': [
 					{button: 'buttonB', graphic: 'b', x: 1156, y: 596, color: 0xFFCB00},
 					{button: 'buttonC', graphic: 'c', x: 1032, y: 596, color: 0x44FF00}

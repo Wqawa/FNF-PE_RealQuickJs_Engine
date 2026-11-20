@@ -54,6 +54,13 @@ class NoteOffsetState extends MusicBeatState
 
 		FlxG.camera.scroll.set(120, 130);
 
+		#if MOBILE_CONTROLS
+		// 主相机会跟着节拍缩放（下面那个 zoom 1.15 的 tween），按键挂上去就一起抖。
+		// 挪到 camOther 上，这个界面只需要一个 B。
+		addTouchPad('', 'B');
+		if (touchPad != null) touchPad.cameras = [camOther];
+		#end
+
 		persistentUpdate = true;
 		FlxG.sound.pause();
 

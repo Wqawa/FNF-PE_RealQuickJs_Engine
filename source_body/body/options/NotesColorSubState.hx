@@ -147,7 +147,12 @@ class NotesColorSubState extends MusicBeatSubstate
 
 		var tipX = 20;
 		var tipY = 660;
-		var tip:FlxText = new FlxText(tipX, tipY, 0, Language.getPhrase('note_colors_tip', 'Press RESET to Reset the selected Note Part.'), 16);
+		var tip:FlxText = new FlxText(tipX, tipY, 0,
+			#if mobile
+			Language.getPhrase('note_colors_tip_touch', 'Press R to Reset the selected Note Part.')
+			#else
+			Language.getPhrase('note_colors_tip', 'Press RESET to Reset the selected Note Part.')
+			#end, 16);
 		tip.setFormat(Paths.font("vcr.ttf"), 16, FlxColor.WHITE, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		tip.borderSize = 2;
 		add(tip);
@@ -171,6 +176,12 @@ class NotesColorSubState extends MusicBeatSubstate
 
 	function updateTip()
 	{
+		#if mobile
+		// 手机上没有 Shift，按住 Shift 那套说法留着只会误导
+		tipTxt.visible = false;
+		return;
+		#end
+
 		var key:String = !controls.controllerMode ? Language.getPhrase('note_colors_shift', 'Shift') : Language.getPhrase('note_colors_lb', 'Left Shoulder Button');
 		tipTxt.text = Language.getPhrase('note_colors_hold_tip', 'Hold {1} + Press RESET key to fully reset the selected Note.', [key]);
 	}
@@ -182,6 +193,15 @@ class NotesColorSubState extends MusicBeatSubstate
 		ZERO => '0', ONE => '1', TWO => '2', THREE => '3', FOUR => '4', FIVE => '5', SIX => '6', SEVEN => '7', EIGHT => '8', NINE => '9',
 		NUMPADZERO => '0', NUMPADONE => '1', NUMPADTWO => '2', NUMPADTHREE => '3', NUMPADFOUR => '4', NUMPADFIVE => '5', NUMPADSIX => '6',
 		NUMPADSEVEN => '7', NUMPADEIGHT => '8', NUMPADNINE => '9', A => 'A', B => 'B', C => 'C', D => 'D', E => 'E', F => 'F'];
+
+	#if MOBILE_CONTROLS
+	override function create():Void
+	{
+		super.create();
+		// 颜色界面要一个 R 回来重置，方向键中间正好空着
+		addTouchPad('LEFT_FULL', 'B_R');
+	}
+	#end
 
 	override function update(elapsed:Float) {
 		if (controls.BACK) {

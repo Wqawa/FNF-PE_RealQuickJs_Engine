@@ -7,13 +7,15 @@ class OptionsState extends MusicBeatState
 {
 	var options:Array<String> = [
 		'Note Colors',
-		'Controls',
+		// 安卓这边按键就是那几个虚拟键，没有改键的必要
+		#if !mobile 'Controls', #end
 		'Adjust Delay and Combo',
 		'Graphics',
 		'Visuals',
 		'Gameplay',
 		'Switch Engine'
-		#if MOBILE_CONTROLS , 'Touch Controls' #end
+		// 桌面版没有触屏按键，这一项只对真正跑在手机上的构建有意义
+		#if mobile , 'Touch Controls' #end
 		#if TRANSLATIONS_ALLOWED , 'Language' #end
 	];
 	private var grpOptions:FlxTypedGroup<Alphabet>;
@@ -84,9 +86,14 @@ class OptionsState extends MusicBeatState
 		super.create();
 	}
 
+	// 子菜单 close() 是当场生效的，而父菜单在同一帧里还会往下跑。
+	// 不记一个标记的话，子菜单里按 B 会把这一层也一起关掉，直接弹回主菜单。
+	var justClosedSub:Bool = false;
+
 	override function closeSubState()
 	{
 		super.closeSubState();
+		justClosedSub = true;
 		ClientPrefs.saveSettings();
 		#if DISCORD_ALLOWED
 		DiscordClient.changePresence("Options Menu", null);
@@ -101,7 +108,9 @@ class OptionsState extends MusicBeatState
 		if (controls.UI_DOWN_P)
 			changeSelection(1);
 
-		if (controls.BACK)
+		// 子菜单开着的时候父菜单还在 update，不挡的话按 B 会把这一层也一起关掉，
+		// 直接弹回主菜单
+		if (controls.BACK && subState == null && !justClosedSub)
 		{
 			FlxG.sound.play(Paths.sound('cancelMenu'));
 			if(onPlayState)
@@ -115,6 +124,8 @@ class OptionsState extends MusicBeatState
 		// ACCEPT is held on mobile, so without the subState guard the substate gets reopened
 		// every frame it is open
 		else if (controls.ACCEPT && subState == null) openSelectedSubstate(options[curSelected]);
+
+		justClosedSub = false;
 	}
 	
 	function changeSelection(change:Int = 0)

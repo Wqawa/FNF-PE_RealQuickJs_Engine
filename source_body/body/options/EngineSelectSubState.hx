@@ -22,6 +22,11 @@ class EngineSelectSubState extends MusicBeatSubstate
 	{
 		super.create();
 
+		#if MOBILE_CONTROLS
+		// 上下选引擎，A 确认，B 返回
+		addTouchPad('UP_DOWN', 'A_B');
+		#end
+
 		var bg:FlxSprite = new FlxSprite().loadGraphic(Paths.image('menuDesat'));
 		bg.antialiasing = ClientPrefs.data.antialiasing;
 		bg.color = 0xFF71bdfd;
