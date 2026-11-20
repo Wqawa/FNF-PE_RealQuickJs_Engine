@@ -22,11 +22,6 @@ class EngineSelectSubState extends MusicBeatSubstate
 	{
 		super.create();
 
-		#if MOBILE_CONTROLS
-		// 上下选引擎，A 确认，B 返回
-		addTouchPad('UP_DOWN', 'A_B');
-		#end
-
 		var bg:FlxSprite = new FlxSprite().loadGraphic(Paths.image('menuDesat'));
 		bg.antialiasing = ClientPrefs.data.antialiasing;
 		bg.color = 0xFF71bdfd;
@@ -73,6 +68,11 @@ class EngineSelectSubState extends MusicBeatSubstate
 		curSelected = keys.indexOf(Engine.current());
 		if (curSelected < 0) curSelected = 0;
 		changeSelection();
+
+		#if MOBILE_CONTROLS
+		// 上下选引擎，A 确认，B 返回。必须最后一个挂，不然被上面那些 add 盖住
+		addTouchPad('UP_DOWN', 'A_B');
+		#end
 	}
 
 	override function update(elapsed:Float)
