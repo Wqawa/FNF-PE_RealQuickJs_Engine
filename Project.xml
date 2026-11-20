@@ -124,6 +124,17 @@
 	<!-- base_game 平时只在 officialBuild 里打；安卓没有 prep_assets.sh 那一步，
 	     直接用同一个 rename 打进包，跑到 assets/body/... -->
 	<section if="android">
+		<!-- 权限数组一旦在 Project.xml 里出现，lime 就不再套默认那四个，得全部列全 -->
+		<android permission="android.permission.WAKE_LOCK" />
+		<android permission="android.permission.INTERNET" />
+		<android permission="android.permission.VIBRATE" />
+		<android permission="android.permission.ACCESS_NETWORK_STATE" />
+		<!-- 目标目录是 /sdcard/RealQuickJS：mods、存档、以及想覆盖的资源都丢那儿。
+		     Android 11+ 读写公共目录要"所有文件访问"，用户得去系统设置里手动开一次；
+		     没开的时候 MobileStorage 会退回 Android/data/<包名>/files（不需要权限）。 -->
+		<android permission="android.permission.READ_EXTERNAL_STORAGE" />
+		<android permission="android.permission.WRITE_EXTERNAL_STORAGE" />
+		<android permission="android.permission.MANAGE_EXTERNAL_STORAGE" />
 		<assets path="assets/base_game" rename="assets/body" exclude="*.ogg" if="web"/>
 		<assets path="assets/base_game" rename="assets/body" exclude="*.mp3"  unless="web"/>
 	</section>

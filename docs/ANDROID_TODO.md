@@ -21,22 +21,32 @@ apk 内资源被 `FileSystem.exists` 判成不存在、`introText` 空导致第 
 
 ## 待办
 
-### 1. 存储目录 + 权限（代码已写，**没在设备上验证**）
+### 1. 存储目录 + 权限（**改成移植版那套了，没在设备上验证**）
 
-`MobileStorage.pickBase()` 现在会先问 `documentsDirectory`，再走 JNI 的
-`Context.getExternalFilesDir(null)`，最后才退回私有目录。
-设备被拔之前只验证到能编译，**运行结果没看过**。
+目标目录换成了 `/sdcard/RealQuickJS/`（公共存储，任何文件管理器都能翻到），
+挑目录的顺序是：
 
-- [ ] 装一版，看启动日志里的 `MobileStorage: cwd = ...`
-      期望是 `/storage/emulated/0/Android/data/com.realQuickJSEngine/files/...`
-- [ ] 确认这个目录真的建出来了，`adb shell ls` 能看到
-- [ ] 确认 `mods/`、`saves/` 落在里面，玩家能拷进去
-- [ ] JNI 那段如果抛异常，日志里会有 `getExternalFilesDir failed`，会把 cwd 退回私有目录
+1. `/storage/emulated/0/RealQuickJS` —— 走 JNI 的 `Environment.isExternalStorageManager()`，
+   只有用户在系统设置里开了"所有文件访问"才会用这个
+2. `Android/data/com.realQuickJSEngine/files/.realQuickJSEngine` —— 不需要权限，数据线能进
+3. `/data/data/.../files/.realQuickJSEngine` —— 兜底
 
-注意：走 `getExternalFilesDir` 这条路**不需要**任何运行时权限，也没往 manifest 里加
-`MANAGE_EXTERNAL_STORAGE`。参考移植版（`kittycathy233/FNF-PsychEngine-Mobile-1.0.4-Archive`）
-是申请了全盘权限、把 assets 也解压到 `/sdcard/.PsychEngine/`；我们选的是"资源留在 apk、
-只把可写目录挪出去"，省空间、启动快，但拿不到公共目录。
+`Project.xml` 里加了三条权限（`READ_EXTERNAL_STORAGE` / `WRITE_EXTERNAL_STORAGE` /
+`MANAGE_EXTERNAL_STORAGE`）。注意 lime 的 `android.permission` 一旦出现就不再套默认值，
+所以原来那四个（WAKE_LOCK / INTERNET / VIBRATE / ACCESS_NETWORK_STATE）也一起写进去了，
+`aapt dump permissions` 确认过 7 条都在。
+
+- [ ] 装一版，看日志 `MobileStorage: cwd = ...` 落在哪。没开权限时应该是第 2 条
+- [ ] 去系统设置里给"所有文件访问"，重启，再看是不是切到 `/storage/emulated/0/RealQuickJS/`
+- [ ] 确认 `mods/`、`saves/` 在里面，能直接用文件管理器拷
+- [ ] **没做**：启动时自动跳设置页引导授权。现在只能靠用户自己去设置里开，
+      日志里会打 `public storage unavailable`。要跳页得用 JNI 拼
+      `Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION` 的 Intent 再 startActivity，
+      下次再说
+
+资源不会解压到外部目录。`Paths.getTextFile` 是"磁盘优先、apk 兜底"，
+所以想改哪张图/哪段 json，把同名文件按 `assets/<版本>/...` 的结构丢进
+`/sdcard/RealQuickJS/` 就会覆盖，不用整包解压。
 
 ### 2. Switch Engine 界面：没有按钮，选不了
 
@@ -69,10 +79,15 @@ Options 那边已经挂了 pad，所以这个子界面不会再挂一层，也�
 - [ ] 暂停菜单加一项，点了直接开 `ChartingState`，且带上当前歌曲（别开成空谱面）
 - [ ] 编辑器返回时能回到暂停状态，而不是回到主菜单
 
-### 5. 主界面加编辑器入口
+### 5. 编辑器入口（**主菜单已加，没在设备上验证**）
 
-- [ ] Title 上加一个按钮（齿轮旁边，或者菜单里加一项），进编辑器选择界面
-- [ ] 编辑器选择界面可以照 `EngineSelectSubState` 的排版做，列 `charts/` 下的谱面
+`MainMenuState` 右上角加了个 `EDITOR` 按钮（`#if mobile`），点了进 `MasterEditorMenu`。
+桌面那条路没动，还是按 7（`debug_1`）。
+
+- [ ] 装上确认按钮位置不挡东西、能戳到（触摸会走 `FlxG.mouse`，理论上没问题）
+- [ ] 从 `MasterEditorMenu` 返回要能回主菜单，别卡在编辑器里
+- [ ] `MasterEditorMenu` 里各个编辑器在安卓上能不能用还没试，尤其
+      `ChartingState` 的键盘操作在触屏上基本没法用，可能要单独的移动端布局
 
 ### 6. 其它两棵树的安卓适配
 
