@@ -288,8 +288,11 @@ setup_msvc() {
 	[ -n "$SDK_VER" ] || { bad "SDK 下没有 10.x：$SDK_BASE/Include"; return 1; }
 
 	export PATH="$MSVC_PATH/bin/Hostx64/x64:$SDK_BASE/bin/$SDK_VER/x64:$PATH"
-	export INCLUDE="$MSVC_PATH/include;$SDK_BASE/Include/$SDK_VER/ucrt;$SDK_BASE/Include/$SDK_VER/shared;$SDK_BASE/Include/$SDK_VER/um;$SDK_BASE/Include/$SDK_VER/winrt"
-	export LIB="$MSVC_PATH/lib/x64;$SDK_BASE/Lib/$SDK_VER/ucrt/x64;$SDK_BASE/Lib/$SDK_VER/um/x64"
+	# INCLUDE/LIB 是给 cl.exe 自己解析的，得是 Windows 路径；PATH 则要 POSIX（git-bash 用冒号分隔）。
+	MSVC_WIN="$(cygpath -m "$MSVC_PATH" 2>/dev/null || printf '%s' "$MSVC_PATH")"
+	SDK_WIN="$(cygpath -m "$SDK_BASE" 2>/dev/null || printf '%s' "$SDK_BASE")"
+	export INCLUDE="$MSVC_WIN/include;$SDK_WIN/Include/$SDK_VER/ucrt;$SDK_WIN/Include/$SDK_VER/shared;$SDK_WIN/Include/$SDK_VER/um;$SDK_WIN/Include/$SDK_VER/winrt"
+	export LIB="$MSVC_WIN/lib/x64;$SDK_WIN/Lib/$SDK_VER/ucrt/x64;$SDK_WIN/Lib/$SDK_VER/um/x64"
 	ok "MSVC $MSVC_PATH"
 	ok "SDK  $SDK_VER"
 	return 0

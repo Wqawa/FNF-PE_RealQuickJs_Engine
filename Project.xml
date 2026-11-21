@@ -24,14 +24,12 @@
 
 	<!-- 安卓也要跑 mod：linc_luajit 自带四个 ABI 的 libluajit .a，hscript-iris 是纯 Haxe，
 	     没有理由跟着上游锁在 desktop。锁着反而让 PlayState 里一堆无条件引用编不过。 -->
-	<define name="MODS_ALLOWED" if="desktop || android" />
-	<define name="HSCRIPT_ALLOWED" if="desktop || android" />
-	<define name="LUA_ALLOWED" if="desktop || android" />
+	<define name="MODS_ALLOWED" if="desktop" />
+	<define name="HSCRIPT_ALLOWED" if="desktop" />
+	<define name="LUA_ALLOWED" if="desktop" />
 	<define name="ACHIEVEMENTS_ALLOWED" />
 	<!-- discord-rpc 只有 win/mac/linux 的原生库，安卓上编译不过 -->
 	<define name="DISCORD_ALLOWED" if="desktop" />
-	<!-- 触屏虚拟按键：手机上是必须的，桌面只在显式 -DMOBILE_CONTROLS 时编进来（调试布局用） -->
-	<define name="MOBILE_CONTROLS" if="android" />
 	<define name="TRANSLATIONS_ALLOWED" />
 	<define name="IRIS_DEBUG"/>
 	
@@ -47,7 +45,7 @@
 	</section>
 
 	<!-- 源码 fork 也要用视频：mod 的 cutscene / hxcodec 兼容类都靠这个开关 -->
-	<define name="VIDEOS_ALLOWED" if="windows || linux || android || mac" unless="32bits"/>
+	<define name="VIDEOS_ALLOWED" if="windows || linux || mac" unless="32bits"/>
 
 	<!-- ____________________________ Window Settings ___________________________ -->
 
@@ -121,23 +119,6 @@
 		<assets path="assets/body/translations" rename="assets/body" exclude="*.mp3"  unless="web"/>
 	</section>
 
-	<!-- base_game 平时只在 officialBuild 里打；安卓没有 prep_assets.sh 那一步，
-	     直接用同一个 rename 打进包，跑到 assets/body/... -->
-	<section if="android">
-		<!-- 权限数组一旦在 Project.xml 里出现，lime 就不再套默认那四个，得全部列全 -->
-		<android permission="android.permission.WAKE_LOCK" />
-		<android permission="android.permission.INTERNET" />
-		<android permission="android.permission.VIBRATE" />
-		<android permission="android.permission.ACCESS_NETWORK_STATE" />
-		<!-- 目标目录是 /sdcard/RealQuickJS：mods、存档、以及想覆盖的资源都丢那儿。
-		     Android 11+ 读写公共目录要"所有文件访问"，用户得去系统设置里手动开一次；
-		     没开的时候 MobileStorage 会退回 Android/data/<包名>/files（不需要权限）。 -->
-		<android permission="android.permission.READ_EXTERNAL_STORAGE" />
-		<android permission="android.permission.WRITE_EXTERNAL_STORAGE" />
-		<android permission="android.permission.MANAGE_EXTERNAL_STORAGE" />
-		<assets path="assets/base_game" rename="assets/body" exclude="*.ogg" if="web"/>
-		<assets path="assets/base_game" rename="assets/body" exclude="*.mp3"  unless="web"/>
-	</section>
 
 	<!-- ===== 1.0.4（原版） ===== -->
 	<assets path="assets/1.0.4/fonts" />
@@ -214,8 +195,7 @@
 	<!-- _______________________________ Libraries ______________________________ -->
 
 	<!-- 安卓只出 arm64-v8a：QuickJS 要按 ABI 各编一份静态库，armv7 先不折腾 -->
-	<architecture exclude="armv7" if="android" />
-
+	
 	<haxelib name="flixel" version="5.6.1"/>
 	<haxelib name="flixel-addons" version="3.2.2"/>
 	<!-- 0.6.3 那棵树要这两个，本体和原版 1.0.4 不用 -->
@@ -232,7 +212,7 @@
 
 	<!-- Disable Discord IO Thread -->
 	<haxedef name="DISCORD_DISABLE_IO_THREAD" if="hxdiscord_rpc" />
-	<haxedef name="NO_PRECOMPILED_HEADERS" if="linux || android" />
+	<haxedef name="NO_PRECOMPILED_HEADERS" if="linux" />
 
 	<!-- Enables a terminal log prompt on debug builds -->
 	<haxelib name="hxcpp-debug-server" if="debug"/>
