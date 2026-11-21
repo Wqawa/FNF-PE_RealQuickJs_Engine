@@ -188,24 +188,12 @@ class StoryMenuState extends MusicBeatState
 
 		super.create();
 
-		#if MOBILE_CONTROLS
-		// 多一个 C 键用来开修改器菜单
-		addTouchPad('LEFT_FULL', 'A_B_C');
-		#end
 	}
 
-	#if mobile
-	// 子菜单关掉的那一帧 persistentUpdate 会被设回 true，父 state 继续跑就会
-	// 把同一次 B 当成自己的，直接回主菜单
-	var justClosedSub:Bool = false;
-	#end
 
 	override function closeSubState() {
 		persistentUpdate = true;
 		changeWeek();
-		#if mobile
-		justClosedSub = true;
-		#end
 		super.closeSubState();
 	}
 
@@ -214,9 +202,6 @@ class StoryMenuState extends MusicBeatState
 		if(WeekData.weeksList.length < 1)
 		{
 			if (controls.BACK && !movedBack && !selectedWeek
-				#if mobile
-				&& subState == null && !justClosedSub
-				#end
 			)
 			{
 				FlxG.sound.play(Paths.sound('cancelMenu'));
@@ -279,12 +264,7 @@ class StoryMenuState extends MusicBeatState
 			else if (changeDiff)
 				changeDifficulty();
 
-			#if mobile
-			// 桌面是 Ctrl，手机上换成 C 键
-			if(Controls.touchButtonJustPressed('ctrl_menu'))
-			#else
 			if(FlxG.keys.justPressed.CONTROL)
-			#end
 			{
 				persistentUpdate = false;
 				openSubState(new GameplayChangersSubstate());
@@ -300,9 +280,6 @@ class StoryMenuState extends MusicBeatState
 		}
 
 		if (controls.BACK && !movedBack && !selectedWeek
-			#if mobile
-			&& subState == null && !justClosedSub
-			#end
 		)
 		{
 			FlxG.sound.play(Paths.sound('cancelMenu'));
@@ -319,9 +296,6 @@ class StoryMenuState extends MusicBeatState
 		for (num => lock in grpLocks.members)
 			lock.y = grpWeekText.members[lock.ID].y + grpWeekText.members[lock.ID].height/2 - lock.height/2;
 
-		#if mobile
-		justClosedSub = false;
-		#end
 	}
 
 	var movedBack:Bool = false;

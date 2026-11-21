@@ -81,11 +81,6 @@ class Engine
 
 	public static function writePath():String
 	{
-		#if android
-		// apk dir is read-only; write next to the cwd instead
-		var cwd:String = normalCwd();
-		if (cwd != null) return join(cwd, FILE_NAME);
-		#end
 
 		var appDir:String = applicationDirectory();
 		if (appDir != null) return join(appDir, FILE_NAME);
@@ -100,19 +95,6 @@ class Engine
 	{
 		var out:Array<String> = [];
 
-		#if android
-		// Main.main 跑的时候 cwd 还是 "/"，而写入发生在 MobileStorage 设好目录之后，
-		// 两边对不上就会「切了没反应」。这里把 MobileStorage 会用的位置直接列出来。
-		out.push('/storage/emulated/0/' + backend.MobileStorage.PUBLIC_NAME + '/' + FILE_NAME);
-
-		try
-		{
-			var pkg:String = lime.app.Application.current.meta.get('packageName');
-			if (pkg != null && pkg.length > 0)
-				out.push('/storage/emulated/0/Android/data/$pkg/files/' + backend.MobileStorage.FOLDER + '/' + FILE_NAME);
-		}
-		catch (e:Dynamic) {}
-		#end
 
 		var appDir:String = applicationDirectory();
 		if (appDir != null) out.push(join(appDir, FILE_NAME));

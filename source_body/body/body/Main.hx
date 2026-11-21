@@ -78,9 +78,6 @@ class Main extends Sprite
 		// Mobile cwd: <app storage>/.realQuickJSEngine (see backend.MobileStorage).
 		// Upstream's android.content.Context.getExternalFilesDir() has no Haxe extern.
 		// lime only gives the internal dir; MobileStorage prefers external when it can find it.
-		#if (android || ios)
-		backend.MobileStorage.init();
-		#end
 		#if VIDEOS_ALLOWED
 		hxvlc.util.Handle.init(#if (hxvlc >= "1.8.0")  ['--no-lua'] #end);
 		#end
@@ -160,18 +157,6 @@ class Main extends Sprite
 		});
 		addChild(new FlxGame(game.width, game.height, game.initialState, game.framerate, game.framerate, game.skipSplash, game.startFullscreen));
 
-		#if mobile
-		// letterboxes exactly like RatioScaleMode until 'Wide Screen' is turned on
-		// FlxGame.create() hangs off addedToStage, and this sprite isn't on the stage yet,
-		// so _state is still null here. set_scaleMode pokes onResize -> resizeGame ->
-		// _state.onResize, which is a null deref on Android. Wait one frame.
-		var applyMobileScale:Event->Void = null;
-		applyMobileScale = function(_) {
-			removeEventListener(Event.ENTER_FRAME, applyMobileScale);
-			FlxG.scaleMode = new mobile.MobileScaleMode();
-		};
-		addEventListener(Event.ENTER_FRAME, applyMobileScale);
-		#end
 
 		#if !mobile
 		fpsVar = new FPSCounter(10, 3, 0xFFFFFF);

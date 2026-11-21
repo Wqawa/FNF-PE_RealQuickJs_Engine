@@ -180,19 +180,13 @@ class Paths
 	// the manifest. cacheBitmap already did this.
 	public static function existsOnDiskOrManifest(path:String, ?type:AssetType = null):Bool
 	{
-		#if (android || ios)
 		#if MODS_ALLOWED
-		if(FileSystem.exists(path)) return true;
 		#end
-		// 手机上基础资源全在 apk 里，磁盘上根本没有，只能问 manifest
-		return OpenFlAssets.exists(path, type);
-		#else
 		// 桌面端保持原样，不去翻包里的资源
 		#if MODS_ALLOWED
 		return FileSystem.exists(path);
 		#else
 		return Assets.exists(path, type);
-		#end
 		#end
 	}
 
@@ -200,17 +194,12 @@ class Paths
 	// otherwise pull it out of the apk. Android has no assets on disk at all.
 	public static function getTextFile(path:String, ?type:AssetType = TEXT):String
 	{
-		#if (android || ios)
 		#if MODS_ALLOWED
-		if(FileSystem.exists(path)) return File.getContent(path);
 		#end
-		return OpenFlAssets.exists(path, type) ? OpenFlAssets.getText(path) : null;
-		#else
 		#if MODS_ALLOWED
 		return FileSystem.exists(path) ? File.getContent(path) : null;
 		#else
 		return Assets.exists(path, type) ? Assets.getText(path) : null;
-		#end
 		#end
 	}
 
@@ -517,11 +506,6 @@ class Paths
 			#if sys
 			if(FileSystem.exists(file))
 				currentTrackedSounds.set(file, Sound.fromFile(file));
-			#if (android || ios)
-			// apk 里的资源磁盘上不存在，得再问一次 manifest
-			else if(OpenFlAssets.exists(file, SOUND))
-				currentTrackedSounds.set(file, OpenFlAssets.getSound(file));
-			#end
 			#else
 			if(OpenFlAssets.exists(file, SOUND))
 				currentTrackedSounds.set(file, OpenFlAssets.getSound(file));

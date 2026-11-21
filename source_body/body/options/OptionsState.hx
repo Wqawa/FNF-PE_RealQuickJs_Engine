@@ -38,8 +38,6 @@ class OptionsState extends MusicBeatState
 				openSubState(new options.GameplaySettingsSubState());
 			case 'Switch Engine':
 				openSubState(new options.EngineSelectSubState());
-			case 'Touch Controls':
-				openSubState(new mobile.MobileControlSelectSubState());
 			case 'Adjust Delay and Combo':
 				MusicBeatState.switchState(new options.NoteOffsetState());
 			case 'Language':
@@ -86,18 +84,10 @@ class OptionsState extends MusicBeatState
 		super.create();
 	}
 
-	#if mobile
-	// 子菜单 close() 是当场生效的，而父菜单在同一帧里还会往下跑。
-	// 不记一个标记的话，子菜单里按 B 会把这一层也一起关掉，直接弹回主菜单。
-	var justClosedSub:Bool = false;
-	#end
 
 	override function closeSubState()
 	{
 		super.closeSubState();
-		#if mobile
-		justClosedSub = true;
-		#end
 		ClientPrefs.saveSettings();
 		#if DISCORD_ALLOWED
 		DiscordClient.changePresence("Options Menu", null);
@@ -112,12 +102,7 @@ class OptionsState extends MusicBeatState
 		if (controls.UI_DOWN_P)
 			changeSelection(1);
 
-		#if mobile
-		// 子菜单开着时父菜单还在 update，不挡的话按 B 会把这一层也一起关掉
-		if (controls.BACK && subState == null && !justClosedSub)
-		#else
 		if (controls.BACK)
-		#end
 		{
 			FlxG.sound.play(Paths.sound('cancelMenu'));
 			if(onPlayState)
@@ -132,9 +117,6 @@ class OptionsState extends MusicBeatState
 		// every frame it is open
 		else if (controls.ACCEPT && subState == null) openSelectedSubstate(options[curSelected]);
 
-		#if mobile
-		justClosedSub = false;
-		#end
 	}
 	
 	function changeSelection(change:Int = 0)

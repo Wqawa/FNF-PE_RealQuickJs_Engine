@@ -58,9 +58,6 @@ import states.play.PlayStateCamera;
 import states.play.PlayStateJudge;
 #end
 
-#if MOBILE_CONTROLS
-import mobile.objects.TouchButton;
-#end
 
 /**
  * This is where all the Gameplay stuff happens and is managed
@@ -220,10 +217,6 @@ class PlayState extends MusicBeatState
 	public var camHUD:FlxCamera;
 	public var camGame:FlxCamera;
 
-	#if mobile
-	var pauseButton:FlxSprite;
-	var pauseIcon:FlxText;
-	#end
 	public var camOther:FlxCamera;
 	public var cameraSpeed:Float = 1;
 
@@ -306,9 +299,6 @@ class PlayState extends MusicBeatState
 	public static var nextReloadAll:Bool = false;
 	override public function create()
 	{
-		#if MOBILE_CONTROLS
-		addMenuPad = false;
-		#end
 		//trace('Playback Rate: ' + playbackRate);
 		_lastLoadedModDirectory = Mods.currentModDirectory;
 		Paths.clearStoredMemory();
@@ -688,36 +678,10 @@ class PlayState extends MusicBeatState
 			eventNotes.sort(sortByTime);
 		}
 
-		#if MOBILE_CONTROLS
-		if(ClientPrefs.data.controlsAlpha > 0.05)
-		{
-			addMobileControls();
-			mobileControls.cameras = [camHUD];
-			mobileControls.visible = true;
-			mobileControls.onButtonDown.add(onButtonPress);
-			mobileControls.onButtonUp.add(onButtonRelease);
-		}
-		#end
 
 		startCallback();
 		RecalculateRating(false, false);
 
-		#if mobile
-		// 右上角暂停键。手机上没有 ESC，返回键又被系统吃掉，没这个就没法暂停。
-		if (ClientPrefs.data.pauseMethod != 'Back')
-		{
-			pauseButton = new FlxSprite(FlxG.width - 70, 10).makeGraphic(58, 58, 0x99000000);
-			pauseButton.cameras = [camHUD];
-			pauseButton.scrollFactor.set();
-			add(pauseButton);
-
-			pauseIcon = new FlxText(pauseButton.x, pauseButton.y + 13, 58, 'II', 24);
-			pauseIcon.setFormat(Paths.font('vcr.ttf'), 24, FlxColor.WHITE, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
-			pauseIcon.cameras = [camHUD];
-			pauseIcon.scrollFactor.set();
-			add(pauseIcon);
-		}
-		#end
 
 		FlxG.stage.addEventListener(KeyboardEvent.KEY_DOWN, onKeyPress);
 		FlxG.stage.addEventListener(KeyboardEvent.KEY_UP, onKeyRelease);
@@ -1583,9 +1547,6 @@ class PlayState extends MusicBeatState
 
 	override function openSubState(SubState:FlxSubState)
 	{
-		#if MOBILE_CONTROLS
-		if(mobileControls != null) mobileControls.releaseAll();
-		#end
 		stagesFunc(function(stage:BaseStage) stage.openSubState(SubState));
 		if (paused)
 		{
@@ -1725,21 +1686,6 @@ class PlayState extends MusicBeatState
 			}
 		}
 
-		#if mobile
-		// pause button. visible only while playing; the substate draws over this state
-		if (pauseButton != null)
-		{
-			pauseButton.visible = true;
-			if (pauseIcon != null) pauseIcon.visible = true;
-
-			if (FlxG.mouse.justPressed && FlxG.mouse.overlaps(pauseButton)
-				&& startedCountdown && canPause && !endingSong && !inCutscene)
-			{
-				var ret:Dynamic = callOnScripts('onPause', null, true);
-				if(ret != LuaUtils.Function_Stop) openPauseMenu();
-			}
-		}
-		#end
 
 		if(!endingSong && !inCutscene && allowDebugKeys)
 		{
@@ -1951,11 +1897,6 @@ class PlayState extends MusicBeatState
 		persistentDraw = true;
 		paused = true;
 
-		#if mobile
-		// the substate draws on top of this state, hide the button so it isn't in the menu
-		if (pauseButton != null) pauseButton.visible = false;
-		if (pauseIcon != null) pauseIcon.visible = false;
-		#end
 
 		if(FlxG.sound.music != null) {
 			FlxG.sound.music.pause();
@@ -2116,9 +2057,6 @@ class PlayState extends MusicBeatState
 	public var transitioning = false;
 	public function endSong()
 	{
-		#if MOBILE_CONTROLS
-		if(mobileControls != null) mobileControls.visible = false;
-		#end
 		//Should kill you if you tried to cheat
 		if(!startingSong)
 		{
@@ -2279,38 +2217,6 @@ class PlayState extends MusicBeatState
 
 	public function keyReleased(key:Int) PlayStateJudge.keyReleased(this, key);
 
-	#if MOBILE_CONTROLS
-	/** Which note lane a touch button stands for, -1 if it isn't one. */
-	static function mobileNoteIndex(button:TouchButton):Int
-	{
-		if(button == null || button.IDs == null) return -1;
-		for(id in button.IDs)
-		{
-			var i:Int = id;
-			if(i >= 0 && i <= 3) return i; // NOTE_LEFT..NOTE_RIGHT
-			if(i >= 34 && i <= 37) return i - 34; // HITBOX_LEFT..HITBOX_RIGHT
-		}
-		return -1;
-	}
-
-	function onButtonPress(button:TouchButton):Void
-	{
-		var dir:Int = mobileNoteIndex(button);
-		if(dir < 0) return;
-		callOnScripts('onButtonPressPre', [dir]);
-		if(button.justPressed) keyPressed(dir);
-		callOnScripts('onButtonPress', [dir]);
-	}
-
-	function onButtonRelease(button:TouchButton):Void
-	{
-		var dir:Int = mobileNoteIndex(button);
-		if(dir < 0) return;
-		callOnScripts('onButtonReleasePre', [dir]);
-		keyReleased(dir);
-		callOnScripts('onButtonRelease', [dir]);
-	}
-	#end
 
 	public static function getKeyFromEvent(arr:Array<String>, key:FlxKey):Int
 	{

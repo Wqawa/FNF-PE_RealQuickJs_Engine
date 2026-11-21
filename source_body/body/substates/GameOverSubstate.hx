@@ -131,10 +131,6 @@ class GameOverSubstate extends MusicBeatSubstate
 
 		super.create();
 
-		#if MOBILE_CONTROLS
-		// 这里只有重试和放弃两个选项，方向键没用
-		addTouchPad('', 'A_B');
-		#end
 	}
 
 	override function update(elapsed:Float)

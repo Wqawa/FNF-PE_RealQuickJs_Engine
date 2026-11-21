@@ -66,9 +66,6 @@ class TitleState extends MusicBeatState
 
 	override public function create():Void
 	{
-		#if MOBILE_CONTROLS
-		addMenuPad = false; // tapping anywhere already accepts
-		#end
 		Paths.clearStoredMemory();
 		super.create();
 		Paths.clearUnusedMemory();
@@ -79,13 +76,7 @@ class TitleState extends MusicBeatState
 			Language.reloadPhrases();
 		}
 
-		#if mobile
-		// apk 里 introText 读不到时这里是空数组，beatHit 的 [0]/[1] 会直接越界
-		var introTexts:Array<Array<String>> = getIntroTextShit();
-		curWacky = introTexts.length > 0 ? FlxG.random.getObject(introTexts) : ['Psych Engine', 'by Shadow Mario'];
-		#else
 		curWacky = FlxG.random.getObject(getIntroTextShit());
-		#end
 
 		if(!initialized)
 		{
@@ -337,15 +328,6 @@ class TitleState extends MusicBeatState
 
 		var pressedEnter:Bool = FlxG.keys.justPressed.ENTER || controls.ACCEPT;
 
-		#if mobile
-		for (touch in FlxG.touches.list)
-		{
-			if (touch.justPressed)
-			{
-				pressedEnter = true;
-			}
-		}
-		#end
 
 		var gamepad:FlxGamepad = FlxG.gamepads.lastActive;
 
@@ -534,10 +516,6 @@ class TitleState extends MusicBeatState
 				case 1:
 					//FlxG.sound.music.stop();
 					FlxG.sound.playMusic(Paths.music('freakyMenu'), 0);
-					#if mobile
-					// 音轨解不出来的时候 sound.music 是 null，别直接点
-					if(FlxG.sound.music != null)
-					#end
 						FlxG.sound.music.fadeIn(4, 0, 0.7);
 				case 2:
 					createCoolText(['Psych Engine by'], 40);

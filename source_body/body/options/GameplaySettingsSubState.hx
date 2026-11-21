@@ -156,42 +156,6 @@ class GameplaySettingsSubState extends BaseOptionsMenu
 			BOOL);
 		addOption(option);
 
-		#if MOBILE_CONTROLS
-		option = new Option('Touch Controls',
-			'Which layout the on-screen buttons use. Custom means you placed them yourself.',
-			'controlsMode',
-			STRING,
-			['Right', 'Left', 'Custom', 'Hitbox']);
-		addOption(option);
-
-		option = new Option('Touch Controls Alpha',
-			'How visible the on-screen buttons are. 0 hides them.',
-			'controlsAlpha',
-			PERCENT);
-		addOption(option);
-
-		option = new Option('Dynamic Controls Color',
-			'Use the note colors for the touch arrows instead of the default ones.',
-			'dynamicColors',
-			BOOL);
-		addOption(option);
-
-		#if mobile
-		option = new Option('Pause Method',
-			'How to pause during a song. Button = the key in the top right, Back = the system back key.',
-			'pauseMethod',
-			STRING,
-			['Both', 'Button', 'Back']);
-		addOption(option);
-
-		option = new Option('Wide Screen',
-			'Stretch the game over the whole screen instead of keeping the 16:9 canvas.',
-			'wideScreen',
-			BOOL);
-		option.onChange = () -> FlxG.scaleMode = new mobile.MobileScaleMode();
-		addOption(option);
-		#end
-		#end
 
 		super();
 	}

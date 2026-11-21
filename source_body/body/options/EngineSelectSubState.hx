@@ -69,10 +69,6 @@ class EngineSelectSubState extends MusicBeatSubstate
 		if (curSelected < 0) curSelected = 0;
 		changeSelection();
 
-		#if MOBILE_CONTROLS
-		// 上下选引擎，A 确认，B 返回。必须最后一个挂，不然被上面那些 add 盖住
-		addTouchPad('UP_DOWN', 'A_B');
-		#end
 	}
 
 	override function update(elapsed:Float)

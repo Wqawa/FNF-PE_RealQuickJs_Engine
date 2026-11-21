@@ -23,10 +23,6 @@ class MainMenuState extends MusicBeatState
 	var leftItem:FlxSprite;
 	var rightItem:FlxSprite;
 
-	#if mobile
-	// desktop opens the editors with the 7 key, phones have no keyboard
-	var editorButton:FlxSprite;
-	#end
 
 	//Centered/Text options
 	var optionShit:Array<String> = [
@@ -107,17 +103,6 @@ class MainMenuState extends MusicBeatState
 		fnfVer.setFormat(Paths.font("vcr.ttf"), 16, FlxColor.WHITE, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		add(fnfVer);
 
-		#if mobile
-		// 编辑器入口。桌面按 7（debug_1），手机没键盘，右上角放个能戳的。
-		editorButton = new FlxSprite(FlxG.width - 138, 16).makeGraphic(120, 42, 0x99000000);
-		editorButton.scrollFactor.set();
-		add(editorButton);
-
-		var editorLabel:FlxText = new FlxText(editorButton.x, editorButton.y + 10, 120, 'EDITOR', 18);
-		editorLabel.setFormat(Paths.font('vcr.ttf'), 18, FlxColor.WHITE, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
-		editorLabel.scrollFactor.set();
-		add(editorLabel);
-		#end
 
 		changeItem();
 
@@ -364,15 +349,6 @@ class MainMenuState extends MusicBeatState
 			}
 			#end
 
-			#if mobile
-			if (FlxG.mouse.justPressed && editorButton != null && FlxG.mouse.overlaps(editorButton))
-			{
-				selectedSomethin = true;
-				FlxG.mouse.visible = false;
-				FlxG.sound.play(Paths.sound('scrollMenu'));
-				MusicBeatState.switchState(new MasterEditorMenu());
-			}
-			#end
 		}
 
 		super.update(elapsed);

@@ -11,12 +11,6 @@ class Main
 		// The crash handler must be installed before the fork: one entry, all three trees.
 		backend.EngineCrash.install();
 
-		#if (android || ios)
-		// 兜底键盘的悬浮球。挂在 stage 上，跟树无关，所以三棵树都能用
-		backend.DebugKeyboard.install();
-
-		trace('Main: startup cwd = ' + Sys.getCwd());
-		#end
 
 		// engine.txt: vanilla = original 1.0.4, pe063 = 0.6.3, anything else = body
 		// on Android the apk copy is read-only; Engine also tries the writable cwd

@@ -45,10 +45,6 @@ class FlashingState extends MusicBeatState
 			onComplete: (_) -> updateItems()
 		});
 
-		#if MOBILE_CONTROLS
-		// 上面那块全屏黑底盖住了 super.create() 挂的 pad，重新挂一次放到最上层
-		addTouchPad('LEFT_FULL', 'A_B');
-		#end
 	}
 
 	override function update(elapsed:Float)

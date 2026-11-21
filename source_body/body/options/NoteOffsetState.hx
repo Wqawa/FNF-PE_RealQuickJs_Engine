@@ -172,12 +172,6 @@ class NoteOffsetState extends MusicBeatState
 
 		super.create();
 
-		#if MOBILE_CONTROLS
-		// super.create() 会铺一套 A_B 在主相机上，而这里的主相机会跟着节拍缩放，
-		// 按键就跟着抖/晚一拍。换成只留 B，挂到不参与游戏的那台相机上。
-		addTouchPad('', 'B');
-		if (touchPad != null) touchPad.cameras = [camOther];
-		#end
 	}
 
 	var holdTime:Float = 0;
