@@ -15,7 +15,6 @@ class OptionsState extends MusicBeatState
 		'Gameplay',
 		'Switch Engine'
 		// 桌面版没有触屏按键，这一项只对真正跑在手机上的构建有意义
-		#if mobile , 'Touch Controls' #end
 		#if TRANSLATIONS_ALLOWED , 'Language' #end
 	];
 	private var grpOptions:FlxTypedGroup<Alphabet>;
