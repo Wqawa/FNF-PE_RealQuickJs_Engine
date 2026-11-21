@@ -75,9 +75,6 @@ class Main extends Sprite
 		backend.Native.fixScaling();
 		#end
 
-		// Mobile cwd: <app storage>/.realQuickJSEngine (see backend.MobileStorage).
-		// Upstream's android.content.Context.getExternalFilesDir() has no Haxe extern.
-		// lime only gives the internal dir; MobileStorage prefers external when it can find it.
 		#if VIDEOS_ALLOWED
 		hxvlc.util.Handle.init(#if (hxvlc >= "1.8.0")  ['--no-lua'] #end);
 		#end

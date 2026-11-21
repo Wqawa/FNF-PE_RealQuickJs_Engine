@@ -226,7 +226,7 @@ class Paths
 
 		// android: applicationDirectory is a read-only apk path and touching it this early
 		// null-derefs inside liblime, so this desktop-only retry stays out of the apk build
-		#if (sys && !android)
+		#if sys
 		var appDir:String = lime.system.System.applicationDirectory;
 		if(appDir != null)
 		{

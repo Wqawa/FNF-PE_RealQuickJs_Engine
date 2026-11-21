@@ -429,8 +429,6 @@ class LuaUtils
 		return 'mac';
 		#elseif html5
 		return 'browser';
-		#elseif android
-		return 'android';
 		#elseif switch
 		return 'switch';
 		#else

@@ -19,10 +19,8 @@ import backend.MusicBeatState;
 // Keep the conditions inside the XML: hxcpp appends every @:buildXml branch it sees.
 @:buildXml('
 <target id="haxe">
-	<libpath name="../../../../third_party/quickjs-ng/build" if="windows" />
-	<libpath name="../../../../third_party/quickjs-ng/build/android-arm64" unless="windows" />
-	<lib name="quickjs-ng.lib" if="windows" />
-	<lib name="-lquickjs-ng" unless="windows" />
+	<libpath name="../../../../third_party/quickjs-ng/build" />
+	<lib name="quickjs-ng.lib" />
 </target>
 ')
 @:cppFileCode('

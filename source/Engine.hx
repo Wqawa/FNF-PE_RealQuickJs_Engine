@@ -114,7 +114,7 @@ class Engine
 		// Android: lime's applicationDirectory blows up (null deref in liblime) when it's
 		// asked this early - it's called from Main.main, before the trees set their cwd.
 		// The apk dir is read-only anyway, so there's nothing to read there; cwd is enough.
-		#if (sys && !android)
+		#if sys
 		try
 		{
 			var dir:String = lime.system.System.applicationDirectory;
