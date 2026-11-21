@@ -120,9 +120,6 @@ class CoolUtil
 	inline public static function browserLoad(site:String) {
 		#if linux
 		Sys.command('/usr/bin/xdg-open', [site]);
-		#elseif (android || ios)
-		// lime 这条路在安卓上走 JNI：Intent.ACTION_VIEW，交给系统默认浏览器
-		lime.system.System.openURL(site);
 		#else
 		FlxG.openURL(site);
 		#end
