@@ -198,9 +198,9 @@ class FreeplayState extends MusicBeatState
 	}
 
 	#if mobile
-	// 子菜单 close 的那一帧，closeSubState 会把 persistentUpdate 设回 true，
-	// 父 state 继续往下跑就会把同一次 B 当成自己的，直接回主菜单
-	var justClosedSub:Bool = false;
+	// 子菜单关掉之后要等 B 真的松开才认下一次 BACK。手机上这个键是「按住」语义，
+	// 只挡一帧的话手指还没抬起来，下一帧照样会被当成返回主菜单。
+	var backLatch:Bool = false;
 	#end
 
 	override function closeSubState()
@@ -208,7 +208,7 @@ class FreeplayState extends MusicBeatState
 		changeSelection(0, false);
 		persistentUpdate = true;
 		#if mobile
-		justClosedSub = true;
+		backLatch = true;
 		#end
 		super.closeSubState();
 	}
@@ -316,7 +316,11 @@ class FreeplayState extends MusicBeatState
 		}
 
 		#if mobile
-		if (controls.BACK && subState == null && !justClosedSub)
+		if (backLatch)
+		{
+			if (!controls.BACK) backLatch = false;
+		}
+		else if (controls.BACK && subState == null)
 		#else
 		if (controls.BACK)
 		#end
@@ -485,10 +489,6 @@ class FreeplayState extends MusicBeatState
 
 		updateTexts(elapsed);
 		super.update(elapsed);
-
-		#if mobile
-		justClosedSub = false;
-		#end
 	}
 	
 	function getVocalFromCharacter(char:String)

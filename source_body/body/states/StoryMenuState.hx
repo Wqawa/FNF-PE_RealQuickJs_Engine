@@ -195,27 +195,34 @@ class StoryMenuState extends MusicBeatState
 	}
 
 	#if mobile
-	// 子菜单关掉的那一帧 persistentUpdate 会被设回 true，父 state 继续跑就会
-	// 把同一次 B 当成自己的，直接回主菜单
-	var justClosedSub:Bool = false;
+	// 子菜单关掉之后要等 B 真的松开。手机上 B 是「按住」语义，只挡一帧没用，
+	// 手指还没抬起来，下一帧又会被当成返回主菜单。
+	var backLatch:Bool = false;
 	#end
 
 	override function closeSubState() {
 		persistentUpdate = true;
 		changeWeek();
 		#if mobile
-		justClosedSub = true;
+		backLatch = true;
 		#end
 		super.closeSubState();
 	}
 
 	override function update(elapsed:Float)
 	{
+		#if mobile
+		if (backLatch)
+		{
+			if (!controls.BACK) backLatch = false;
+		}
+		#end
+
 		if(WeekData.weeksList.length < 1)
 		{
 			if (controls.BACK && !movedBack && !selectedWeek
 				#if mobile
-				&& subState == null && !justClosedSub
+				&& subState == null && !backLatch
 				#end
 			)
 			{
@@ -301,7 +308,7 @@ class StoryMenuState extends MusicBeatState
 
 		if (controls.BACK && !movedBack && !selectedWeek
 			#if mobile
-			&& subState == null && !justClosedSub
+			&& subState == null && !backLatch
 			#end
 		)
 		{
@@ -318,10 +325,6 @@ class StoryMenuState extends MusicBeatState
 
 		for (num => lock in grpLocks.members)
 			lock.y = grpWeekText.members[lock.ID].y + grpWeekText.members[lock.ID].height/2 - lock.height/2;
-
-		#if mobile
-		justClosedSub = false;
-		#end
 	}
 
 	var movedBack:Bool = false;

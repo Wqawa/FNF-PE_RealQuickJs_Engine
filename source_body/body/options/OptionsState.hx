@@ -87,16 +87,16 @@ class OptionsState extends MusicBeatState
 	}
 
 	#if mobile
-	// 子菜单 close() 是当场生效的，而父菜单在同一帧里还会往下跑。
-	// 不记一个标记的话，子菜单里按 B 会把这一层也一起关掉，直接弹回主菜单。
-	var justClosedSub:Bool = false;
+	// 子菜单关掉之后要等 B 真的松开。手机上 B 是按住语义，只挡一帧不够，
+	// 手指还没抬起来下一帧又会把这一层关掉。
+	var backLatch:Bool = false;
 	#end
 
 	override function closeSubState()
 	{
 		super.closeSubState();
 		#if mobile
-		justClosedSub = true;
+		backLatch = true;
 		#end
 		ClientPrefs.saveSettings();
 		#if DISCORD_ALLOWED
@@ -113,8 +113,12 @@ class OptionsState extends MusicBeatState
 			changeSelection(1);
 
 		#if mobile
-		// 子菜单开着时父菜单还在 update，不挡的话按 B 会把这一层也一起关掉
-		if (controls.BACK && subState == null && !justClosedSub)
+		// B 还按着的话这里先不认，松开再说
+		if (backLatch)
+		{
+			if (!controls.BACK) backLatch = false;
+		}
+		else if (controls.BACK && subState == null)
 		#else
 		if (controls.BACK)
 		#end
@@ -131,10 +135,6 @@ class OptionsState extends MusicBeatState
 		// ACCEPT is held on mobile, so without the subState guard the substate gets reopened
 		// every frame it is open
 		else if (controls.ACCEPT && subState == null) openSelectedSubstate(options[curSelected]);
-
-		#if mobile
-		justClosedSub = false;
-		#end
 	}
 	
 	function changeSelection(change:Int = 0)
