@@ -224,8 +224,8 @@ class Paths
 		var root:String = 'assets/$VERSION_DIR/$file';
 		if(existsOnDiskOrManifest(root)) return root;
 
-		// android: applicationDirectory is a read-only apk path and touching it this early
-		// null-derefs inside liblime, so this desktop-only retry stays out of the apk build
+		// applicationDirectory 在某些环境下是只读路径，过早碰会在 liblime 里空指针，
+		// 所以这段重试只在 sys 下走
 		#if sys
 		var appDir:String = lime.system.System.applicationDirectory;
 		if(appDir != null)

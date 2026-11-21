@@ -161,7 +161,7 @@ class WeekData {
 	}
 
 	private static function getWeekFile(path:String):WeekFile {
-		// disk first (mods), apk manifest second - android has no assets on disk
+		// 磁盘优先（mods），manifest 兜底
 		var rawJson:String = Paths.getTextFile(path);
 
 		if(rawJson != null && rawJson.length > 0) {

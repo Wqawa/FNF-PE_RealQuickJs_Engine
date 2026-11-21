@@ -79,7 +79,7 @@ class Mods
 	{
 		var foldersToCheck:Array<String> = [];
 		//Main folder
-		// base files live inside the apk on android, so check the manifest too
+		// 打包后的 base 资源不在磁盘上，manifest 也要查一遍
 		if(Paths.existsOnDiskOrManifest(path + fileToFind))
 			foldersToCheck.push(path + fileToFind);
 
