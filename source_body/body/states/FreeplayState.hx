@@ -201,6 +201,9 @@ class FreeplayState extends MusicBeatState
 	// 子菜单关掉之后要等 B 真的松开才认下一次 BACK。手机上这个键是「按住」语义，
 	// 只挡一帧的话手指还没抬起来，下一帧照样会被当成返回主菜单。
 	var backLatch:Bool = false;
+
+	inline function subJustClosed():Bool
+		return (openfl.Lib.getTimer() - MusicBeatState.lastSubstateClose) < 250;
 	#end
 
 	override function closeSubState()
@@ -320,7 +323,7 @@ class FreeplayState extends MusicBeatState
 		{
 			if (!controls.BACK) backLatch = false;
 		}
-		else if (controls.BACK && subState == null)
+		else if (controls.BACK && subState == null && !subJustClosed())
 		#else
 		if (controls.BACK)
 		#end

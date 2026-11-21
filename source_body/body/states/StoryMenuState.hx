@@ -198,6 +198,9 @@ class StoryMenuState extends MusicBeatState
 	// 子菜单关掉之后要等 B 真的松开。手机上 B 是「按住」语义，只挡一帧没用，
 	// 手指还没抬起来，下一帧又会被当成返回主菜单。
 	var backLatch:Bool = false;
+
+	inline function subJustClosed():Bool
+		return (openfl.Lib.getTimer() - MusicBeatState.lastSubstateClose) < 250;
 	#end
 
 	override function closeSubState() {
@@ -308,7 +311,7 @@ class StoryMenuState extends MusicBeatState
 
 		if (controls.BACK && !movedBack && !selectedWeek
 			#if mobile
-			&& subState == null && !backLatch
+			&& subState == null && !backLatch && !subJustClosed()
 			#end
 		)
 		{

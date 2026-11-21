@@ -71,6 +71,14 @@ class MusicBeatSubstate extends FlxSubState
 			addTouchPad('LEFT_FULL', 'A_B');
 	}
 
+	override function close():Void
+	{
+		// 记下关闭时间。子菜单里的 B 会继续传给父界面，父界面靠这个时间窗
+		// 躲掉「一次按键被算两遍」，比只靠按键状态判断稳。
+		MusicBeatState.lastSubstateClose = openfl.Lib.getTimer();
+		super.close();
+	}
+
 	override function destroy():Void
 	{
 		removeTouchPad();

@@ -131,6 +131,10 @@ class MusicBeatState extends FlxState
 	}
 
 	public static var timePassedOnState:Float = 0;
+
+	/** 上一次子菜单关闭的时间（毫秒）。子菜单里的 B 会传到父界面，
+	 *  父界面靠这个时间窗躲掉「同一次按键被算两遍」。 */
+	public static var lastSubstateClose:Float = -9999;
 	override function update(elapsed:Float)
 	{
 		//everyStep();

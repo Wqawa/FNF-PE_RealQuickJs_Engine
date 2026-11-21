@@ -121,6 +121,11 @@ class MainMenuState extends MusicBeatState
 
 		changeItem();
 
+		#if MOBILE_CONTROLS
+		// 这块 bg 是 super.create() 之后才 add 的，把挂好的 pad 整个盖住了
+		addTouchPad('LEFT_FULL', 'A_B');
+		#end
+
 		#if ACHIEVEMENTS_ALLOWED
 		// Unlocks "Freaky on a Friday Night" achievement if it's a Friday and between 18:00 PM and 23:59 PM
 		var leDate = Date.now();
