@@ -115,7 +115,7 @@ class BaseOptionsMenu extends MusicBeatSubstate
 	var holdTime:Float = 0;
 	var holdValue:Float = 0;
 
-	#if mobile
+	#if MOBILE_CONTROLS
 	// 手机上这个界面是靠按住 A 打开的，ACCEPT 在 create 之后那几帧还是按下的状态。
 	// 不等手指抬起来，BOOL 项就会每帧翻一次 —— Gameplay 里开关连环闪就是这个。
 	var acceptLatch:Bool = true;
@@ -145,7 +145,7 @@ class BaseOptionsMenu extends MusicBeatSubstate
 			changeSelection(1);
 		}
 
-		#if mobile
+		#if MOBILE_CONTROLS
 		if (acceptLatch && !controls.ACCEPT)
 			acceptLatch = false;
 		#end
@@ -155,7 +155,7 @@ class BaseOptionsMenu extends MusicBeatSubstate
 			FlxG.sound.play(Paths.sound('cancelMenu'));
 		}
 
-		#if mobile
+		#if MOBILE_CONTROLS
 		if(nextAccept <= 0 && !acceptLatch)
 		#else
 		if(nextAccept <= 0)

@@ -39,6 +39,10 @@ class MusicBeatSubstate extends FlxSubState
 	// 所以进来先把它藏掉，出去再放回来。
 	var parentPad:MobileInputManager;
 
+	/** 过场用的子状态（只有一层黑幕）把它设成 false：父界面的 pad 保持可见，
+	 *  否则一进新界面会先冒出一套默认 pad，等过场结束才换成真正的布局。 */
+	public var hideParentPad:Bool = true;
+
 	public function addTouchPad(DPad:String, Action:String):TouchPad
 	{
 		removeTouchPad();
@@ -64,7 +68,7 @@ class MusicBeatSubstate extends FlxSubState
 		// 父菜单的 pad 不会跟着 subState 画出来，所以这里自己挂一个，
 		// 顺便把父的藏掉，免得它还在收触摸。
 		parentPad = MobileInputManager.current;
-		if(parentPad != null && parentPad != touchPad)
+		if(hideParentPad && parentPad != null && parentPad != touchPad)
 			parentPad.visible = false;
 
 		if(addMenuPad && touchPad == null && ClientPrefs.data.controlsAlpha > 0.05)
@@ -82,11 +86,12 @@ class MusicBeatSubstate extends FlxSubState
 	override function destroy():Void
 	{
 		removeTouchPad();
-		if(parentPad != null)
+		if(hideParentPad && parentPad != null)
 		{
+			// 只放回自己藏掉的，免得给没藏过（过场）的情况乱设 visible
 			parentPad.visible = true;
-			parentPad = null;
 		}
+		parentPad = null;
 		super.destroy();
 	}
 	#end

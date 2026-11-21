@@ -289,8 +289,8 @@ class StoryMenuState extends MusicBeatState
 			else if (changeDiff)
 				changeDifficulty();
 
-			#if mobile
-			// 桌面是 Ctrl，手机上换成 C 键
+			#if MOBILE_CONTROLS
+			// 桌面是 Ctrl，触屏构建换成 C 键（touchButton* 只存在于 #if MOBILE_CONTROLS 里，别用 #if mobile）
 			if(Controls.touchButtonJustPressed('ctrl_menu'))
 			#else
 			if(FlxG.keys.justPressed.CONTROL)

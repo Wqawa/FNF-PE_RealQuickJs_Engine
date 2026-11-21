@@ -31,7 +31,9 @@
 	<!-- discord-rpc 只有 win/mac/linux 的原生库，安卓上编译不过 -->
 	<define name="DISCORD_ALLOWED" if="desktop" />
 	<!-- 触屏虚拟按键：手机上是必须的，桌面只在显式 -DMOBILE_CONTROLS 时编进来（调试布局用） -->
-	<define name="MOBILE_CONTROLS" if="android" />
+	<!-- ios 也带上：菜单选项、存档字段都靠这个宏开关，漏掉 ios 会变成
+	     「有虚拟按键但改不了布局」或「设置里没有触屏项」的半开状态。 -->
+	<define name="MOBILE_CONTROLS" if="android || ios" />
 	<define name="TRANSLATIONS_ALLOWED" />
 	<define name="IRIS_DEBUG"/>
 	
@@ -44,6 +46,16 @@
 		<!-- 故意留在这个段里：开了之后 lime 会把 470M 基础素材打进包，
 		     而我们是用 manage.sh --zh 5 事后铺进 bin/assets/<版本>/。 -->
 		<define name="BASE_GAME_FILES" />
+	</section>
+
+	<!-- weekend1 的 ABot 音箱靠 funkin.vis 做频谱分析来跳均衡器柱子，这两个库原来锁在
+	     上面那个 officialBuild 段里，而源码 fork 的桌面/安卓构建都不带 officialBuild，
+	     于是 #if funkin.vis 全被剪掉，柱子永远冻在最低帧。两个库都是纯 Haxe
+	     （grig.audio 是 dsp，funkin.vis 走 lime.media.AudioSource），cpp 后端能编。 -->
+	<define name="funkin.vis" if="desktop || android" />
+	<section if="desktop || android">
+		<haxelib name="grig.audio" />
+		<haxelib name="funkin.vis" />
 	</section>
 
 	<!-- 源码 fork 也要用视频：mod 的 cutscene / hxcodec 兼容类都靠这个开关 -->
@@ -87,7 +99,10 @@
 	<!-- __________________________ Game Assets & Etc. __________________________ -->
 	
 	<!-- Turn on Crash Handler -->
+	<!-- 桌面和安卓的 release 都开：安卓的 C++ 段崩溃 Haxe 拦不住，但脚本层报错、手动上报和崩溃屏本身
+	     能用，dump 会落到应用私有目录（见 EngineCrash.saveDump 的 #if android 分支） -->
 	<define name="CRASH_HANDLER" if="desktop release" />
+	<define name="CRASH_HANDLER" if="android release" />
 
 	<!-- Assets -->
 	<!--
@@ -192,8 +207,7 @@
 	<section if="BASE_GAME_FILES">
 		<assets path="assets/base_game" rename="assets/body" exclude="*.ogg" if="web"/>
 		<assets path="assets/base_game" rename="assets/body" exclude="*.mp3"  unless="web"/>
-		<haxelib name="grig.audio" if="BASE_GAME_FILES"/>
-		<haxelib name="funkin.vis" if="BASE_GAME_FILES"/>
+
 	</section>
 
 	<define name="CHECK_FOR_UPDATES" if="desktop officialBuild"/>

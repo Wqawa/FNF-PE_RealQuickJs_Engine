@@ -210,27 +210,24 @@ class PhillyStreets extends BaseStage
 	var videoEnded:Bool = false;
 	function videoCutscene(?videoName:String = null)
 	{
-		#if android
-		// 安卓上视频在 apk 里，hxvlc 拿不到路径；而且跳过视频会提前进 darnellCutscene，
-		// 那里面用到的道具（spraycan 之类）这会儿还没建好。过场整个跳过。
-		videoEnded = true;
-		game.inCutscene = false;
-		return;
-		#end
-
 		game.inCutscene = true;
 		if(!videoEnded && videoName != null)
 		{
 			#if VIDEOS_ALLOWED
 			game.startVideo(videoName);
 
-			// 视频没起来的话 videoCutscene 是 null（安卓上视频在 apk 里，hxvlc 拿不到路径）。
-			// 直接往下设回调就是空指针，之前 weekend1 进图崩在这。
 			if(game.videoCutscene == null)
 			{
-				trace('PhillyStreets: video "$videoName" not loaded, skipping cutscene');
-				videoEnded = true;
-				videoCutscene();
+				// 视频没起来（文件缺失 / 解码失败）。不能当场往下走：
+				// 后面 darnellCutscene 会碰还在建的舞台道具，会直接空指针。
+				// 等一帧，让 create 收完尾再说。
+				trace('PhillyStreets: video "$videoName" not loaded, skipping after a beat');
+				new FlxTimer().start(0.1, function(_)
+				{
+					videoEnded = true;
+					game.inCutscene = false;
+					videoCutscene();
+				});
 				return;
 			}
 

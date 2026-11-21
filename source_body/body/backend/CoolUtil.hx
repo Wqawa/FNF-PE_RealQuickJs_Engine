@@ -130,11 +130,11 @@ class CoolUtil
 	}
 
 	inline public static function openFolder(folder:String, absolute:Bool = false) {
-		#if sys
+		#if (sys && !android && !ios)
 			if(!absolute) folder =  Sys.getCwd() + '$folder';
 
 			folder = folder.replace('/', '\\');
-			if(folder.endsWith('/')) folder.substr(0, folder.length - 1);
+			if(folder.endsWith('\\')) folder = folder.substr(0, folder.length - 1);
 
 			#if linux
 			var command:String = '/usr/bin/xdg-open';
@@ -143,6 +143,10 @@ class CoolUtil
 			#end
 			Sys.command(command, [folder]);
 			trace('$command $folder');
+		#elseif (android || ios)
+			// 手机上不存在“资源管理器”，也没有打开目录的通用 Intent，explorer.exe 更不会存在；
+			// 只把路径打到控制台，用户自己从文件管理器进（以前这里会白跑一次 Sys.command）
+			trace('openFolder: $folder');
 		#else
 			FlxG.error("Platform is not supported for CoolUtil.openFolder");
 		#end

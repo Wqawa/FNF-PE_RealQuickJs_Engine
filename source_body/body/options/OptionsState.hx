@@ -14,8 +14,8 @@ class OptionsState extends MusicBeatState
 		'Visuals',
 		'Gameplay',
 		'Switch Engine'
-		// 桌面版没有触屏按键，这一项只对真正跑在手机上的构建有意义
-		#if mobile , 'Touch Controls' #end
+		// 桌面版没有触屏按键，这一项只对编进了触屏层的构建有意义（和 GameplaySettingsSubState 用同一个宏）
+		#if MOBILE_CONTROLS , 'Touch Controls' #end
 		#if TRANSLATIONS_ALLOWED , 'Language' #end
 	];
 	private var grpOptions:FlxTypedGroup<Alphabet>;
@@ -39,7 +39,9 @@ class OptionsState extends MusicBeatState
 			case 'Switch Engine':
 				openSubState(new options.EngineSelectSubState());
 			case 'Touch Controls':
+				#if MOBILE_CONTROLS
 				openSubState(new mobile.MobileControlSelectSubState());
+				#end
 			case 'Adjust Delay and Combo':
 				MusicBeatState.switchState(new options.NoteOffsetState());
 			case 'Language':
@@ -86,7 +88,7 @@ class OptionsState extends MusicBeatState
 		super.create();
 	}
 
-	#if mobile
+	#if MOBILE_CONTROLS
 	// 子菜单关掉之后要等 B 真的松开。手机上 B 是按住语义，只挡一帧不够，
 	// 手指还没抬起来下一帧又会把这一层关掉。
 	var backLatch:Bool = false;
@@ -98,7 +100,7 @@ class OptionsState extends MusicBeatState
 	override function closeSubState()
 	{
 		super.closeSubState();
-		#if mobile
+		#if MOBILE_CONTROLS
 		backLatch = true;
 		#end
 		ClientPrefs.saveSettings();
@@ -115,7 +117,7 @@ class OptionsState extends MusicBeatState
 		if (controls.UI_DOWN_P)
 			changeSelection(1);
 
-		#if mobile
+		#if MOBILE_CONTROLS
 		// B 还按着的话这里先不认，松开再说
 		if (backLatch)
 		{

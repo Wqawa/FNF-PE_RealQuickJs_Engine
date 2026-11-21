@@ -90,7 +90,15 @@ class Main extends Sprite
 
 		#if mobile
 		// letterboxes exactly like RatioScaleMode until 'Wide Screen' is turned on
-		FlxG.scaleMode = new pe063.mobile.MobileScaleMode();
+		// FlxGame.create() hangs off addedToStage，而这里还没加进舞台，_state 还是 null：
+		// 直接 set_scaleMode 会 pokes onResize -> resizeGame -> _state.onResize，安卓上 null deref 崩。
+		// 等一帧再设（和 body 树的 Main 一致）。
+		var applyMobileScale:Event->Void = null;
+		applyMobileScale = function(_) {
+			removeEventListener(Event.ENTER_FRAME, applyMobileScale);
+			FlxG.scaleMode = new pe063.mobile.MobileScaleMode();
+		};
+		addEventListener(Event.ENTER_FRAME, applyMobileScale);
 		#end
 
 		#if !mobile

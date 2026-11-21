@@ -1,0 +1,148 @@
+diff --git a/src/lj_load.c b/src/lj_load.c
+index ce7814b..aa3e662 100644
+--- a/src/lj_load.c
++++ b/src/lj_load.c
+@@ -3,6 +3,7 @@
+ ** Copyright (C) 2005-2026 Mike Pall. See Copyright Notice in luajit.h
+ */
+ 
++#include "ljdbg.h"
+ #include <errno.h>
+ #include <stdio.h>
+ 
+@@ -27,6 +28,7 @@
+ 
+ static TValue *cpparser(lua_State *L, lua_CFunction dummy, void *ud)
+ {
++  LJDBG("cpparser", L);
+   LexState *ls = (LexState *)ud;
+   GCproto *pt;
+   GCfunc *fn;
+@@ -66,9 +68,13 @@ LUA_API int lua_loadx(lua_State *L, lua_Reader reader, void *data,
+   int status;
+   ls.rfunc = reader;
+   ls.rdata = data;
++  LJDBG("loadx", L);
++  LJDBG("loadx", L);
+   ls.chunkarg = chunkname ? chunkname : "?";
+   ls.mode = mode;
+   lj_buf_init(L, &ls.sb);
++  LJDBG("before-cpcall", L);
++  LJDBG("before-cpcall", L);
+   status = lj_vm_cpcall(L, NULL, &ls, cpparser);
+   lj_lex_cleanup(L, &ls);
+   lj_gc_check(L);
+diff --git a/src/lj_parse.c b/src/lj_parse.c
+index 2de6eda..4d5dfeb 100644
+--- a/src/lj_parse.c
++++ b/src/lj_parse.c
+@@ -9,6 +9,7 @@
+ #define lj_parse_c
+ #define LUA_CORE
+ 
++#include "ljdbg.h"
+ #include "lj_obj.h"
+ #include "lj_gc.h"
+ #include "lj_err.h"
+@@ -3100,6 +3101,7 @@ static void parse_chunk(LexState *ls)
+ /* Entry point of bytecode parser. */
+ GCproto *lj_parse(LexState *ls)
+ {
++  LJDBG("parse", ls->L);
+   FuncState fs;
+   FuncScope bl;
+   GCproto *pt;
+diff --git a/src/lj_state.c b/src/lj_state.c
+index db7118e..5c03fc0 100644
+--- a/src/lj_state.c
++++ b/src/lj_state.c
+@@ -9,6 +9,7 @@
+ #define lj_state_c
+ #define LUA_CORE
+ 
++#include "ljdbg.h"
+ #include "lj_obj.h"
+ #include "lj_gc.h"
+ #include "lj_err.h"
+@@ -109,6 +110,7 @@ void lj_state_shrinkstack(lua_State *L, MSize used)
+ /* Try to grow stack. */
+ void LJ_FASTCALL lj_state_growstack(lua_State *L, MSize need)
+ {
++  LJDBG("growstack", L);
+   MSize n = L->stacksize + need;
+   if (LJ_LIKELY(n < LJ_STACK_MAX)) {  /* The stack can grow as requested. */
+     if (n < 2 * L->stacksize) {  /* Try to double the size. */
+diff --git a/src/lj_str.c b/src/lj_str.c
+index 2ece8ee..074943f 100644
+--- a/src/lj_str.c
++++ b/src/lj_str.c
+@@ -6,6 +6,7 @@
+ #define lj_str_c
+ #define LUA_CORE
+ 
++#include "ljdbg.h"
+ #include "lj_obj.h"
+ #include "lj_gc.h"
+ #include "lj_err.h"
+@@ -128,6 +129,7 @@ static LJ_NOINLINE StrHash hash_dense(uint64_t seed, StrHash h,
+ /* Resize the string interning hash table (grow and shrink). */
+ void lj_str_resize(lua_State *L, MSize newmask)
+ {
++  LJDBG("str_resize", L);
+   global_State *g = G(L);
+   GCRef *newtab, *oldtab = g->str.tab;
+   MSize i;
+@@ -313,6 +315,7 @@ static GCstr *lj_str_alloc(lua_State *L, const char *str, MSize len,
+ /* Intern a string and return string object. */
+ GCstr *lj_str_new(lua_State *L, const char *str, size_t lenx)
+ {
++  ljdbg_strnew("str_new", L, str, lenx);
+   global_State *g = G(L);
+   if (lenx-1 < LJ_MAX_STR-1) {
+     MSize len = (MSize)lenx;
+diff --git a/src/ljdbg.h b/src/ljdbg.h
+new file mode 100644
+index 0000000..ea8c551
+--- /dev/null
++++ b/src/ljdbg.h
+@@ -0,0 +1,40 @@
++#ifndef LJDBG_H
++#define LJDBG_H
++/* 临时调试头：把 Lua 运行时内部状态写进设备上的 lj_dbg.log。 */
++#include <stdio.h>
++#include "lj_obj.h"
++
++static int ljdbg_strnew_calls = 0;
++
++static void ljdbg_dump(const char *tag, lua_State *L)
++{
++  FILE *f = fopen("/storage/emulated/0/RealQuickJS/lj_dbg.log", "a");
++  if (!f) return;
++  if (L) {
++    global_State *g = G(L);
++    fprintf(f, "%-14s L=%p g=%p dL=%ld tab=%p mask=%08x num=%u top=%p base=%p st=%u\n",
++      tag, (void *)L, (void *)g, (long)((char *)g - (char *)L),
++      (void *)g->str.tab, (unsigned)g->str.mask, (unsigned)g->str.num,
++      (void *)L->top, (void *)L->base, (unsigned)g->gc.state);
++  } else {
++    fprintf(f, "%-14s L=NULL\n", tag);
++  }
++  fclose(f);
++}
++
++static void ljdbg_strnew(const char *tag, lua_State *L, const char *str, size_t len)
++{
++  if (ljdbg_strnew_calls++ > 150) return;
++  FILE *f = fopen("/storage/emulated/0/RealQuickJS/lj_dbg.log", "a");
++  if (!f) return;
++  {
++    global_State *g = G(L);
++    fprintf(f, "%-14s L=%p g=%p dL=%ld tab=%p mask=%08x num=%u len=%u str=%.16s\n",
++      tag, (void *)L, (void *)g, (long)((char *)g - (char *)L),
++      (void *)g->str.tab, (unsigned)g->str.mask, (unsigned)g->str.num,
++      (unsigned)len, str ? str : "(null)");
++  }
++  fclose(f);
++}
++#define LJDBG(tag, L) ljdbg_dump(tag, L)
++#endif

@@ -7,7 +7,8 @@ import haxe.CallStack;
 import openfl.events.UncaughtErrorEvent;
 #end
 
-#if desktop
+#if (desktop || android || ios)
+// 安卓/iOS 的剪贴板走 JNI，和桌面是同一个入口，之前只在这里 import 过
 import lime.system.Clipboard;
 #end
 
@@ -144,10 +145,19 @@ class EngineCrash
 		#if sys
 		try
 		{
-			if (!sys.FileSystem.exists('./crash')) sys.FileSystem.createDirectory('./crash');
+			#if android
+			// 安卓的默认工作目录是 apk 解包出来的只读目录，不能直接写 './crash'；
+			// 但 MobileStorage 启动时会 Sys.setCwd 到外部存储根（/storage/emulated/0/RealQuickJS），那里可写。
+			// 注意别用 lime.system.System.documentsDirectory —— 安卓上它是 /mnt/sdcard，不可写。
+			var cwd:String = Sys.getCwd();
+			var dir:String = (cwd == null || cwd.length == 0 ? './crash' : cwd + '/crash');
+			#else
+			var dir:String = './crash';
+			#end
+			if (!sys.FileSystem.exists(dir)) sys.FileSystem.createDirectory(dir);
 			var stamp:String = Date.now().toString();
 			stamp = stamp.split(' ').join('_').split(':').join("'");
-			var path:String = './crash/PsychEngine_' + stamp + '.txt';
+			var path:String = dir + '/PsychEngine_' + stamp + '.txt';
 			sys.io.File.saveContent(path, text + '\n');
 			return path;
 		}
@@ -159,7 +169,7 @@ class EngineCrash
 	/** Copies to the clipboard. Returns false on failure and the crash screen says so. */
 	public static function copy(text:String):Bool
 	{
-		#if desktop
+		#if (desktop || android || ios)
 		try
 		{
 			Clipboard.text = (text == null) ? '' : text;

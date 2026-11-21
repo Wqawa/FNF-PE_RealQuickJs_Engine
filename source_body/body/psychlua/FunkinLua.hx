@@ -43,6 +43,30 @@ import flixel.input.gamepad.FlxGamepadInputID;
 
 import haxe.Json;
 
+// lib_aux.o 在安卓这边根本没被链进 .so —— .so 里那些 luaL_* 全来自 lj_load.o，
+// 而 luaL_newstate / luaL_openlibs 只存在于 lib_aux.c。表现就是 newstate 拿到空指针、
+// openlibs 卡死。下面这个强制引用数组会让链接器把 lib_aux.o 拉进来。
+@:headerCode('
+#include <stdlib.h>
+#include <stddef.h>
+extern "C" {
+	struct lua_State;
+	typedef struct lua_State lua_State;
+	typedef void *(*lua_Alloc)(void *ud, void *ptr, size_t osize, size_t nsize);
+	lua_State *lua_newstate(lua_Alloc f, void *ud);
+	lua_State *luaL_newstate(void);
+	void luaL_openlibs(lua_State *L);
+}
+static void *pe_lua_alloc(void *ud, void *ptr, size_t osize, size_t nsize);
+__attribute__((retain)) static void *pe_lua_pin[] = {
+	reinterpret_cast<void *>(&luaL_newstate),
+	reinterpret_cast<void *>(&luaL_openlibs)
+};
+static void *pe_lua_alloc(void *ud, void *ptr, size_t osize, size_t nsize) {
+	if (nsize == 0) { free(ptr); return NULL; }
+	return realloc(ptr, nsize);
+}
+')
 class FunkinLua implements IScriptHost {
 	public var lua:State = null;
 	public var camTarget:FlxCamera;
@@ -74,8 +98,26 @@ class FunkinLua implements IScriptHost {
 	}
 
 	public function new(scriptName:String, ?rawCode:String = null) {
+		trace('LUA new: ' + scriptName);
+		backend.DebugLog.log('lua', 'new: ' + scriptName);
+		#if (android || ios)
+		// 安卓上不用 luaL_newstate（那个符号根本没链进来），直接用 lua_newstate + 自己的 allocator
+		lua = untyped __cpp__('lua_newstate(pe_lua_alloc, 0)');
+		#else
 		lua = LuaL.newstate();
+		#end
+		trace('LUA state: ' + scriptName + ' -> ' + (lua != null));
+		backend.DebugLog.log('lua', 'newstate ok=' + (lua != null) + ' : ' + scriptName);
 		LuaL.openlibs(lua);
+		trace('LUA libs ok: ' + scriptName);
+		backend.DebugLog.log('lua', 'openlibs ok : ' + scriptName);
+
+		#if (android || ios)
+		// 自编的 arm64 LuaJIT 在 JIT 汇编阶段会崩（ra_alloc2 → lj_asm_trace）。
+		// 解释器路径是好的，直接用 C API 把 JIT 引擎关掉（dostring 那条不可靠）。
+		var jitRet:Int = llua.LuaJIT.setmode(lua, 0, llua.LuaJIT.LUAJIT_MODE_OFF);
+		backend.DebugLog.log('lua', 'jit off ret=' + jitRet + ' : ' + scriptName);
+		#end
 
 		//trace('Lua version: ' + Lua.version());
 		//trace("LuaJIT version: " + Lua.versionJIT());
@@ -1686,6 +1728,8 @@ class FunkinLua implements IScriptHost {
 				Lua_helper.add_callback(lua, name, func);
 		}
 
+		trace('LUA ready to run: ' + scriptName);
+		backend.DebugLog.log('lua', 'ready: ' + scriptName);
 		try{
 			var isString:Bool = (rawCode != null) || !FileSystem.exists(scriptName);
 			var result:Dynamic = null;
@@ -1712,9 +1756,11 @@ class FunkinLua implements IScriptHost {
 			if(isString && rawCode == null) scriptName = 'unknown';
 		} catch(e:Dynamic) {
 			trace(e);
+			backend.DebugLog.log('lua', 'EXCEPTION: ' + scriptName + ' -> ' + Std.string(e));
 			return;
 		}
 		trace('lua file loaded succesfully:' + scriptName);
+		backend.DebugLog.log('lua', 'loaded: ' + scriptName);
 		// rawCode != null means this was a .js file, transpiled by FunkinJS and fed to Lua
 		LuaUtils.logScriptSource(rawCode != null ? 'js->lua' : 'lua', scriptName, modFolder);
 
@@ -1726,6 +1772,16 @@ class FunkinLua implements IScriptHost {
 	public static var lastCalledScript:FunkinLua = null;
 	public function call(func:String, args:Array<Dynamic>):Dynamic {
 		if(closed) return LuaUtils.Function_Continue;
+
+		#if (android || ios)
+		// 高频回调每帧都来，写日志会把文件撑爆，只记不那么密集的
+		switch (func)
+		{
+			case 'onUpdate', 'onUpdatePost', 'onStepHit', 'onBeatHit', 'onSectionHit', 'onMove', 'onDraw':
+			default:
+				backend.DebugLog.log('luacall', scriptName + ' :: ' + func);
+		}
+		#end
 
 		lastCalledFunction = func;
 		lastCalledScript = this;

@@ -1,5 +1,6 @@
 package mobile;
 
+#if MOBILE_CONTROLS
 import mobile.input.MobileInputManager;
 import mobile.objects.Hitbox;
 import mobile.objects.TouchButton;
@@ -212,3 +213,4 @@ class MobileControlSelectSubState extends MusicBeatSubstate
 		close();
 	}
 }
+#end

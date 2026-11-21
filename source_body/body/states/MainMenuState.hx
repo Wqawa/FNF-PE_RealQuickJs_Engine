@@ -370,7 +370,8 @@ class MainMenuState extends MusicBeatState
 			#end
 
 			#if mobile
-			if (FlxG.mouse.justPressed && editorButton != null && FlxG.mouse.overlaps(editorButton))
+			// 同 PlayState 的暂停键：触摸屏要遍历所有触点，单指 FlxG.mouse 在另一只手按住时点不到
+			if (mobile.TouchUtil.justPressed && editorButton != null && mobile.TouchUtil.overlaps(editorButton))
 			{
 				selectedSomethin = true;
 				FlxG.mouse.visible = false;

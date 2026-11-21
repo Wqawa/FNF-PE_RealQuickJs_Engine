@@ -151,6 +151,12 @@ class PauseSubState extends MusicBeatSubstate
 		cameras = [FlxG.cameras.list[FlxG.cameras.list.length - 1]];
 
 		super.create();
+
+		#if MOBILE_CONTROLS
+		// super.create() 挂的 pad 默认绑主相机（camGame），在这个界面会跟着歌内镜头缩放/错位。
+		// 跟上一步设的 cameras 走，和 pauseButton 用 camPause 是同一个道理。
+		if (touchPad != null) touchPad.cameras = cameras;
+		#end
 	}
 	
 	function getPauseSong()

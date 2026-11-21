@@ -837,10 +837,31 @@ cmd_qjsandroid() {
 	ok "$OUT/libquickjs-ng.a ($(du -h "$OUT/libquickjs-ng.a" | cut -f1))"
 }
 
+# linc_luajit 的安卓 LuaJIT 预编译库换成仓库里自建的那份（内容相同就跳过）。
+# 路径不写成常量：haxelib 可能装在别的盘/版本目录下，问 haxelib 自己最准。
+ensure_android_luajit() {
+	local patched="$ROOT/third_party/luajit-android/libluajit-64.a"
+	[ -f "$patched" ] || return 0
+	local dest
+	dest="$(haxelib path linc_luajit 2>/dev/null | head -1)"
+	[ -n "$dest" ] || return 0
+	dest="${dest%/}/lib/lua/lib/Android/libluajit-64.a"
+	[ -f "$dest" ] || return 0
+	if cmp -s "$patched" "$dest"; then
+		ok "LuaJIT android 静态库已是自建版"
+	else
+		cp "$patched" "$dest" && ok "LuaJIT android 静态库 → 自建版（$dest）"
+	fi
+}
+
 cmd_android() {
 	setup_android_env || return 1
 	local lib="$ROOT/third_party/quickjs-ng/build/android-arm64/libquickjs-ng.a"
 	[ -f "$lib" ] || { cmd_qjsandroid || return 1; }
+	# linc_luajit 自带的 Android 预编译 .a 是社区上传的混代产物，设备上一编译
+	# chunk 就 SIGSEGV（lj_str_new 里 global_State->str.mask 仍是 ~0 哨兵）。
+	# 用本仓库自建版覆盖，见 third_party/luajit-android/build.sh。
+	ensure_android_luajit || true
 	cd "$ROOT" || return 1
 	head_ "构建 android（arm64-v8a）"
 	# -Dnostrip：NDK 25 的 bin 只有 llvm-strip.exe，hxcpp 按 ${TOOLCHAIN_PREFIX}strip

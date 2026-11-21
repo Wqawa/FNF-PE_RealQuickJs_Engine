@@ -18,6 +18,12 @@ class CustomFadeTransition extends MusicBeatSubstate {
 
 	override function create()
 	{
+		// 这一层只是黑幕，不是真的菜单：别给它挂 pad（会盖掉本界面的按键，
+		// 看着就是「进歌后过几帧布局才同步」），也别把下面的 pad 藏起来。
+		#if MOBILE_CONTROLS
+		addMenuPad = false;
+		hideParentPad = false;
+		#end
 		cameras = [FlxG.cameras.list[FlxG.cameras.list.length-1]];
 		var width:Int = Std.int(FlxG.width / Math.max(camera.zoom, 0.001));
 		var height:Int = Std.int(FlxG.height / Math.max(camera.zoom, 0.001));

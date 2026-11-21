@@ -225,6 +225,11 @@ class PlayState extends MusicBeatState
 	var pauseIcon:FlxText;
 	#end
 	public var camOther:FlxCamera;
+	#if (mobile || MOBILE_CONTROLS)
+	// 触摸控件（歌内 pad + 右上角暂停键）专用的相机：不跟 camGame 滚动，
+	// 也不吃 camHUD 的节拍缩放，画在 camOther 之上。
+	public var camPause:FlxCamera;
+	#end
 	public var cameraSpeed:Float = 1;
 
 	// 0.6.3-0.7.x kept modchart objects in two dedicated maps (modchartSprites/modchartTexts).
@@ -306,6 +311,7 @@ class PlayState extends MusicBeatState
 	public static var nextReloadAll:Bool = false;
 	override public function create()
 	{
+		backend.DebugLog.log('play', 'create start, song=' + SONG.song);
 		#if MOBILE_CONTROLS
 		addMenuPad = false;
 		#end
@@ -355,12 +361,18 @@ class PlayState extends MusicBeatState
 
 		FlxG.cameras.add(camHUD, false);
 		FlxG.cameras.add(camOther, false);
+		#if (mobile || MOBILE_CONTROLS)
+		camPause = new FlxCamera();
+		camPause.bgColor.alpha = 0;
+		FlxG.cameras.add(camPause, false);
+		#end
 
 		persistentUpdate = true;
 		persistentDraw = true;
 
 		Conductor.mapBPMChanges(SONG);
 		Conductor.bpm = SONG.bpm;
+		backend.DebugLog.log('play', 'mapBPMChanges done');
 
 		#if DISCORD_ALLOWED
 		// String that contains the mode defined here so it isn't necessary to call changePresence for each mode
@@ -383,6 +395,7 @@ class PlayState extends MusicBeatState
 		curStage = SONG.stage;
 
 		var stageData:StageFile = StageData.getStageFile(curStage);
+		backend.DebugLog.log('play', 'stage file loaded: ' + curStage);
 		defaultCamZoom = stageData.defaultZoom;
 
 		stageUI = "normal";
@@ -493,6 +506,7 @@ class PlayState extends MusicBeatState
 				#if LUA_ALLOWED
 				if(file.toLowerCase().endsWith('.lua'))
 				{
+					// 插桩诊断：放行 scripts/ 下的脚本，用 test.lua 触发
 					if(!isLuaScriptRunning(scriptPath)) new FunkinLua(scriptPath);
 				}
 				else if(psychlua.FunkinJS.isJSFile(file))
@@ -566,7 +580,9 @@ class PlayState extends MusicBeatState
 			timeTxt.y += 3;
 		}
 
+		backend.DebugLog.log('play', 'generateSong start');
 		generateSong();
+		backend.DebugLog.log('play', 'generateSong done');
 
 		noteGroup.add(grpNoteSplashes);
 
@@ -670,7 +686,9 @@ class PlayState extends MusicBeatState
 			{
 				#if LUA_ALLOWED
 				if(file.toLowerCase().endsWith('.lua'))
+				{
 					new FunkinLua(folder + file);
+				}
 				else if(psychlua.FunkinJS.isJSFile(file))
 					psychlua.FunkinJS.start(folder + file);
 				#end
@@ -692,7 +710,8 @@ class PlayState extends MusicBeatState
 		if(ClientPrefs.data.controlsAlpha > 0.05)
 		{
 			addMobileControls();
-			mobileControls.cameras = [camHUD];
+			// 挂 camPause 而不是 camHUD：camHUD 每拍会 zoom，pad 会跟着抖/错位
+			mobileControls.cameras = [camPause];
 			mobileControls.visible = true;
 			mobileControls.onButtonDown.add(onButtonPress);
 			mobileControls.onButtonUp.add(onButtonRelease);
@@ -707,13 +726,15 @@ class PlayState extends MusicBeatState
 		if (ClientPrefs.data.pauseMethod != 'Back')
 		{
 			pauseButton = new FlxSprite(FlxG.width - 70, 10).makeGraphic(58, 58, 0x99000000);
-			pauseButton.cameras = [camHUD];
+			// camHUD 有节拍缩放，判定用的是 camGame 的坐标，两边对不上点不中。
+			// 单独挂一台不缩放的相机，画和判定都在同一套坐标里。
+			pauseButton.cameras = [camPause];
 			pauseButton.scrollFactor.set();
 			add(pauseButton);
 
 			pauseIcon = new FlxText(pauseButton.x, pauseButton.y + 13, 58, 'II', 24);
 			pauseIcon.setFormat(Paths.font('vcr.ttf'), 24, FlxColor.WHITE, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
-			pauseIcon.cameras = [camHUD];
+			pauseIcon.cameras = [camPause];
 			pauseIcon.scrollFactor.set();
 			add(pauseIcon);
 		}
@@ -1686,9 +1707,14 @@ class PlayState extends MusicBeatState
 	var canPause:Bool = true;
 	var freezeCamera:Bool = false;
 	var allowDebugKeys:Bool = true;
+	var firstUpdateLogged:Bool = false;
 
 	override public function update(elapsed:Float)
 	{
+		if(!firstUpdateLogged) {
+			firstUpdateLogged = true;
+			backend.DebugLog.log('play', 'create finished, first update');
+		}
 		if(!inCutscene && !paused && !freezeCamera) {
 			FlxG.camera.followLerp = 0.04 * cameraSpeed * playbackRate;
 			var idleAnim:Bool = (boyfriend.getAnimationName().startsWith('idle') || boyfriend.getAnimationName().startsWith('danceLeft') || boyfriend.getAnimationName().startsWith('danceRight'));
@@ -1732,7 +1758,8 @@ class PlayState extends MusicBeatState
 			pauseButton.visible = true;
 			if (pauseIcon != null) pauseIcon.visible = true;
 
-			if (FlxG.mouse.justPressed && FlxG.mouse.overlaps(pauseButton)
+			// TouchUtil 遍历所有触点：FlxG.mouse 只有一个指针，双指/长按打歌时点不到暂停键
+			if (mobile.TouchUtil.justPressed && mobile.TouchUtil.overlaps(pauseButton, camPause)
 				&& startedCountdown && canPause && !endingSong && !inCutscene)
 			{
 				var ret:Dynamic = callOnScripts('onPause', null, true);
@@ -2512,6 +2539,7 @@ class PlayState extends MusicBeatState
 
 	public function startLuasNamed(luaFile:String)
 	{
+		backend.DebugLog.log('play', 'startLuasNamed: ' + luaFile);
 		var luaToLoad:String = Paths.findScriptFile(luaFile);
 
 		// No .lua? Look for the same name with a .js extension instead.

@@ -204,6 +204,12 @@ class Paths
 		#if MODS_ALLOWED
 		if(FileSystem.exists(path)) return File.getContent(path);
 		#end
+		// apk 里的文本（json/xml/txt）也先解到工作目录再读，跟桌面一个流程
+		var diskFile:String = localAsset(path, type);
+		if (diskFile != path)
+		{
+			try return File.getContent(diskFile) catch (e:Dynamic) trace('getTextFile failed: ' + diskFile + ' (' + Std.string(e) + ')');
+		}
 		return OpenFlAssets.exists(path, type) ? OpenFlAssets.getText(path) : null;
 		#else
 		#if MODS_ALLOWED
@@ -287,8 +293,47 @@ class Paths
 		var file:String = modsVideo(key);
 		if(FileSystem.exists(file)) return file;
 		#end
-		return 'assets/$VERSION_DIR/videos/$key.$VIDEO_EXT';
+
+		var assetPath:String = 'assets/$VERSION_DIR/videos/$key.$VIDEO_EXT';
+
+		#if (android || ios)
+		// hxvlc 只认真实文件路径，apk 里的视频它打不开 —— 用之前先解一份到 cwd
+		return extractVideo(assetPath, key);
+		#else
+		return assetPath;
+		#end
 	}
+
+	#if (android || ios)
+	static function extractVideo(assetPath:String, key:String):String
+	{
+		var out:String = 'videos/$key.$VIDEO_EXT';
+
+		try
+		{
+			if (FileSystem.exists(out) && FileSystem.stat(out).size > 0)
+				return out;
+
+			if (!OpenFlAssets.exists(assetPath, AssetType.BINARY))
+			{
+				trace('Paths: video "$assetPath" is not in the apk');
+				return assetPath;
+			}
+
+			var bytes:haxe.io.Bytes = OpenFlAssets.getBytes(assetPath);
+			if (bytes == null) return assetPath;
+
+			if (!FileSystem.exists('videos')) FileSystem.createDirectory('videos');
+			File.saveBytes(out, bytes);
+			trace('Paths: extracted "$assetPath" -> "$out" (${bytes.length} bytes)');
+			return out;
+		}
+		catch (e:Dynamic)
+			trace('Paths: could not extract "$assetPath" ($e)');
+
+		return assetPath;
+	}
+	#end
 
 	inline static public function sound(key:String, ?modsAllowed:Bool = true):Sound
 		return returnSound('sounds/$key', modsAllowed);
@@ -328,15 +373,26 @@ class Paths
 		if (bitmap == null)
 		{
 			var file:String = getPath(key, IMAGE, parentFolder, true);
-			#if MODS_ALLOWED
-			if (FileSystem.exists(file))
-				bitmap = BitmapData.fromFile(file);
-			else #end if (OpenFlAssets.exists(file, IMAGE))
-				bitmap = OpenFlAssets.getBitmapData(file);
+			#if (android || ios)
+			// 手机：磁盘上有（解压过 / mod 覆盖）就直接读；apk 里的第一次用到就解到工作目录再读
+			var diskFile:String = localAsset(file, IMAGE);
+			if (diskFile != file) bitmap = BitmapData.fromFile(diskFile);
+			else if (OpenFlAssets.exists(file, IMAGE)) bitmap = OpenFlAssets.getBitmapData(file);
+			#elseif MODS_ALLOWED
+			if (FileSystem.exists(file)) bitmap = BitmapData.fromFile(file);
+			else if (OpenFlAssets.exists(file, IMAGE)) bitmap = OpenFlAssets.getBitmapData(file);
+			#else
+			if (OpenFlAssets.exists(file, IMAGE)) bitmap = OpenFlAssets.getBitmapData(file);
+			#end
 
 			if (bitmap == null)
 			{
+				#if (android || ios)
+				// 只在安卓/苹果上多打一行，方便区分「路径没解析对」和「原生解码器打不开」
+				trace('Bitmap not found: $file | key: $key | abs: ' + absoluteDiskPath(file) + ' | exists: ' + FileSystem.exists(file));
+				#else
 				trace('Bitmap not found: $file | key: $key');
+				#end
 				return null;
 			}
 		}
@@ -451,6 +507,14 @@ class Paths
 		if(FileSystem.exists(path))
 			return File.getContent(path);
 		#end
+		#if (android || ios)
+		// 图集的 xml/json 也走磁盘：先解到工作目录再读，跟桌面同一个流程
+		var diskFile:String = localAsset(path, TEXT);
+		if (diskFile != path)
+		{
+			try return File.getContent(diskFile) catch (e:Dynamic) trace('readTextOrPath failed: ' + diskFile + ' (' + Std.string(e) + ')');
+		}
+		#end
 		return path;
 	}
 
@@ -515,23 +579,38 @@ class Paths
 		if(!currentTrackedSounds.exists(file))
 		{
 			#if sys
-			if(FileSystem.exists(file))
-				currentTrackedSounds.set(file, Sound.fromFile(file));
+			// 手机上所有资源都落到工作目录当真实文件用（apk 里的第一次用到时解压），载入路径和桌面一致；
+			// Sound.fromFile 打不开会 throw IOError，必须接住，否则整局崩（音频还在放、画面已经死了）
+			var diskFile:String = #if (android || ios) localAsset(file, SOUND) #else file #end;
+			var loaded:Sound = null;
+			if(FileSystem.exists(diskFile))
+			{
+				try loaded = Sound.fromFile(diskFile)
+				catch(e:Dynamic) trace('SOUND LOAD FAILED: ' + diskFile + ' (' + Std.string(e) + ')');
+
+				if(loaded != null) currentTrackedSounds.set(file, loaded);
+			}
 			#if (android || ios)
-			// apk 里的资源磁盘上不存在，得再问一次 manifest
+			// 解不出来（apk 里没有、磁盘上也没有）最后再问一次 manifest
 			else if(OpenFlAssets.exists(file, SOUND))
 				currentTrackedSounds.set(file, OpenFlAssets.getSound(file));
 			#end
+			if(!currentTrackedSounds.exists(file) && beepOnNull)
+			{
+				trace('SOUND NOT FOUND: ' + key + ', PATH: ' + path);
+				FlxG.log.error('SOUND NOT FOUND: $key, PATH: $path');
+				return FlxAssets.getSound('flixel/sounds/beep');
+			}
 			#else
 			if(OpenFlAssets.exists(file, SOUND))
 				currentTrackedSounds.set(file, OpenFlAssets.getSound(file));
-			#end
 			else if(beepOnNull)
 			{
 				trace('SOUND NOT FOUND: $key, PATH: $path');
 				FlxG.log.error('SOUND NOT FOUND: $key, PATH: $path');
 				return FlxAssets.getSound('flixel/sounds/beep');
 			}
+			#end
 		}
 		localTrackedAssets.push(file);
 		return currentTrackedSounds.get(file);
@@ -544,6 +623,51 @@ class Paths
 	/** This version's own modsList.txt; versions do not touch each other's. */
 	inline static public function modsListPath():String
 		return 'mods/$VERSION_DIR/modsList.txt';
+
+	#if (android || ios)
+	// lime 的原生加载器（BitmapData.fromFile / Sound.fromFile / AudioBuffer.fromFile）在安卓上
+	// 拿到相对路径会当成 apk 里的资源去开，磁盘上的 mods 文件必须给绝对路径，否则一律返回 null：
+	// 图标加载不出来、音效一 fromFile 就抛 IOError 把整个游戏带崩。
+	public static function absoluteDiskPath(file:String):String
+	{
+		if (file == null || file.length == 0) return file;
+		if (file.charAt(0) == '/' || file.indexOf(':') > 0) return file;
+
+		var cwd:String = Sys.getCwd();
+		if (cwd == null || cwd.length == 0) return file;
+
+		var last:String = cwd.charAt(cwd.length - 1);
+		if (last != '/' && last != '\\') cwd += '/';
+		return cwd + file;
+	}
+
+	// apk 里的资源第一次用到时解一份到工作目录，之后一律当磁盘文件载入 —— 手机上跑起来和桌面一样，
+	// 所有资源都是真实文件，mod 也能直接覆盖基础资源。返回值：能落到磁盘就给绝对路径，否则原样返回。
+	public static function localAsset(file:String, ?type:AssetType = null):String
+	{
+		if (file == null || file.length == 0) return file;
+
+		var abs:String = absoluteDiskPath(file);
+		if (FileSystem.exists(abs)) return abs; // 已经解压过，或者本来就在磁盘上（mod）
+
+		if (type == null) type = AssetType.BINARY;
+		if (!OpenFlAssets.exists(file, type)) return file;
+
+		try
+		{
+			var bytes:haxe.io.Bytes = OpenFlAssets.getBytes(file);
+			if (bytes == null || bytes.length == 0) return file;
+
+			var dir:String = haxe.io.Path.directory(abs);
+			if (dir != null && dir.length > 0 && !FileSystem.exists(dir)) FileSystem.createDirectory(dir);
+			File.saveBytes(abs, bytes);
+			return abs;
+		}
+		catch (e:Dynamic) trace('Paths.localAsset: extract failed "' + file + '" (' + Std.string(e) + ')');
+
+		return file;
+	}
+	#end
 
 	inline static public function modsJson(key:String)
 		return modFolders('data/' + key + '.json');

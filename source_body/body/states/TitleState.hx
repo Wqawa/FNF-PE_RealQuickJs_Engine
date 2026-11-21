@@ -66,6 +66,7 @@ class TitleState extends MusicBeatState
 
 	override public function create():Void
 	{
+		// 自检别挂在启动流程里：它本身崩在 s8，等于每次开游戏都自杀
 		#if MOBILE_CONTROLS
 		addMenuPad = false; // tapping anywhere already accepts
 		#end

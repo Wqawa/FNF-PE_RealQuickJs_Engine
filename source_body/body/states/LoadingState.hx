@@ -317,6 +317,7 @@ class LoadingState extends MusicBeatState
 	var finishedLoading:Bool = false;
 	function onLoad()
 	{
+		backend.DebugLog.log('loading', 'onLoad -> switching to target state');
 		_loaded();
 
 		if (stopMusic && FlxG.sound.music != null)
@@ -774,9 +775,21 @@ class LoadingState extends MusicBeatState
 		//trace('precaching sound: $file');
 		if(!Paths.currentTrackedSounds.exists(file))
 		{
-			if (#if sys FileSystem.exists(file) || #end OpenFlAssets.exists(file, SOUND))
+			// 手机上资源统一当磁盘文件用：apk 里的第一次用到就解到工作目录，之后和桌面一样按真实文件读
+			var diskFile:String = #if (android || ios) Paths.localAsset(file, SOUND) #else file #end;
+			if (#if sys FileSystem.exists(diskFile) || #end OpenFlAssets.exists(file, SOUND))
 			{
-				var sound:Sound = #if sys Sound.fromFile(file) #else OpenFlAssets.getSound(file, false) #end;
+				#if sys
+				var sound:Sound = null;
+				try
+				{
+					if(FileSystem.exists(diskFile)) sound = Sound.fromFile(diskFile);
+					if(sound == null) sound = Sound.fromFile(file); // 退回 apk 的 asset 命名空间
+				}
+				catch(e:Dynamic) trace('preloadSound failed: ' + file + ' (' + Std.string(e) + ')');
+				#else
+				var sound:Sound = OpenFlAssets.getSound(file, false);
+				#end
 				mutex.acquire();
 				Paths.currentTrackedSounds.set(file, sound);
 				mutex.release();
@@ -806,10 +819,13 @@ class LoadingState extends MusicBeatState
 			if (!Paths.currentTrackedAssets.exists(requestKey))
 			{
 				var file:String = Paths.getPath(requestKey, IMAGE);
-				if (#if sys FileSystem.exists(file) || #end OpenFlAssets.exists(file, IMAGE))
+				var diskFile:String = #if (android || ios) Paths.localAsset(file, IMAGE) #else file #end;
+				if (#if sys FileSystem.exists(diskFile) || #end OpenFlAssets.exists(file, IMAGE))
 				{
 					#if sys
-					var bitmap:BitmapData = BitmapData.fromFile(file);
+					var bitmap:BitmapData = null;
+					if(FileSystem.exists(diskFile)) bitmap = BitmapData.fromFile(diskFile);
+					if(bitmap == null) bitmap = BitmapData.fromFile(file); // 退回 apk 的 asset 命名空间
 					#else
 					var bitmap:BitmapData = OpenFlAssets.getBitmapData(file, false);
 					#end

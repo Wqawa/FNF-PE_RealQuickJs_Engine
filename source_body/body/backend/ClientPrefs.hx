@@ -16,10 +16,16 @@ import states.TitleState;
 	public var flashing:Bool = true;
 	public var autoPause:Bool = true;
 	public var antialiasing:Bool = true;
+	#if MOBILE_CONTROLS
+	// 触屏按键的三个偏好在桌面构建里根本不该存在：以前没包宏，桌面存档会写进
+	// controlsAlpha = 0，把这份存档带去手机就会让整排虚拟键隐身（见审计 D1）。
 	public var controlsMode:String = 'Right'; // touch controls: Right / Left / Custom / Hitbox
-	public var controlsAlpha:Float = #if mobile 0.6 #else 0 #end; // touch controls visibility
+	public var controlsAlpha:Float = 0.6; // touch controls visibility
 	public var dynamicColors:Bool = false; // touch arrows take the note colors
+	#end
+	#if mobile
 	public var wideScreen:Bool = false; // stretch the canvas over the whole phone screen
+	#end
 	#if mobile
 	public var pauseMethod:String = 'Both'; // how to pause in a song: Button / Back / Both
 	#end
@@ -378,7 +384,19 @@ class ClientPrefs {
 		FlxG.autoPause = ClientPrefs.data.autoPause;
 
 		if(FlxG.save.data.framerate == null) {
-			final refreshRate:Int = FlxG.stage.application.window.displayMode.refreshRate;
+			var refreshRate:Int = FlxG.stage.application.window.displayMode.refreshRate;
+			#if mobile
+			// 安卓的 displayMode.refreshRate 经常报 0（部分机型和全屏模式下），以前 bound(0,60,240)=60
+			// 直接把高刷屏锁在 60。先向 lime 要一次，还拿不到再退 60
+			if(refreshRate <= 0) {
+				try {
+					// window.display 是 lime 的 Display 实例，currentMode 挂在它上面（静态访问不了）
+					var display = FlxG.stage.application.window.display;
+					if(display != null && display.currentMode != null) refreshRate = display.currentMode.refreshRate;
+				} catch(e:Dynamic) {}
+			}
+			#end
+			if(refreshRate <= 0) refreshRate = 60;
 			data.framerate = Std.int(FlxMath.bound(refreshRate, 60, 240));
 		}
 		#end
