@@ -366,6 +366,10 @@ cmd_build() {
 
 	args=(build windows -nocolor)
 	[ "$MODE" = debug ] && args+=(-debug)
+	# hxcpp 默认按核心数并发（这台 8 个）。多个 cl.exe 同时发现预编译头还没生成时会互相
+	# 死等，表现是 haxe 退出、cl 挂着 CPU 0.01s 十几分钟不动（2026-11 撞了 4 次）。
+	# 压到 2 线程就没事，单个 cl 只慢一点。PE_COMPILE_THREADS 可以临时调。
+	args+=(-D "HXCPP_COMPILE_THREADS=${PE_COMPILE_THREADS:-2}")
 	say "  编译（$MODE）…" "  building ($MODE)…"
 	local t0
 	t0=$(date +%s)
@@ -395,21 +399,20 @@ copy_tree() {
 file_list() { [ -d "$1" ] || return 0; (cd "$1" && find . -type f "${@:2}" | sed 's|^\./||' | LC_ALL=C sort); }
 
 cmd_assets() {
-	local check="${1:-0}" BIN="$ROOT/export/$MODE/windows/bin" SRC="$ROOT/assets/base_game" TMP="$ROOT/.cache/manage"
+	local check="${1:-0}" BIN="$ROOT/export/$MODE/windows/bin" TMP="$ROOT/.cache/manage"
 	mkdir -p "$TMP"
 	BAD=0
 
 	[ -d "$BIN" ] || { say "没有 $BIN，先编译" "no $BIN, build first"; return 1; }
-	[ -d "$SRC" ] || { say "没有 assets/base_game" "assets/base_game missing"; return 1; }
 
-	head_ "素材（源：assets/base_game）"
+	head_ "素材（源：assets/<版本>）"
 	if [ "$check" = 1 ]; then
 		printf '  只校验，不铺\n'
 	else
-		for ver in body 1.0.4; do copy_tree "$SRC" "$BIN/assets/$ver" "assets/$ver"; done
-		for w in week1 week2 week3 week4 week5 week6 week7; do
-			[ -d "$SRC/$w" ] || continue
-			copy_tree "$SRC/$w" "$BIN/assets/0.6.3/$w" "0.6.3/$w"
+		# 三棵树的素材各自完整（2026-11-23 把 base_game 拆进去了），直接铺，不用再拼
+		for ver in body 1.0.4 0.6.3; do
+			[ -d "$ROOT/assets/$ver" ] || continue
+			copy_tree "$ROOT/assets/$ver" "$BIN/assets/$ver" "$ver"
 		done
 		# 老构建残留的 mp3：同目录有同名 .ogg 才删
 		local ver d n
@@ -444,14 +447,18 @@ cmd_assets() {
 	[ -f "$BIN/engine.txt" ] && ok "engine.txt = $(tr -d '\r\n' < "$BIN/engine.txt")" || bad "engine.txt 不存在"
 
 	head_ "素材完整性"
-	file_list "$SRC" ! -name "$AUDIO_SKIP" > "$TMP/base.txt"
 	local ver missing
-	for ver in body 1.0.4; do
+	for ver in body 1.0.4 0.6.3; do
+		# embed/ 是 embed="true" 打进 exe 的，preload/ 在 Project.xml 里 rename 到版本根，
+		# 这两个目录本来就不会以原路径出现在 bin/assets 下
+		file_list "$ROOT/assets/$ver" ! -name "$AUDIO_SKIP" \
+			! -path './embed/*' ! -path './preload/*' ! -path './secrets/*' \
+			! -path './translations/*' ! -path './week_assets/*' > "$TMP/base.txt"
 		file_list "$BIN/assets/$ver" > "$TMP/bin.txt"
 		LC_ALL=C comm -23 "$TMP/base.txt" "$TMP/bin.txt" > "$TMP/miss.txt"
 		missing=$(wc -l < "$TMP/miss.txt")
 		if [ "$missing" -eq 0 ]; then
-			ok "assets/$ver 与 base_game 对齐（$(wc -l < "$TMP/bin.txt") 个文件）"
+			ok "assets/$ver 已铺全（$(wc -l < "$TMP/bin.txt") 个文件）"
 		else
 			bad "assets/$ver 少 $missing 个文件"
 			head -5 "$TMP/miss.txt" | sed 's/^/        /'

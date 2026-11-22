@@ -337,11 +337,14 @@ bash manage.sh env                     # 环境体检，缺库会自动补
 ```
 
 `manage.sh` 是唯一的脚本（以前散在 `building/`、`tools/`、`.workbuddy/*.sh` 里的都并进来了，
-2026-11-19 收拢）：环境体检 → 补库 → `lime build windows` → 铺 `assets/base_game` 并校验。
+2026-11-19 收拢）：环境体检 → 补库 → `lime build windows` → 铺 `assets/<版本>` 并校验。
 **直接 `haxelib run lime build` 会失败**，缺 MSVC/SDK 的环境变量。
 
 - hxcpp 缓存在 `.cache/hxcpp`，命中时直接拷 `.obj`
-- `assets/base_game` 是编译**之后**才铺进 bin 的（`BASE_GAME_FILES` 故意留在 `Project.xml` 的 officialBuild 段）
+- **源码 `assets/` 就是产物结构**（2026-11-23 拆了 base_game）：`0.6.3/`、`1.0.4/`、`body/`
+  三份各自完整，`Project.xml` 里每棵树自己声明自己的 week 目录。
+  以前那层 `assets/base_game`（470M 共享源）已经并进 `1.0.4/` 和 `body/` 了，别再往回加。
+  `manage.sh` 的铺素材步骤现在只是把 `assets/<版本>` 逐文件硬链接到 `bin/assets/<版本>`。
 - 无控制台环境（编辑器 / CI / 后台任务）带动作调用时会自动裹 `conhost --headless`，
   否则 haxe、cl、link 各弹一个黑框；真退出码走临时文件带出来（`conhost` 会把退出码吃成 0）
 - 跑游戏/跑测试一律不弹窗：`AutoTestState` 把窗口最小化 + 挪屏幕外 + 静音，
@@ -463,9 +466,10 @@ QuickJS 冒烟 26 项（run_qjs_test.sh）
 ## 6. 已知未修
 
 - ~~`weeb/` / `pauseAlt/` / `ui/` / `philly/` 素材在 bin 里不存在~~ —— 2026-11-13 晚修好：
-  根因是 `assets/base_game`（官方素材单一源，713 个文件）没被铺进 `bin/assets/<版本>/`，
+  根因是当时那个共享素材源（`assets/base_game`，713 个文件）没被铺进 `bin/assets/<版本>/`，
   连带两棵 1.0.4 树的 `shared/weeks/*.json`、`week*`、`songs`、`characters` 全都缺。
   现在由 `manage.sh` 的铺素材步骤（5 号功能）用硬链接补齐，已核对三棵树 0 缺。
+  （`base_game` 那一层 2026-11-23 已并进各版本目录，源就是 `assets/<版本>`。）
 - `noteSplashes` 的老式扁平图集如果**和 1.0 内置皮肤同名**，仍会被解析到内置皮肤（优先能加载的那个）。
 - `FlxUIDropDownMenuCustom` 这类依赖 flixel-ui 的类，1.0 已经没有对应库，接不了。
 - 画面层面的兼容（贴图位置、动画观感、UI 层级）这套测试看不出来，只能人眼验。

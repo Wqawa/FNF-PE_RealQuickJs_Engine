@@ -175,15 +175,19 @@ bash .workbuddy/tmp/build063.sh
 
 ```
 assets/
-  base_game/       共享的官方素材源，不打包，由 prep_assets.sh 铺进 bin
-  body/            修改版 1.0.4 —— fonts shared embed videos songs
-                   week_assets secrets translations
-  1.0.4/           原版 Psych Engine 1.0.4 —— 同样是上面那一套（复制品）
+  body/            修改版 1.0.4 —— fonts shared embed videos songs week1..week7
+                   weekend1 week_assets secrets translations，**完整**
+  1.0.4/           原版 Psych Engine 1.0.4 —— 同一套，也完整
+  0.6.3/           0.6.3 树 —— preload shared week1..week7 songs videos …
   exclude/ meta/   打包/发布用的，不参与运行时寻路，留在原处
 mods/
   body/            本体的 mod + modsList.txt
   1.0.4/           原版的 mod + modsList.txt
 ```
+
+（2026-11-23：原来那层 `assets/base_game` 共享素材源已经并进 `body/` 和 `1.0.4/`，
+源码结构现在和 `bin/assets/` 一一对应。代价是两份 1.0.4 素材各存一份，
+`1.0.4/` 和 `body/` 实际只差 3 个 credits 头像。）
 
 `body` 这个名字跟 `bin/engine.txt` 里的 `body` / `vanilla` 是同一套术语，`Engine.BODY` 现成能用。
 
@@ -230,8 +234,8 @@ public static var VERSION_DIR:String = '1.0.4';
 - **`assets/1.0.4` 不打包进 exe**，靠 `prep_assets.sh` 铺到 `bin/assets/1.0.4`。
   原版模式全靠磁盘文件，`existsOnDiskOrManifest()` 本来就先查磁盘，所以能读到。
   真要单文件分发时得把这块补上。
-- **`base_game` 在 1.0.4 那边用硬链接**（`cp -rl`），省 470M。改 `assets/base_game`
-  里的文件会同时影响两边 —— 它是共享素材源，本来就是给两边用的，不算 bug。
+- **`1.0.4/` 和 `body/` 现在各存一份完整素材**（2026-11-23 拆 base_game 的结果）。
+  以前是靠硬链接共享 470M；现在改一张图要改两处，除非它只属于一棵树。
 
 ## 六点六、0.6.3 也接进来了（2026-11-13 中午）
 

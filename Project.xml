@@ -110,6 +110,22 @@
 	<assets path="assets/body/songs"         exclude="*.mp3" unless="web"/>
 	<assets path="assets/body/week_assets"   rename="assets/body" exclude="*.ogg" if="web"/>
 	<assets path="assets/body/week_assets"   rename="assets/body" exclude="*.mp3" unless="web"/>
+	<assets path="assets/body/week1"         exclude="*.ogg" if="web"/>
+	<assets path="assets/body/week1"         exclude="*.mp3" unless="web"/>
+	<assets path="assets/body/week2"         exclude="*.ogg" if="web"/>
+	<assets path="assets/body/week2"         exclude="*.mp3" unless="web"/>
+	<assets path="assets/body/week3"         exclude="*.ogg" if="web"/>
+	<assets path="assets/body/week3"         exclude="*.mp3" unless="web"/>
+	<assets path="assets/body/week4"         exclude="*.ogg" if="web"/>
+	<assets path="assets/body/week4"         exclude="*.mp3" unless="web"/>
+	<assets path="assets/body/week5"         exclude="*.ogg" if="web"/>
+	<assets path="assets/body/week5"         exclude="*.mp3" unless="web"/>
+	<assets path="assets/body/week6"         exclude="*.ogg" if="web"/>
+	<assets path="assets/body/week6"         exclude="*.mp3" unless="web"/>
+	<assets path="assets/body/week7"         exclude="*.ogg" if="web"/>
+	<assets path="assets/body/week7"         exclude="*.mp3" unless="web"/>
+	<assets path="assets/body/weekend1"      exclude="*.ogg" if="web"/>
+	<assets path="assets/body/weekend1"      exclude="*.mp3" unless="web"/>
 	<section if="TITLE_SCREEN_EASTER_EGG">
 		<assets path="assets/body/secrets" rename="assets/body/shared" exclude="*.ogg" if="web"/>
 		<assets path="assets/body/secrets" rename="assets/body/shared" exclude="*.mp3"  unless="web"/>
@@ -131,6 +147,22 @@
 	<assets path="assets/1.0.4/songs"        exclude="*.mp3" unless="web"/>
 	<assets path="assets/1.0.4/week_assets"  rename="assets/1.0.4" exclude="*.ogg" if="web"/>
 	<assets path="assets/1.0.4/week_assets"  rename="assets/1.0.4" exclude="*.mp3" unless="web"/>
+	<assets path="assets/1.0.4/week1"        exclude="*.ogg" if="web"/>
+	<assets path="assets/1.0.4/week1"        exclude="*.mp3" unless="web"/>
+	<assets path="assets/1.0.4/week2"        exclude="*.ogg" if="web"/>
+	<assets path="assets/1.0.4/week2"        exclude="*.mp3" unless="web"/>
+	<assets path="assets/1.0.4/week3"        exclude="*.ogg" if="web"/>
+	<assets path="assets/1.0.4/week3"        exclude="*.mp3" unless="web"/>
+	<assets path="assets/1.0.4/week4"        exclude="*.ogg" if="web"/>
+	<assets path="assets/1.0.4/week4"        exclude="*.mp3" unless="web"/>
+	<assets path="assets/1.0.4/week5"        exclude="*.ogg" if="web"/>
+	<assets path="assets/1.0.4/week5"        exclude="*.mp3" unless="web"/>
+	<assets path="assets/1.0.4/week6"        exclude="*.ogg" if="web"/>
+	<assets path="assets/1.0.4/week6"        exclude="*.mp3" unless="web"/>
+	<assets path="assets/1.0.4/week7"        exclude="*.ogg" if="web"/>
+	<assets path="assets/1.0.4/week7"        exclude="*.mp3" unless="web"/>
+	<assets path="assets/1.0.4/weekend1"     exclude="*.ogg" if="web"/>
+	<assets path="assets/1.0.4/weekend1"     exclude="*.mp3" unless="web"/>
 	<section if="TITLE_SCREEN_EASTER_EGG">
 		<assets path="assets/1.0.4/secrets" rename="assets/1.0.4/shared" exclude="*.ogg" if="web"/>
 		<assets path="assets/1.0.4/secrets" rename="assets/1.0.4/shared" exclude="*.mp3"  unless="web"/>
@@ -157,6 +189,8 @@
 	<assets path="assets/0.6.3/songs" exclude="*.mp3" unless="web"/>
 	<assets path="assets/0.6.3/shared" exclude="*.ogg" if="web"/>
 	<assets path="assets/0.6.3/shared" exclude="*.mp3" unless="web"/>
+	<assets path="assets/0.6.3/week1" exclude="*.ogg" if="web"/>
+	<assets path="assets/0.6.3/week1" exclude="*.mp3" unless="web"/>
 	<assets path="assets/0.6.3/week2" exclude="*.ogg" if="web"/>
 	<assets path="assets/0.6.3/week2" exclude="*.mp3" unless="web"/>
 	<assets path="assets/0.6.3/week3" exclude="*.ogg" if="web"/>
@@ -170,11 +204,8 @@
 	<assets path="assets/0.6.3/week7" exclude="*.ogg" if="web"/>
 	<assets path="assets/0.6.3/week7" exclude="*.mp3" unless="web"/>
 
-	<section if="BASE_GAME_FILES">
-		<assets path="assets/base_game" rename="assets/body" exclude="*.ogg" if="web"/>
-		<assets path="assets/base_game" rename="assets/body" exclude="*.mp3"  unless="web"/>
-	</section>
-
+	<!-- 以前这里把 assets/base_game 整个 rename 成 assets/body，week 素材只有
+	     officialBuild 才进包。现在三棵树的素材各自完整，周目录直接在各自那段里声明。 -->
 	<define name="CHECK_FOR_UPDATES" if="desktop officialBuild"/>
 
 	<section if="MODS_ALLOWED">

@@ -122,9 +122,9 @@ QuickJS 的 arm64 静态库由 `bash manage.sh --zh qjsandroid` 编（8 号安�
 
 - 三棵树（body / 1.0.4 / 0.6.3）全编进去，`include('vanilla')` 不再按平台关。
   入口仍是 `source/Main.hx` 读 `engine.txt`，安卓上文件在工作目录里。
-- 三棵树的素材全打进 apk，外加 `assets/base_game`（桌面是 `prep_assets.sh` 事后铺，安卓没这一步，
-  Project.xml 里用 `<section if="android">` 把 base_game rename 到 `assets/body` 一起打）。
-  代价是包很大：现在 **565M**（body+base_game 879 项、1.0.4 278 项、0.6.3 681 项）。
+- 三棵树的素材全打进 apk。**这段是安卓还没剥离之前写的（2026-11 已回到纯桌面），当历史看**。
+  另外 `assets/base_game` 那一层 2026-11-23 已经并进各版本目录了，现在源码 `assets/` 就是
+  `0.6.3/`、`1.0.4/`、`body/` 三份各自完整，`Project.xml` 里各自声明自己的 week 目录。
 - `*.mp3` 在三棵树里都不打（`exclude="*.mp3" unless="web"`），和桌面一致：native 只认 ogg。
 - QuickJS 是另一份产物：`third_party/quickjs-ng/build/android-arm64/libquickjs-ng.a`，
   由 `manage.sh --zh qjsandroid` 用 NDK clang 编。`QuickJSHandler.hx` / `QuickJS.hx`
@@ -143,7 +143,7 @@ QuickJS 的 arm64 静态库由 `bash manage.sh --zh qjsandroid` 编（8 号安�
 - `Assets.getBitmapData('assets/body/...')` 拿得到图；`FileSystem.exists('assets/body/...')`
   是 false —— 工作目录在 `.realQuickJSEngine`，那儿没有 assets 目录。
 - `Paths` 的判断是「先磁盘、后编译期 manifest」，安卓上实际只剩 manifest 那一半。
-  **编译完再往 `bin/assets` 丢文件，安卓看不到**（桌面能看到，base_game 就是这么铺的）。
+  **编译完再往 `bin/assets` 丢文件，安卓看不到**（桌面能看到）。
 - 反过来，**工作目录里铺 `assets/<版本>/...` 是能读到的**：`Paths` 先 `FileSystem.exists`
   再退回清单，所以把整棵树拷到 `.realQuickJSEngine/assets/body/` 就能覆盖/补充素材，不用重打包。
   零散几张图、一首歌还是做成 `mods/<版本>/<名字>/` 更稳。
