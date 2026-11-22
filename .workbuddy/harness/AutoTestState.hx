@@ -238,10 +238,6 @@ class AutoTestState extends MusicBeatState
 		}
 		catch (e:Dynamic) trace('[autotest] dump failed: ' + e);
 	}
-	@:access(states.PlayState)
-	static function diagStreamedTrack():Bool
-		return PlayState.streamedTrack('bopeebo') != null;
-
 	@:access(flixel.system.frontEnds.BitmapFrontEnd._cache)
 	@:access(states.PlayState)
 	static function installProfile(duration:Float):Void
@@ -362,18 +358,7 @@ class AutoTestState extends MusicBeatState
 					+ ' nodata=' + (buf != null && buf.data == null);
 			}
 			sb.add('audio_streaming=' + musicStreaming + ' pref=' + ClientPrefs.data.streamAudio
-				+ ' viz_needed=' + PlayState.audioVizNeeded + ' ' + bufDetail
-				+ ' again=' + diagStreamedTrack() + '\n');
-
-			// 流式没生效时，用这两行定位：路径对不对、库函数有没有返回 null
-			sb.add('diag_path ' + Paths.getPath('bopeebo/Inst.ogg', openfl.utils.AssetType.SOUND, 'songs') + '\n');
-			#if (desktop && lime_vorbis)
-			var diagStream:Bool = false;
-			try diagStream = Paths.instStream('bopeebo') != null catch (e:Dynamic) trace('[diag] ' + e);
-			sb.add('diag_stream=' + diagStream + '\n');
-			#else
-			sb.add('diag_stream=#if off\n');
-			#end
+				+ ' viz_needed=' + PlayState.audioVizNeeded + ' ' + bufDetail + '\n');
 
 			sb.add('bitmaps total=' + profileMB(gfxBytes) + 'MB in ' + gfx + ' graphics\n');
 			var top:StringBuf = new StringBuf();
