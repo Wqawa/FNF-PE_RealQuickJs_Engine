@@ -173,8 +173,6 @@
 	<section if="BASE_GAME_FILES">
 		<assets path="assets/base_game" rename="assets/body" exclude="*.ogg" if="web"/>
 		<assets path="assets/base_game" rename="assets/body" exclude="*.mp3"  unless="web"/>
-		<haxelib name="grig.audio" if="BASE_GAME_FILES"/>
-		<haxelib name="funkin.vis" if="BASE_GAME_FILES"/>
 	</section>
 
 	<define name="CHECK_FOR_UPDATES" if="desktop officialBuild"/>
@@ -209,6 +207,14 @@
 	<haxelib name="hxvlc" if="VIDEOS_ALLOWED" version="2.0.1"/>
 	<haxelib name="hxdiscord_rpc" version="1.2.4" if="DISCORD_ALLOWED"/>
 	<haxelib name="flxanimate"/>
+
+	<!-- Week 8 的 Abot 音响要频谱：ABotSpeaker 的 viz 整段都在 #if funkin.vis 里，
+	     声卡分析器不在的话 7 根音波条会停在最低点不动。这两个以前挂在
+	     BASE_GAME_FILES 下面，而那个 define 只在 officialBuild 里开，所以本地编译
+	     永远没有分析器。grig.audio 是 funkin.vis 的依赖（SpectralAnalyzer 直接
+	     import grig.audio.FFT），必须一起放出来。 -->
+	<haxelib name="grig.audio" if="desktop"/>
+	<haxelib name="funkin.vis" if="desktop"/>
 
 	<!-- Disable Discord IO Thread -->
 	<haxedef name="DISCORD_DISABLE_IO_THREAD" if="hxdiscord_rpc" />
