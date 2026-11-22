@@ -45,6 +45,12 @@ class GraphicsSettingsSubState extends BaseOptionsMenu
 			BOOL);
 		addOption(option);
 
+		var option:Option = new Option('Stream Audio',
+			"If checked, song audio is read from disk while playing instead of\nbeing decoded into memory up front. Saves a lot of RAM.\nOnly affects the song tracks, not sound effects.",
+			'streamAudio',
+			BOOL);
+		addOption(option);
+
 		#if !html5 //Apparently other framerates isn't correctly supported on Browser? Probably it has some V-Sync shit enabled by default, idk
 		var option:Option = new Option('Framerate',
 			"Pretty self explanatory, isn't it?",

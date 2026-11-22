@@ -39,12 +39,6 @@ class GameplaySettingsSubState extends BaseOptionsMenu
 			['Troll', 'QuickJS']);
 		addOption(option);
 
-		var option:Option = new Option('Stream Audio',
-			"If checked, song audio is read from disk as it plays\ninstead of being decoded into memory up front.\nOnly affects the song tracks, not sound effects.",
-			'streamAudio',
-			BOOL);
-		addOption(option);
-
 		var option:Option = new Option('Auto Pause',
 			"If checked, the game automatically pauses if the screen isn't on focus.",
 			'autoPause',
