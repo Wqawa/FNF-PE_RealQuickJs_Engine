@@ -8,6 +8,7 @@ import shaders.RGBPalette.RGBShaderReference;
 
 import objects.StrumNote;
 
+import flixel.graphics.frames.FlxAtlasFrames;
 import flixel.math.FlxRect;
 
 import openfl.utils.AssetType;
@@ -382,6 +383,30 @@ class Note extends FlxSprite
 
 	var _lastNoteOffX:Float = 0;
 	static var _lastValidChecked:String; //optimization
+
+	// Every note used to parse its skin's xml on its own, so a 1000-note chart read and split
+	// the same file 1000 times and kept 1000 identical frame lists alive. One collection is
+	// shared now, like any other sprite atlas. Keyed by mod because the same skin name
+	// resolves into whichever mod is loaded.
+	static var _atlasCache:Map<String, FlxAtlasFrames> = new Map<String, FlxAtlasFrames>();
+
+	public static function noteAtlas(skin:String):FlxAtlasFrames
+	{
+		var key:String = (Mods.currentModDirectory == null ? '' : Mods.currentModDirectory) + '|' + skin;
+
+		var cached:FlxAtlasFrames = _atlasCache.get(key);
+		if(cached != null)
+		{
+			// Paths.clearStoredMemory() can drop the graphic underneath, rebuild if so
+			if(cached.parent != null && cached.parent.bitmap != null) return cached;
+			_atlasCache.remove(key);
+		}
+
+		var made:FlxAtlasFrames = Paths.getSparrowAtlas(skin);
+		if(made != null) _atlasCache.set(key, made);
+		return made;
+	}
+
 	public var originalHeight:Float = 6;
 	public var correctionOffset:Float = 0; //dont mess with this
 	public function reloadNote(texture:String = '', postfix:String = '') {
@@ -435,7 +460,7 @@ class Note extends FlxSprite
 				offsetX -= _lastNoteOffX;
 			}
 		} else {
-			frames = Paths.getSparrowAtlas(skin);
+			frames = noteAtlas(skin);
 			loadNoteAnims();
 			if(!isSustainNote)
 			{
