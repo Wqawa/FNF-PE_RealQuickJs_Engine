@@ -36,10 +36,17 @@ class AutoTestState extends MusicBeatState
 
 		#if desktop
 		// 默认把窗口挪到屏幕外 + 最小化，不弹到桌面上、不抢焦点；要截游戏画面就设 PE_AUTOTEST_SHOW=1。
+		// PE_AUTOTEST_SHOW=2 = 可见但挪出屏幕：测帧率时用，隐藏的窗口会被系统降到 ~24fps。
 		var show:Null<String> = Sys.getEnv('PE_AUTOTEST_SHOW');
-		var visible:Bool = (show != null && show == '1');
+		var offscreen:Bool = (show != null && show == '2');
+		var visible:Bool = (show != null && (show == '1' || offscreen));
 		var win = lime.app.Application.current.window;
-		if(win != null && !visible)
+		if(win != null && offscreen)
+		{
+			win.x = -4000;
+			win.y = -4000;
+		}
+		else if(win != null && !visible)
 		{
 			win.x = -4000;
 			win.y = -4000;
@@ -148,6 +155,13 @@ class AutoTestState extends MusicBeatState
 			});
 		}
 
+		// 性能探针：PE_AUTOTEST_PROFILE=秒数 时统计每帧 CPU/间隔/内存，跑完写 profile.txt 退出
+		#if (desktop && cpp)
+		var profSec:Null<String> = Sys.getEnv('PE_AUTOTEST_PROFILE');
+		if (profSec != null && profSec.length > 0 && profSec != '0')
+			installProfile(Std.parseFloat(profSec));
+		#end
+
 		LoadingState.prepareToSong();
 		LoadingState.loadAndSwitchState(new PlayState());
 	}
@@ -220,5 +234,132 @@ class AutoTestState extends MusicBeatState
 		}
 		catch (e:Dynamic) trace('[autotest] dump failed: ' + e);
 	}
+	@:access(flixel.system.frontEnds.BitmapFrontEnd._cache)
+	@:access(states.PlayState)
+	static function installProfile(duration:Float):Void
+	{
+		var cpu:Array<Float> = [];
+		var gap:Array<Float> = [];
+		var memUse:Array<Int> = [];
+		var memCur:Array<Int> = [];
+		var started:Bool = false;
+		var tStart:Float = 0;
+		var tPrev:Float = 0;
+		var tPre:Float = 0;
+		var lastMem:Float = -1;
+
+		trace('[profile] armed, will sample ' + duration + 's after the song starts');
+
+		FlxG.signals.preUpdate.add(function() tPre = haxe.Timer.stamp());
+
+		FlxG.signals.postDraw.add(function()
+		{
+			var now:Float = haxe.Timer.stamp();
+			var ps:PlayState = PlayState.instance;
+
+			// 等谱面真开跑，loading 和倒计时那段不算
+			if (!started)
+			{
+				if (ps == null || !ps.startedCountdown) return;
+				started = true;
+				tStart = tPrev = now;
+				lastMem = now;
+				memUse.push(profileMem(0));
+				memCur.push(profileMem(2));
+				return;
+			}
+
+			cpu.push((now - tPre) * 1000);
+			gap.push((now - tPrev) * 1000);
+			tPrev = now;
+
+			if (now - lastMem >= 1.0)
+			{
+				lastMem = now;
+				memUse.push(profileMem(0));
+				memCur.push(profileMem(2));
+			}
+
+			if (now - tStart < duration) return;
+
+			// 收尾：再抓一次内存，音符/图集计数一起写出去
+			memUse.push(profileMem(0));
+			memCur.push(profileMem(2));
+
+			var sb:StringBuf = new StringBuf();
+			sb.add('song=' + (PlayState.SONG != null ? PlayState.SONG.song : '?')
+				+ ' stage=' + (PlayState.SONG != null ? PlayState.SONG.stage : '?')
+				+ ' frames=' + cpu.length + ' seconds=' + duration + '\n');
+			var win = lime.app.Application.current.window;
+			sb.add('loop draw=' + FlxG.drawFramerate + ' update=' + FlxG.updateFramerate
+				+ ' pref=' + ClientPrefs.data.framerate
+				+ ' win=' + (win != null ? (win.visible ? 'visible' : 'hidden') + (win.minimized ? '/min' : '') : 'null')
+				+ '\n');
+
+			var cpuS:Array<Float> = cpu.copy();
+			cpuS.sort(function(a, b) return a < b ? -1 : (a > b ? 1 : 0));
+			var gapS:Array<Float> = gap.copy();
+			gapS.sort(function(a, b) return a < b ? -1 : (a > b ? 1 : 0));
+
+			sb.add('cpu_ms  avg=' + profileFixed(profileAvg(cpu)) + ' med=' + profileFixed(profilePct(cpuS, 0.5))
+				+ ' p95=' + profileFixed(profilePct(cpuS, 0.95)) + ' max=' + profileFixed(profilePct(cpuS, 1.0)) + '\n');
+			sb.add('gap_ms  avg=' + profileFixed(profileAvg(gap)) + ' med=' + profileFixed(profilePct(gapS, 0.5))
+				+ ' p95=' + profileFixed(profilePct(gapS, 0.95)) + ' max=' + profileFixed(profilePct(gapS, 1.0)) + '\n');
+			sb.add('fps_avg=' + profileFixed(1000 / Math.max(0.001, profileAvg(gap))) + '\n');
+
+			sb.add('mem_use_mb   start=' + profileMB(memUse[0]) + ' end=' + profileMB(memUse[memUse.length - 1])
+				+ ' peak=' + profileMB(profileMax(memUse)) + '\n');
+			sb.add('mem_cur_mb   peak=' + profileMB(profileMax(memCur)) + '\n');
+			var perSec:StringBuf = new StringBuf();
+			for (m in memUse) perSec.add(profileMB(m) + ' ');
+			sb.add('mem_use_each_second ' + perSec.toString() + '\n');
+
+			var gfx:Int = 0;
+			for (k in FlxG.bitmap._cache.keys()) gfx++;
+			sb.add('counts notes=' + ps.notes.length + ' unspawn=' + ps.unspawnNotes.length
+				+ ' graphics=' + gfx
+				#if LUA_ALLOWED + ' lua=' + ps.luaArray.length #end
+				#if HSCRIPT_ALLOWED + ' hscript=' + ps.hscriptArray.length #end
+				+ '\n');
+
+			try sys.io.File.saveContent('./testout/profile.txt', sb.toString())
+			catch (e:Dynamic) trace('[profile] write failed: ' + e);
+
+			trace('[profile] done');
+			Sys.exit(0);
+		});
+	}
+
+	static inline function profileMem(what:Int):Int
+		return cpp.vm.Gc.memInfo(what);
+
+	static function profileAvg(a:Array<Float>):Float
+	{
+		if (a.length == 0) return 0;
+		var s:Float = 0;
+		for (v in a) s += v;
+		return s / a.length;
+	}
+
+	static function profileMax(a:Array<Int>):Int
+	{
+		var m:Int = 0;
+		for (v in a) if (v > m) m = v;
+		return m;
+	}
+
+	static function profilePct(sorted:Array<Float>, p:Float):Float
+	{
+		if (sorted.length == 0) return 0;
+		var i:Int = Std.int((sorted.length - 1) * p);
+		return sorted[i];
+	}
+
+	static inline function profileFixed(v:Float):String
+		return Std.string(Math.round(v * 100) / 100);
+
+	static inline function profileMB(bytes:Int):String
+		return Std.string(Math.round(bytes / 1048576 * 10) / 10);
+
 	#end
 }
