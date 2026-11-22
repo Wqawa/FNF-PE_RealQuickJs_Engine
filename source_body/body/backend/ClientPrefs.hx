@@ -42,6 +42,7 @@ import states.TitleState;
 		[0xFFFF884E, 0xFFFFFAF5, 0xFF6C0000]];
 
 	public var ghostTapping:Bool = true;
+	public var streamAudio:Bool = false; // read song audio off disk while playing, see Paths.streamSound
 	public var timeBarType:String = 'Time Left';
 	public var scoreZoom:Bool = true;
 	public var noReset:Bool = false;
@@ -161,6 +162,10 @@ class ClientPrefs {
 	public static var ghostTapping(get, set):Bool;
 	static inline function get_ghostTapping():Bool return data.ghostTapping;
 	static inline function set_ghostTapping(v:Bool):Bool return data.ghostTapping = v;
+
+	public static var streamAudio(get, set):Bool;
+	static inline function get_streamAudio():Bool return data.streamAudio;
+	static inline function set_streamAudio(v:Bool):Bool return data.streamAudio = v;
 
 	public static var timeBarType(get, set):String;
 	static inline function get_timeBarType():String return data.timeBarType;

@@ -78,6 +78,10 @@ class AutoTestState extends MusicBeatState
 		var jsEng:Null<String> = Sys.getEnv('PE_AUTOTEST_JSENGINE');
 		if(jsEng != null && jsEng.length > 0) ClientPrefs.data.jsEngine = jsEng;
 
+		// 音频流式开关：只改内存里的值，Sys.exit 前不落盘，不会污染存档
+		var streamAudio:Null<String> = Sys.getEnv('PE_AUTOTEST_STREAMAUDIO');
+		if(streamAudio != null && streamAudio.length > 0) ClientPrefs.data.streamAudio = (streamAudio == '1');
+
 		try
 		{
 			// 测 mod 里的歌要先切到那个 mod，否则 Paths 根本找不到它的 data/
@@ -234,6 +238,10 @@ class AutoTestState extends MusicBeatState
 		}
 		catch (e:Dynamic) trace('[autotest] dump failed: ' + e);
 	}
+	@:access(states.PlayState)
+	static function diagStreamedTrack():Bool
+		return PlayState.streamedTrack('bopeebo') != null;
+
 	@:access(flixel.system.frontEnds.BitmapFrontEnd._cache)
 	@:access(states.PlayState)
 	static function installProfile(duration:Float):Void
@@ -247,6 +255,7 @@ class AutoTestState extends MusicBeatState
 		var tPrev:Float = 0;
 		var tPre:Float = 0;
 		var lastMem:Float = -1;
+		var heapLine:String = '';
 
 		trace('[profile] armed, will sample ' + duration + 's after the song starts');
 
@@ -266,6 +275,16 @@ class AutoTestState extends MusicBeatState
 				lastMem = now;
 				memUse.push(profileMem(0));
 				memCur.push(profileMem(2));
+
+				// Immix 默认回收后留 100% 空闲区（存活量翻倍），先量一下 compact 前后的四个数
+				var u0:Int = profileMem(0), r0:Int = profileMem(1), c0:Int = profileMem(2);
+				var tt:Float = haxe.Timer.stamp();
+				cpp.vm.Gc.compact();
+				var compactMs:Int = Math.round((haxe.Timer.stamp() - tt) * 1000);
+				heapLine = 'heap usage=' + profileMB(u0) + '/' + profileMB(profileMem(0))
+					+ ' reserved=' + profileMB(r0) + '/' + profileMB(profileMem(1))
+					+ ' current=' + profileMB(c0) + '/' + profileMB(profileMem(2))
+					+ ' compact=' + compactMs + 'ms (before/after)\n';
 				return;
 			}
 
@@ -315,7 +334,53 @@ class AutoTestState extends MusicBeatState
 			sb.add('mem_use_each_second ' + perSec.toString() + '\n');
 
 			var gfx:Int = 0;
-			for (k in FlxG.bitmap._cache.keys()) gfx++;
+			var gfxBytes:Int = 0;
+			var big:Array<{k:String, b:Int}> = [];
+			for (k in FlxG.bitmap._cache.keys())
+			{
+				var g:flixel.graphics.FlxGraphic = FlxG.bitmap._cache.get(k);
+				if (g == null) continue;
+				gfx++;
+				var b:Int = Std.int(g.width * g.height * 4);
+				gfxBytes += b;
+				big.push({k: k, b: b});
+			}
+			big.sort(function(a, b) return b.b - a.b);
+
+			sb.add(heapLine);
+
+			// 音乐到底是不是流式源：__srcVorbisFile 有值、data 为空就是
+			// 走 Dynamic 读私有字段，省得 @:privateAccess 用在这里不生效
+			var music:Dynamic = FlxG.sound.music;
+			var musicStreaming:Bool = false;
+			var bufDetail:String = 'nobuf';
+			if(music != null && music._sound != null)
+			{
+				var buf:Dynamic = music._sound.__buffer;
+				musicStreaming = buf != null && buf.__srcVorbisFile != null && buf.data == null;
+				bufDetail = 'buf=' + (buf != null) + ' vorbis=' + (buf != null && buf.__srcVorbisFile != null)
+					+ ' nodata=' + (buf != null && buf.data == null);
+			}
+			sb.add('audio_streaming=' + musicStreaming + ' pref=' + ClientPrefs.data.streamAudio
+				+ ' viz_needed=' + PlayState.audioVizNeeded + ' ' + bufDetail
+				+ ' again=' + diagStreamedTrack() + '\n');
+
+			// 流式没生效时，用这两行定位：路径对不对、库函数有没有返回 null
+			sb.add('diag_path ' + Paths.getPath('bopeebo/Inst.ogg', openfl.utils.AssetType.SOUND, 'songs') + '\n');
+			#if (desktop && lime_vorbis)
+			var diagStream:Bool = false;
+			try diagStream = Paths.instStream('bopeebo') != null catch (e:Dynamic) trace('[diag] ' + e);
+			sb.add('diag_stream=' + diagStream + '\n');
+			#else
+			sb.add('diag_stream=#if off\n');
+			#end
+
+			sb.add('bitmaps total=' + profileMB(gfxBytes) + 'MB in ' + gfx + ' graphics\n');
+			var top:StringBuf = new StringBuf();
+			for (i in 0...Std.int(Math.min(8, big.length)))
+				top.add(big[i].k + '=' + Std.int(big[i].b / 1024) + 'K ');
+			sb.add('bitmaps_top ' + top.toString() + '\n');
+
 			sb.add('counts notes=' + ps.notes.length + ' unspawn=' + ps.unspawnNotes.length
 				+ ' graphics=' + gfx
 				#if LUA_ALLOWED + ' lua=' + ps.luaArray.length #end

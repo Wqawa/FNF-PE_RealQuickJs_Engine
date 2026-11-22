@@ -280,6 +280,8 @@ class PlayState extends MusicBeatState
 
 	// Lua shit
 	public static var instance:PlayState;
+	// a stage that needs to analyse the song audio sets this before generateSong() runs
+	public static var audioVizNeeded:Bool = false;
 	#if LUA_ALLOWED public var luaArray:Array<FunkinLua> = []; #end
 
 	#if (LUA_ALLOWED || HSCRIPT_ALLOWED)
@@ -302,6 +304,9 @@ class PlayState extends MusicBeatState
 		//trace('Playback Rate: ' + playbackRate);
 		_lastLoadedModDirectory = Mods.currentModDirectory;
 		Paths.clearStoredMemory();
+		// stages that run a SpectrumAnalyzer on the music need the pcm in memory, so they
+		// opt out of streaming. Set by ABotSpeaker, read when the tracks get loaded.
+		audioVizNeeded = false;
 		if(nextReloadAll)
 		{
 			Paths.clearUnusedMemory();
@@ -1289,6 +1294,31 @@ class PlayState extends MusicBeatState
 	private var eventsPushed:Array<String> = [];
 	private var totalColumns: Int = 4;
 
+	// stages that build an ABotSpeaker read the song pcm for its spectrum analyser
+	public static function stageWantsAudioViz(stage:String):Bool
+		return stage == 'phillyStreets' || stage == 'phillyBlazin';
+
+	// Returns null when streaming is off (or the stage needs the pcm for its analyser), and
+	// the caller falls back to the normal embedded load. postfix null means the instrumental.
+	static function streamedTrack(song:String, ?postfix:String):openfl.media.Sound
+	{
+		#if (desktop && lime_vorbis)
+		if(ClientPrefs.data.streamAudio && !audioVizNeeded
+			&& !stageWantsAudioViz(SONG != null ? SONG.stage : null))
+		{
+			var made:openfl.media.Sound = null;
+			try
+			{
+				made = postfix == null ? Paths.instStream(song) : Paths.voicesStream(song, postfix);
+			}
+			catch (e:Dynamic) {}
+
+			if (made != null) return made;
+		}
+		#end
+		return null;
+	}
+
 	private function generateSong():Void
 	{
 		// FlxG.log.add(ChartParser.parse());
@@ -1313,10 +1343,14 @@ class PlayState extends MusicBeatState
 		{
 			if (songData.needsVoices)
 			{
-				var playerVocals = Paths.voices(songData.song, (boyfriend.vocalsFile == null || boyfriend.vocalsFile.length < 1) ? 'Player' : boyfriend.vocalsFile);
+				var playerPostfix:String = (boyfriend.vocalsFile == null || boyfriend.vocalsFile.length < 1) ? 'Player' : boyfriend.vocalsFile;
+				var playerVocals = streamedTrack(songData.song, playerPostfix);
+				if(playerVocals == null) playerVocals = Paths.voices(songData.song, playerPostfix);
 				vocals.loadEmbedded(playerVocals != null ? playerVocals : Paths.voices(songData.song));
-				
-				var oppVocals = Paths.voices(songData.song, (dad.vocalsFile == null || dad.vocalsFile.length < 1) ? 'Opponent' : dad.vocalsFile);
+
+				var oppPostfix:String = (dad.vocalsFile == null || dad.vocalsFile.length < 1) ? 'Opponent' : dad.vocalsFile;
+				var oppVocals = streamedTrack(songData.song, oppPostfix);
+				if(oppVocals == null) oppVocals = Paths.voices(songData.song, oppPostfix);
 				if(oppVocals != null && oppVocals.length > 0) opponentVocals.loadEmbedded(oppVocals);
 			}
 		}
@@ -1332,7 +1366,8 @@ class PlayState extends MusicBeatState
 		inst = new FlxSound();
 		try
 		{
-			inst.loadEmbedded(Paths.inst(songData.song));
+			var streamedInst = streamedTrack(songData.song, null);
+			inst.loadEmbedded(streamedInst != null ? streamedInst : Paths.inst(songData.song));
 		}
 		catch (e:Dynamic) {}
 		FlxG.sound.list.add(inst);

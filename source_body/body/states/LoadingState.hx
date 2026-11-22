@@ -661,7 +661,8 @@ class LoadingState extends MusicBeatState
 	public static function startThreads()
 	{
 		mutex = new Mutex();
-		loadMax = imagesToPrepare.length + soundsToPrepare.length + musicToPrepare.length + songsToPrepare.length;
+		loadMax = imagesToPrepare.length + soundsToPrepare.length + musicToPrepare.length
+			+ (skipSongPreload() ? 0 : songsToPrepare.length);
 		loaded = 0;
 
 		//then start threads
@@ -673,14 +674,20 @@ class LoadingState extends MusicBeatState
 		_startPool();
 		for (sound in soundsToPrepare) initThread(() -> preloadSound('sounds/$sound'), 'sound $sound');
 		for (music in musicToPrepare) initThread(() -> preloadSound('music/$music'), 'music $music');
-		for (song in songsToPrepare) initThread(() -> preloadSound(song, 'songs', true, false), 'song $song');
+		if (!skipSongPreload())
+			for (song in songsToPrepare) initThread(() -> preloadSound(song, 'songs', true, false), 'song $song');
 
 		// for images, they get to have their own thread
 		for (image in imagesToPrepare) initThread(() -> preloadGraphic(image), 'image $image');
 	}
 
-	static function initThread(func:Void->Dynamic, traceData:String)
-	{
+	// Streaming reads the song tracks off disk while playing, so decoding them here would
+	// just leave a second copy in memory. Viz stages still need the pcm, they keep the preload.
+	static function skipSongPreload():Bool
+		return ClientPrefs.data.streamAudio
+			&& !PlayState.stageWantsAudioViz(PlayState.SONG != null ? PlayState.SONG.stage : null);
+
+	static function initThread(func:Void->Dynamic, traceData:String)	{
 		// trace('scheduled $func in threadPool');
 		#if debug
 		var threadSchedule = Sys.time();

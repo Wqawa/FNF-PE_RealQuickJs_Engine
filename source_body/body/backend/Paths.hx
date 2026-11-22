@@ -296,6 +296,32 @@ class Paths
 		return returnSound(songKey, 'songs', modsAllowed, false);
 	}
 
+	// Same lookup as returnSound, but the pcm stays on disk and lime feeds it through a
+	// ring buffer while playing. Only the song tracks use this (see ClientPrefs.streamAudio);
+	// effects and anything a script creates still go through returnSound.
+	#if (desktop && lime_vorbis)
+	public static function streamSound(key:String, ?path:String, ?modsAllowed:Bool = true):Sound
+	{
+		var file:String = getPath(Language.getFileTranslation(key) + '.$SOUND_EXT', SOUND, path, modsAllowed);
+		if(!FileSystem.exists(file)) return null;
+
+		var vorbis:lime.media.vorbis.VorbisFile = lime.media.vorbis.VorbisFile.fromFile(file);
+		if(vorbis == null) return null;
+
+		return Sound.fromAudioBuffer(lime.media.AudioBuffer.fromVorbisFile(vorbis));
+	}
+
+	inline static public function instStream(song:String, ?modsAllowed:Bool = true):Sound
+		return streamSound('${formatToSongPath(song)}/Inst', 'songs', modsAllowed);
+
+	inline static public function voicesStream(song:String, postfix:String = null, ?modsAllowed:Bool = true):Sound
+	{
+		var songKey:String = '${formatToSongPath(song)}/Voices';
+		if(postfix != null) songKey += '-' + postfix;
+		return streamSound(songKey, 'songs', modsAllowed);
+	}
+	#end
+
 	inline static public function soundRandom(key:String, min:Int, max:Int, ?modsAllowed:Bool = true)
 		return sound(key + FlxG.random.int(min, max), modsAllowed);
 

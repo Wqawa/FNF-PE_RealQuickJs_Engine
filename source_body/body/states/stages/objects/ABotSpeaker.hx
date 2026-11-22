@@ -35,6 +35,10 @@ class ABotSpeaker extends FlxSpriteGroup
 	{
 		super(x, y);
 
+		// the analyser reads the decoded pcm off the music channel, so tell PlayState to keep
+		// the song tracks decoded instead of streaming them
+		PlayState.audioVizNeeded = true;
+
 		var antialias = ClientPrefs.data.antialiasing;
 
 		bg = new FlxSprite(90, 20).loadGraphic(Paths.image('abot/stereoBG'));
@@ -120,8 +124,30 @@ class ABotSpeaker extends FlxSpriteGroup
 	#if funkin.vis
 	public function initAnalyzer()
 	{
-		@:privateAccess
-		analyzer = new SpectralAnalyzer(snd._channel.__audioSource, 7, 0.1, 40);
+		// A streamed track keeps its pcm on disk, so the fft has nothing to read.
+		// Leave the bars resting at the bottom instead of crashing on the null buffer.
+		if(snd == null)
+		{
+			analyzer = null;
+			return;
+		}
+
+		var channel:Dynamic = null;
+		@:privateAccess channel = snd._channel;
+
+		var source:Dynamic = null;
+		if(channel != null)
+		{
+			@:privateAccess source = channel.__audioSource;
+		}
+
+		if(source == null || source.buffer == null || source.buffer.data == null)
+		{
+			analyzer = null;
+			return;
+		}
+
+		@:privateAccess analyzer = new SpectralAnalyzer(source, 7, 0.1, 40);
 	
 		#if desktop
 		// On desktop it uses FFT stuff that isn't as optimized as the direct browser stuff we use on HTML5
