@@ -119,45 +119,66 @@ class PlayStateJudge
 		ps.callOnScripts('onKeyRelease', [key]);
 	}
 
+	// reused across frames: keysCheck runs 60 times a second and these used to be
+	// three fresh arrays every call
+	static var holdArray:Array<Bool> = [];
+	static var pressArray:Array<Bool> = [];
+	static var releaseArray:Array<Bool> = [];
+	static var anyHeld:Bool = false;
+	static var anyPressed:Bool = false;
+	static var anyReleased:Bool = false;
+
 	public static function keysCheck(ps:PlayState):Void
 	{
 		// HOLDING
-		var holdArray:Array<Bool> = [];
-		var pressArray:Array<Bool> = [];
-		var releaseArray:Array<Bool> = [];
-		for (key in ps.keysArray)
+		var count:Int = ps.keysArray.length;
+		if(holdArray.length != count)
 		{
-			holdArray.push(ps.controls.pressed(key));
-			pressArray.push(ps.controls.justPressed(key));
-			releaseArray.push(ps.controls.justReleased(key));
+			holdArray.resize(count);
+			pressArray.resize(count);
+			releaseArray.resize(count);
+		}
+
+		anyHeld = anyPressed = anyReleased = false;
+		for (i in 0...count)
+		{
+			var key = ps.keysArray[i];
+			var held:Bool = ps.controls.pressed(key);
+			var pressed:Bool = ps.controls.justPressed(key);
+			var released:Bool = ps.controls.justReleased(key);
+
+			holdArray[i] = held;
+			pressArray[i] = pressed;
+			releaseArray[i] = released;
+
+			if(held) anyHeld = true;
+			if(pressed) anyPressed = true;
+			if(released) anyReleased = true;
 		}
 
 		// TO DO: Find a better way to handle controller inputs, this should work for now
-		if(ps.controls.controllerMode && pressArray.contains(true))
-			for (i in 0...pressArray.length)
+		if(ps.controls.controllerMode && anyPressed)
+			for (i in 0...count)
 				if(pressArray[i] && ps.strumsBlocked[i] != true)
 					ps.keyPressed(i);
 
+		// nothing is held down, so no sustain can be hit: skip the whole note scan
 		if (ps.startedCountdown && !ps.inCutscene && !ps.boyfriend.stunned && ps.generatedMusic)
 		{
-			if (ps.notes.length > 0) {
+			if (anyHeld && ps.notes.length > 0) {
 				for (n in ps.notes) { // I can't do a filter here, that's kinda awesome
-					var canHit:Bool = (n != null && !ps.strumsBlocked[n.noteData] && n.canBeHit
-						&& n.mustPress && !n.tooLate && !n.wasGoodHit && !n.blockHit);
+					// cheapest checks first, this loop runs over every spawned note
+					if (n == null || !n.isSustainNote || !n.canBeHit) continue;
+					if (!n.mustPress || n.tooLate || n.wasGoodHit || n.blockHit) continue;
+					if (ps.strumsBlocked[n.noteData]) continue;
+					if (ps.guitarHeroSustains && (n.parent == null || !n.parent.wasGoodHit)) continue;
 
-					if (ps.guitarHeroSustains)
-						canHit = canHit && n.parent != null && n.parent.wasGoodHit;
-
-					if (canHit && n.isSustainNote) {
-						var released:Bool = !holdArray[n.noteData];
-
-						if (!released)
-							ps.goodNoteHit(n);
-					}
+					if (holdArray[n.noteData])
+						ps.goodNoteHit(n);
 				}
 			}
 
-			if (!holdArray.contains(true) || ps.endingSong)
+			if (!anyHeld || ps.endingSong)
 				ps.playerDance();
 
 			#if ACHIEVEMENTS_ALLOWED
@@ -166,8 +187,8 @@ class PlayStateJudge
 		}
 
 		// TO DO: Find a better way to handle controller inputs, this should work for now
-		if((ps.controls.controllerMode || ps.strumsBlocked.contains(true)) && releaseArray.contains(true))
-			for (i in 0...releaseArray.length)
+		if((ps.controls.controllerMode || ps.strumsBlocked.contains(true)) && anyReleased)
+			for (i in 0...count)
 				if(releaseArray[i] || ps.strumsBlocked[i] == true)
 					ps.keyReleased(i);
 	}

@@ -246,6 +246,9 @@ class PlayState extends MusicBeatState
 	public var scoreTxt:FlxText;
 	var timeTxt:FlxText;
 	var scoreTxtTween:FlxTween;
+	// last values written to timeTxt, so update() only touches the text when it changes
+	var lastTimeSeconds:Int = -1;
+	var lastTimeBarType:String = '';
 
 	public static var campaignScore:Int = 0;
 	public static var campaignMisses:Int = 0;
@@ -1716,11 +1719,7 @@ class PlayState extends MusicBeatState
 
 		super.update(elapsed);
 
-		setOnScripts('curDecStep', curDecStep);
-		setOnScripts('curDecBeat', curDecBeat);
-		// 0.7.x always synced camera scroll to scripts; old mods use it for parallax
-		setOnScripts('cameraX', camFollow.x);
-		setOnScripts('cameraY', camFollow.y);
+		pushFrameScriptVars();
 
 		if(botplayTxt != null && botplayTxt.visible) {
 			botplaySine += 180 * elapsed;
@@ -1780,8 +1779,15 @@ class PlayState extends MusicBeatState
 			var secondsTotal:Int = Math.floor(songCalc / 1000);
 			if(secondsTotal < 0) secondsTotal = 0;
 
-			if(ClientPrefs.data.timeBarType != 'Song Name')
+			// the clock only moves once a second, rewriting the text (and making openfl
+			// re-lay it out) every frame was pure waste
+			var barType:String = ClientPrefs.data.timeBarType;
+			if(barType != 'Song Name' && (secondsTotal != lastTimeSeconds || barType != lastTimeBarType))
+			{
+				lastTimeSeconds = secondsTotal;
+				lastTimeBarType = barType;
 				timeTxt.text = FlxStringUtil.formatTime(secondsTotal, false);
+			}
 		}
 
 		if (camZooming)
@@ -1789,10 +1795,6 @@ class PlayState extends MusicBeatState
 			FlxG.camera.zoom = FlxMath.lerp(defaultCamZoom, FlxG.camera.zoom, Math.exp(-elapsed * 3.125 * camZoomingDecay * playbackRate));
 			camHUD.zoom = FlxMath.lerp(1, camHUD.zoom, Math.exp(-elapsed * 3.125 * camZoomingDecay * playbackRate));
 		}
-
-		FlxG.watch.addQuick("secShit", curSection);
-		FlxG.watch.addQuick("beatShit", curBeat);
-		FlxG.watch.addQuick("stepShit", curStep);
 
 		// RESET = Quick Game Over Screen
 		if (!ClientPrefs.data.noReset && controls.RESET && canReset && !inCutscene && startedCountdown && !endingSong)
@@ -1810,15 +1812,18 @@ class PlayState extends MusicBeatState
 
 			while (unspawnNotes.length > 0 && unspawnNotes[0].strumTime - Conductor.songPosition < time)
 			{
-				var dunceNote:Note = unspawnNotes[0];
+				// always the head of the list, so shift() instead of indexOf() + splice()
+				var dunceNote:Note = unspawnNotes.shift();
 				notes.insert(0, dunceNote);
 				dunceNote.spawned = true;
 
-				callOnLuas('onSpawnNote', [notes.members.indexOf(dunceNote), dunceNote.noteData, dunceNote.noteType, dunceNote.isSustainNote, dunceNote.strumTime]);
+				// the index is only for lua, don't scan the whole group when nothing listens
+				var luaIndex:Int = -1;
+				#if LUA_ALLOWED
+				if(luaArray != null && luaArray.length > 0) luaIndex = notes.members.indexOf(dunceNote);
+				#end
+				callOnLuas('onSpawnNote', [luaIndex, dunceNote.noteData, dunceNote.noteType, dunceNote.isSustainNote, dunceNote.strumTime]);
 				callOnHScript('onSpawnNote', [dunceNote]);
-
-				var index:Int = unspawnNotes.indexOf(dunceNote);
-				unspawnNotes.splice(index, 1);
 			}
 		}
 
@@ -1840,7 +1845,9 @@ class PlayState extends MusicBeatState
 						while(i < notes.length)
 						{
 							var daNote:Note = notes.members[i];
-							if(daNote == null) continue;
+							// nulls shouldn't happen (invalidateNote splices), but bailing out
+							// without advancing the index used to hang the whole game
+							if(daNote == null) { i++; continue; }
 
 							var strumGroup:FlxTypedGroup<StrumNote> = playerStrums;
 							if(!daNote.mustPress) strumGroup = opponentStrums;
@@ -1903,13 +1910,24 @@ class PlayState extends MusicBeatState
 	// Health icon updaters
 	public dynamic function updateIconsScale(elapsed:Float)
 	{
-		var mult:Float = FlxMath.lerp(1, iconP1.scale.x, Math.exp(-elapsed * 9 * playbackRate));
-		iconP1.scale.set(mult, mult);
-		iconP1.updateHitbox();
+		// icons sit at 1:1 most of the time, skip the lerp + hitbox rebuild while they do.
+		// The lerp never quite reaches 1, so snap the last sliver to let this actually save
+		// anything after a bop.
+		if(iconP1.scale.x != 1 || iconP1.scale.y != 1)
+		{
+			var mult:Float = FlxMath.lerp(1, iconP1.scale.x, Math.exp(-elapsed * 9 * playbackRate));
+			if(Math.abs(mult - 1) < 0.005) mult = 1;
+			iconP1.scale.set(mult, mult);
+			iconP1.updateHitbox();
+		}
 
-		var mult:Float = FlxMath.lerp(1, iconP2.scale.x, Math.exp(-elapsed * 9 * playbackRate));
-		iconP2.scale.set(mult, mult);
-		iconP2.updateHitbox();
+		if(iconP2.scale.x != 1 || iconP2.scale.y != 1)
+		{
+			var mult:Float = FlxMath.lerp(1, iconP2.scale.x, Math.exp(-elapsed * 9 * playbackRate));
+			if(Math.abs(mult - 1) < 0.005) mult = 1;
+			iconP2.scale.set(mult, mult);
+			iconP2.updateHitbox();
+		}
 	}
 
 	public dynamic function updateIconsPosition()
@@ -2711,6 +2729,45 @@ class PlayState extends MusicBeatState
 			for (s in hscriptArray)
 				if (s != null && !s.isClosed() && !exclusions.contains(s.scriptId())) s.setVar(variable, arg);
 		#end
+	}
+
+	// Same thing for several variables at once: one pass over the scripts instead of one
+	// pass each. values[i] must belong to names[i].
+	public function setOnScriptsMulti(names:Array<String>, values:Array<Dynamic>):Void {
+		var count:Int = names.length;
+
+		#if LUA_ALLOWED
+		if (jsruntime.JSPlayer.active)
+			for (s in jsruntime.JSPlayer.hosts())
+				if (!s.isClosed())
+					for (i in 0...count) s.setVar(names[i], values[i]);
+
+		if (luaArray != null)
+			for (s in luaArray)
+				if (s != null && !s.isClosed())
+					for (i in 0...count) s.setVar(names[i], values[i]);
+		#end
+
+		#if HSCRIPT_ALLOWED
+		if (hscriptArray != null)
+			for (s in hscriptArray)
+				if (s != null && !s.isClosed())
+					for (i in 0...count) s.setVar(names[i], values[i]);
+		#end
+	}
+
+	// things scripts expect to read every frame; pushed in one pass instead of four
+	static var frameVarNames:Array<String> = ['curDecStep', 'curDecBeat', 'cameraX', 'cameraY'];
+	static var frameVarValues:Array<Dynamic> = [0, 0, 0, 0];
+
+	function pushFrameScriptVars():Void
+	{
+		frameVarValues[0] = curDecStep;
+		frameVarValues[1] = curDecBeat;
+		// 0.7.x always synced camera scroll to scripts; old mods use it for parallax
+		frameVarValues[2] = camFollow.x;
+		frameVarValues[3] = camFollow.y;
+		setOnScriptsMulti(frameVarNames, frameVarValues);
 	}
 
 	public function setOnLuas(variable:String, arg:Dynamic, exclusions:Array<String> = null) {

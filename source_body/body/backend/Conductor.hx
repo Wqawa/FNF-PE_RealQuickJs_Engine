@@ -39,17 +39,36 @@ class Conductor
 		return lastChange.stepCrochet*4;
 	}
 
+	// PlayState asks for this every frame, so it walks from the last answer instead of
+	// rebuilding an event and rescanning the whole map. The event it returns is shared,
+	// read it right away, don't keep it around.
+	static var bpmCacheIdx:Int = -1;
+	static var bpmCacheEvent:BPMChangeEvent = {stepTime: 0, songTime: 0, bpm: 0, stepCrochet: 0};
+
 	public static function getBPMFromSeconds(time:Float){
-		var lastChange:BPMChangeEvent = {
-			stepTime: 0,
-			songTime: 0,
-			bpm: bpm,
-			stepCrochet: stepCrochet
-		}
-		for (i in 0...Conductor.bpmChangeMap.length)
+		var map:Array<BPMChangeEvent> = Conductor.bpmChangeMap;
+		var idx:Int = bpmCacheIdx;
+		if (idx < -1 || idx >= map.length) idx = -1;
+
+		while (idx + 1 < map.length && time >= map[idx + 1].songTime) idx++;
+		while (idx >= 0 && time < map[idx].songTime) idx--;
+		bpmCacheIdx = idx;
+
+		var lastChange:BPMChangeEvent = bpmCacheEvent;
+		if (idx < 0)
 		{
-			if (time >= Conductor.bpmChangeMap[i].songTime)
-				lastChange = Conductor.bpmChangeMap[i];
+			lastChange.stepTime = 0;
+			lastChange.songTime = 0;
+			lastChange.bpm = bpm;
+			lastChange.stepCrochet = stepCrochet;
+		}
+		else
+		{
+			var entry:BPMChangeEvent = map[idx];
+			lastChange.stepTime = entry.stepTime;
+			lastChange.songTime = entry.songTime;
+			lastChange.bpm = entry.bpm;
+			lastChange.stepCrochet = entry.stepCrochet;
 		}
 
 		return lastChange;
@@ -98,6 +117,7 @@ class Conductor
 	public static function mapBPMChanges(song:SwagSong)
 	{
 		bpmChangeMap = [];
+		bpmCacheIdx = -1;
 
 		var curBPM:Float = song.bpm;
 		var totalSteps:Int = 0;

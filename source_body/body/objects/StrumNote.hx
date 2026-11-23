@@ -10,7 +10,11 @@ class StrumNote extends FlxSprite
 	public var rgbShader:RGBShaderReference;
 	public var resetAnim:Float = 0;
 	private var noteData:Int = 0;
-	public var direction:Float = 90;
+	public var direction(default, set):Float = 90;
+	// cos/sin of `direction`, cached because Note.followStrumNote asks for them for every
+	// note every frame and direction is 90 for basically every chart
+	public var dirCos:Float = 0;
+	public var dirSin:Float = 1;
 	public var downScroll:Bool = false;
 	public var sustainReduce:Bool = true;
 	private var player:Int;
@@ -25,6 +29,16 @@ class StrumNote extends FlxSprite
 	}
 
 	public var useRGBShader:Bool = true;
+
+	function set_direction(value:Float):Float
+	{
+		direction = value;
+		var rad:Float = value * Math.PI / 180;
+		dirCos = Math.cos(rad);
+		dirSin = Math.sin(rad);
+		return value;
+	}
+
 	public function new(x:Float, y:Float, leData:Int, player:Int) {
 		animation = new PsychAnimationController(this);
 

@@ -81,11 +81,13 @@ class MusicBeatState extends FlxState
 			}
 		}
 
-		if(FlxG.save.data != null) FlxG.save.data.fullscreen = FlxG.fullscreen;
-		
-		stagesFunc(function(stage:BaseStage) {
-			stage.update(elapsed);
-		});
+		// only write when it actually changed, this used to be a save-data write every frame
+		if(FlxG.save.data != null && FlxG.save.data.fullscreen != FlxG.fullscreen) FlxG.save.data.fullscreen = FlxG.fullscreen;
+
+		// inlined instead of stagesFunc(): that allocates a closure every single frame
+		for (stage in stages)
+			if(stage != null && stage.exists && stage.active)
+				stage.update(elapsed);
 
 		super.update(elapsed);
 	}

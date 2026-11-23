@@ -252,6 +252,46 @@ Continue / Quit Game / Quit and Restart Game。退出走 `Sys.exit(0)`；重启�
 - `LoadingJob` 是 `LoadingState.hx` 里的模块级 private class，`label` 同时就是日志里的
   文件名（原来 `initThread` 的 `'image $image'` 前缀没了）。
 
+### 0.0.8 2026-11-23 晚：PlayState 每帧固定开销清理（只改 body）
+
+目标是删「每帧都在做、但结果没人看」的计算。着色器那一批先没动。实测底数：bopeebo
+全帧 CPU 1.32ms（60fps 预算 16.7ms），所以这些改动不会体现在帧率上，价值在
+GC 抖动和脚本多的场景。
+
+**每帧固定浪费**
+
+| 位置 | 改动 |
+|---|---|
+| `PlayState.update` | `setOnScripts` 4 次/帧 → `pushFrameScriptVars()` 走 `setOnScriptsMulti()`，脚本数组只遍历 1 次（`botPlay` 那行留着，它要赶在 `onUpdatePost` 前推） |
+| 同上 | 删掉 `FlxG.watch.addQuick` ×3（只有调试 overlay 用，每帧 `Std.string` + map 写） |
+| 同上 | `timeTxt` 只在秒数或 `timeBarType` 变了才写（`lastTimeSeconds` / `lastTimeBarType`），以前每帧 new 一个时间字符串再让 openfl 比较 |
+| `updateIconsScale` | 图标 scale 已经是 1 就跳过 lerp + `updateHitbox()`；lerp 永远到不了 1，所以加了个 0.005 的吸附，不然第一次 bop 之后永远走不到早退分支 |
+| `MusicBeatState.update` | `stagesFunc(闭包)` 每帧 new 一个闭包 → 内联成 for 循环；`FlxG.save.data.fullscreen` 改成只在变化时写 |
+| `Conductor.getBPMFromSeconds` | 每帧 new 一个 `BPMChangeEvent` + 从头线性扫整张 BPM 表 → 改成从上次的下标往前走，返回一个共享事件。**返回的对象是共享的，别存引用** |
+| `PlayStateJudge.keysCheck` | 每帧 3 个 Bool 数组 → 复用 static 数组；顺便记录 anyHeld/anyPressed/anyReleased，`contains(true)` 全删 |
+
+**音符路径**
+
+- `keysCheck` 的音符扫描加了 `anyHeld` 门：没按住任何键时直接跳过整轮（原来每帧无条件扫一遍全部音符，只有按住时才可能命中长条）。
+- 循环里把最便宜的判断放前面（`isSustainNote` / `canBeHit` 先出），复合条件展开成 `continue`。
+- spawn 循环：`unspawnNotes.indexOf()` + `splice()` → `shift()`；给 lua 的 `notes.members.indexOf()` 只在真有 lua 脚本时才算。
+- `if(daNote == null) continue;` **没有 i++**，真出现 null 就是死循环（整个游戏卡住）。已改成 `{ i++; continue; }`。
+- `Note.followStrumNote` 每帧每个音符 2 次三角函数 → `StrumNote.dirCos/dirSin`，在 `set_direction` 里算一次（`direction` 99% 的谱面都是 90）。
+
+**验证**
+
+- `Conductor.getBPMFromSeconds` 的等价性用 `haxe --run` 单独跑过：4 万条合成 BPM 事件 +
+  5 万次随机跳转（含往回跳、空表），与旧实现逐条比对 **0 处不一致**（`.cache/BpmCheck.hx`）。
+- 实机：bopeebo（无 BPM 变化）和 monster（9 处 BPM 变化）都正常进歌、0 报错；
+  monster 的 `[hud]` 探针显示 `time=2:56 icon1=1 icon2=1 bpm=95`，说明时间文本和图标吸附都正常。
+- 帧时间没有可测变化（1.3 → 1.5ms，属于噪声/不同曲目），本来也不是奔着帧率去的。
+
+**故意没做**
+
+- 音符的 strum 引用没有缓存在 `Note` 上：mod 会换 strum 对象，省下的只是 2 次数组索引，不值这个风险。
+- `notes.insert(0, ...)` 每次 spawn 的 O(n) 没动：它决定绘制层级，换 `add()` 会改音符互相压盖的顺序。
+- 着色器（音符 RGB 每 sprite 一次 program 绑定、Philly 全屏雨的 30 波纹循环）留到下一轮。
+
 ### 0.1 未解决（2026-11-13 记录，之后没复核）：0.6.3 的 Options → Switch Engine 打不开
 
 **现象**：0.6.3 里选中 Switch Engine，界面不出现（卡住 / 一闪即回）。

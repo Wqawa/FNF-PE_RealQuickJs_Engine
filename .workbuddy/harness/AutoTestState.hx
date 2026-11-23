@@ -1,6 +1,7 @@
 package;
 
 import backend.ClientPrefs;
+import backend.Conductor;
 import backend.Difficulty;
 import backend.Highscore;
 import backend.Mods;
@@ -31,6 +32,7 @@ class AutoTestState extends MusicBeatState
 	}
 
 	@:access(states.LoadingState)
+	@:access(states.PlayState)
 	override function create()
 	{
 		super.create();
@@ -113,6 +115,22 @@ class AutoTestState extends MusicBeatState
 					shot();
 					try sys.io.File.saveContent('./testout/loadshot.txt', dump.toString()) catch(e:Dynamic) {}
 					Sys.exit(0);
+				}
+			});
+		}
+
+		// HUD 自检：跑 5 秒后把时间/分数/图标缩放打出来（验证 timeTxt 缓存和图标缩放）
+		if (Sys.getEnv('PE_AUTOTEST_HUD') == '1')
+		{
+			var n:Int = 0;
+			FlxG.signals.postUpdate.add(function() {
+				n++;
+				if (n == 300 && PlayState.instance != null)
+				{
+					var ps:PlayState = PlayState.instance;
+					trace('[hud] time=' + ps.timeTxt.text + ' score=' + ps.scoreTxt.text.split('\n').join(' | ')
+						+ ' icon1=' + ps.iconP1.scale.x + ' icon2=' + ps.iconP2.scale.x
+						+ ' bpm=' + Conductor.bpm + ' songPos=' + Std.int(Conductor.songPosition));
 				}
 			});
 		}
