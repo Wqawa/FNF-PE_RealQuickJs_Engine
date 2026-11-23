@@ -51,6 +51,12 @@ class GraphicsSettingsSubState extends BaseOptionsMenu
 			BOOL);
 		addOption(option);
 
+		var option:Option = new Option('Segmented Loading',
+			"If checked, files are loaded in small batches instead of all at once.\nMuch lower memory peak while loading, so heavy mods are less likely\nto run out of memory and crash. Loading takes a bit longer.",
+			'segmentedLoading',
+			BOOL);
+		addOption(option);
+
 		var option:Option = new Option('Clear Old Textures',
 			"If checked, textures from the previous song are freed when a new\none starts. Saves a lot of RAM, but the next song loads a bit slower.",
 			'clearOldAssets',

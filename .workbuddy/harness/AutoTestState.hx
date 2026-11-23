@@ -30,6 +30,7 @@ class AutoTestState extends MusicBeatState
 		return null;
 	}
 
+	@:access(states.LoadingState)
 	override function create()
 	{
 		super.create();
@@ -81,6 +82,40 @@ class AutoTestState extends MusicBeatState
 		// 音频流式开关：只改内存里的值，Sys.exit 前不落盘，不会污染存档
 		var streamAudio:Null<String> = Sys.getEnv('PE_AUTOTEST_STREAMAUDIO');
 		if(streamAudio != null && streamAudio.length > 0) ClientPrefs.data.streamAudio = (streamAudio == '1');
+
+		// 分段加载开关，同样只改内存值
+		var segmented:Null<String> = Sys.getEnv('PE_AUTOTEST_SEGMENTED');
+		if(segmented != null && segmented.length > 0) ClientPrefs.data.segmentedLoading = (segmented == '1');
+
+		// 加载屏自检：抓一张加载中的截图，顺便把左上角文本和卡死询问面板打出来
+		if (Sys.getEnv('PE_AUTOTEST_LOADSHOT') == '1')
+		{
+			var phase:Int = 0;
+			var dump:StringBuf = new StringBuf();
+			FlxG.signals.postUpdate.add(function() {
+				if (!Std.isOfType(FlxG.state, states.LoadingState)) return;
+				var ls:states.LoadingState = cast FlxG.state;
+				phase++;
+				if (phase == 4)
+				{
+					dump.add('[loadtext] ' + ls.detailText.text.split('\n').join(' | ') + '\n');
+					ls.stallTimer = 999; // 下一帧就弹询问面板
+					try sys.io.File.saveContent('./testout/loadshot.txt', dump.toString()) catch(e:Dynamic) {}
+				}
+				if (phase == 60)
+				{
+					dump.add('[loadtext] stall=' + ls.stallInfo.text.split('\n').join(' | ') + '\n');
+					var vis:Int = 0;
+					for (m in ls.stallMembers) if (m.visible) vis++;
+					dump.add('[loadtext] visible=' + vis + '/' + ls.stallMembers.length + '\n');
+					dump.add('[loadtext] detail y=' + ls.detailText.y + ' alpha=' + ls.detailText.alpha
+						+ ' vis=' + ls.detailText.visible + ' h=' + ls.detailText.height + '\n');
+					shot();
+					try sys.io.File.saveContent('./testout/loadshot.txt', dump.toString()) catch(e:Dynamic) {}
+					Sys.exit(0);
+				}
+			});
+		}
 
 		try
 		{

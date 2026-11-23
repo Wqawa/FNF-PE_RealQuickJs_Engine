@@ -46,6 +46,9 @@ import states.TitleState;
 
 	public var ghostTapping:Bool = true;
 	public var streamAudio:Bool = false; // read song audio off disk while playing, see Paths.streamSound
+	// load a few files at a time instead of throwing the whole list at the pool at once,
+	// see LoadingState.dispatchSegment(). Lower memory peak on heavy mods, slower on purpose
+	public var segmentedLoading:Bool = false;
 	public var timeBarType:String = 'Time Left';
 	public var scoreZoom:Bool = true;
 	public var noReset:Bool = false;

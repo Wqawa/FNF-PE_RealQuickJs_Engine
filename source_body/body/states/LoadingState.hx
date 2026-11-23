@@ -41,10 +41,25 @@ class LoadingState extends MusicBeatState
 	public static var loaded:Int = 0;
 	public static var loadMax:Int = 0;
 
+	// what the corner text shows: the last file handed to a worker, its size on disk,
+	// and how many bytes have come back so far. Written by worker threads, read by update()
+	public static var currentLabel:String = '';
+	public static var currentBytes:Float = 0;
+	public static var loadedBytes:Float = 0;
+	public static var totalBytes:Float = 0;
+
 	static var originalBitmapKeys:Map<String, String> = [];
 	static var requestedBitmaps:Map<String, BitmapData> = [];
 	static var mutex:Mutex;
 	static var threadPool:FixedThreadPool = null;
+
+	// Segmented loading: jobs sit in this queue and update() hands them to the pool
+	// a few at a time. Empty (and unused) when the pref is off.
+	static var loadQueue:Array<LoadingJob> = [];
+	static var segmented:Bool = false;
+	static var segmentActive:Int = 0;
+	static final SEGMENT_FILES:Int = 3;
+	static final SEGMENT_BYTES:Float = 24 * 1024 * 1024;
 
 	function new(target:FlxState, stopMusic:Bool)
 	{
@@ -67,6 +82,20 @@ class LoadingState extends MusicBeatState
 	var intendedPercent:Float = 0;
 	var curPercent:Float = 0;
 	var stateChangeDelay:Float = 0;
+
+	// top-left readout: file being loaded right now, its size, files done, bytes done
+	var detailText:FlxText;
+	var detailCache:String = '';
+
+	// "this is taking forever, what do you want to do" prompt
+	static final STALL_SECONDS:Float = 30;
+	var stallTimer:Float = 0;
+	var stallPromptOpen:Bool = false;
+	var stallSelected:Int = 0;
+	var stallMembers:Array<flixel.FlxBasic> = [];
+	var stallInfo:FlxText;
+	var stallChoices:FlxText;
+	var stallHint:FlxText;
 
 	#if PSYCH_WATERMARKS
 	var logo:FlxSprite;
@@ -142,6 +171,15 @@ class LoadingState extends MusicBeatState
 		}
 		#end
 
+		// mods with their own LoadingScreen.hx took over above, they get the plain screen.
+		// The FPS overlay also lives in this corner, so drop below it when it's showing
+		var fpsShown:Bool = body.Main.fpsVar != null && body.Main.fpsVar.visible;
+		detailText = new FlxText(8, fpsShown ? 78 : 4, FlxG.width - 16, '', 14);
+		detailText.setFormat(Paths.font("vcr.ttf"), 14, FlxColor.WHITE, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
+		detailText.borderSize = 1.6;
+		detailText.scrollFactor.set();
+		add(detailText);
+
 		#if PSYCH_WATERMARKS // PSYCH LOADING SCREEN
 		var bg = new FlxSprite().loadGraphic(Paths.image('menuDesat'));
 		bg.antialiasing = ClientPrefs.data.antialiasing;
@@ -179,6 +217,9 @@ class LoadingState extends MusicBeatState
 		#end
 		super.create();
 
+		buildStallPrompt();
+		refreshDetails();
+
 		if (stateChangeDelay <= 0 && checkLoaded())
 		{
 			dontUpdate = true;
@@ -191,11 +232,178 @@ class LoadingState extends MusicBeatState
 		insert(members.indexOf(barGroup), obj);
 	}
 
+	inline function hasModLoadScreen():Bool
+	{
+		#if HSCRIPT_ALLOWED
+		return hscript != null;
+		#else
+		return false;
+		#end
+	}
+
+	static function byteText(bytes:Float):String
+	{
+		if (bytes >= 1048576) return (Std.int(bytes / 104857.6) / 10) + ' MB';
+		if (bytes >= 1024) return Std.int(bytes / 1024) + ' KB';
+		return Std.int(bytes) + ' B';
+	}
+
+	// rebuilt only when something actually changed, it's a per frame call otherwise
+	function refreshDetails():Void
+	{
+		if (detailText == null) return;
+
+		var filesPct:Int = loadMax > 0 ? Std.int(Math.min(1, loaded / loadMax) * 100) : 0;
+		var text:String = 'Now loading: ' + (currentLabel.length > 0 ? currentLabel : 'starting up');
+		text += '\nSize: ' + byteText(currentBytes) + '     Files: ' + loaded + ' / ' + loadMax + ' (' + filesPct + '%)';
+		text += '\nTotal: ' + byteText(loadedBytes) + ' / ' + byteText(totalBytes);
+		if (totalBytes > 0) text += ' (' + Std.int(Math.min(1, loadedBytes / totalBytes) * 100) + '%)';
+
+		if (text != detailCache)
+		{
+			detailCache = text;
+			detailText.text = text;
+		}
+	}
+
+	static final STALL_LABELS:Array<String> = ['Continue Loading', 'Quit Game', 'Quit and Restart Game'];
+
+	function buildStallPrompt():Void
+	{
+		var dim:FlxSprite = new FlxSprite().makeGraphic(1, 1, FlxColor.BLACK);
+		dim.scale.set(FlxG.width, FlxG.height);
+		dim.updateHitbox();
+		dim.screenCenter();
+		dim.alpha = 0.85;
+		stallAdd(dim);
+
+		var box:FlxSprite = new FlxSprite().makeGraphic(1, 1, 0xFF141414);
+		box.scale.set(780, 280);
+		box.updateHitbox();
+		box.screenCenter();
+		stallAdd(box);
+
+		stallInfo = new FlxText(box.x + 30, box.y + 24, 720, '', 18);
+		stallInfo.setFormat(Paths.font('vcr.ttf'), 18, FlxColor.WHITE, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
+		stallInfo.borderSize = 1.5;
+		stallAdd(stallInfo);
+
+		stallChoices = new FlxText(box.x + 40, box.y + 130, 700, '', 22);
+		stallChoices.setFormat(Paths.font('vcr.ttf'), 22, FlxColor.WHITE, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
+		stallChoices.borderSize = 1.5;
+		stallAdd(stallChoices);
+
+		stallHint = new FlxText(box.x + 30, box.y + box.height - 42, 720, 'UP / DOWN to pick, ACCEPT to confirm.', 16);
+		stallHint.setFormat(Paths.font('vcr.ttf'), 16, 0xFFB0B0B0, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
+		stallHint.borderSize = 1.5;
+		stallAdd(stallHint);
+	}
+
+	function stallAdd(obj:flixel.FlxBasic):Void
+	{
+		add(obj);
+		stallMembers.push(obj);
+		obj.visible = false;
+	}
+
+	function showStallPrompt():Void
+	{
+		if (stallPromptOpen || stallInfo == null) return;
+
+		stallPromptOpen = true;
+		stallSelected = 0;
+		stallInfo.text = 'This screen has been loading for ' + Std.int(stallTimer) + ' seconds.\n'
+			+ 'It may be stuck, or the mod is just very heavy.\n'
+			+ 'Current file: ' + (currentLabel.length > 0 ? currentLabel : '-') + '\n'
+			+ 'Files: ' + loaded + ' / ' + loadMax + '     ' + byteText(loadedBytes) + ' read';
+		refreshStallChoices();
+		for (obj in stallMembers) obj.visible = true;
+	}
+
+	function hideStallPrompt():Void
+	{
+		if (!stallPromptOpen) return;
+
+		stallPromptOpen = false;
+		stallTimer = 0;
+		for (obj in stallMembers) obj.visible = false;
+	}
+
+	function changeStallSelection(change:Int):Void
+	{
+		stallSelected = FlxMath.wrap(stallSelected + change, 0, STALL_LABELS.length - 1);
+		refreshStallChoices();
+	}
+
+	function refreshStallChoices():Void
+	{
+		var text:String = '';
+		for (i in 0...STALL_LABELS.length)
+			text += (i == stallSelected ? '> ' : '  ') + STALL_LABELS[i] + '\n';
+		stallChoices.text = text;
+	}
+
+	function confirmStallSelection():Void
+	{
+		switch(stallSelected)
+		{
+			case 1:
+				#if sys Sys.exit(0); #end
+			case 2:
+				restartGame();
+			case 0:
+				hideStallPrompt();
+			default:
+		}
+	}
+
+	// start a second copy and let this one die; whatever is half loaded is not coming back
+	static function restartGame():Void
+	{
+		#if sys
+		try
+		{
+			var exe:String = Sys.programPath();
+			#if windows
+			// Process launches the exe straight through CreateProcess, so no console window
+			// pops up the way `cmd /c start` would. It also doesn't wait for it to quit.
+			new sys.io.Process(exe, []);
+			#else
+			Sys.command('"' + exe + '"');
+			#end
+		}
+		catch(e:Dynamic)
+		{
+			trace('could not restart the game: $e');
+			lime.system.System.openFile(Sys.programPath());
+		}
+		Sys.exit(0);
+		#end
+	}
+
 	var transitioning:Bool = false;
 	override function update(elapsed:Float)
 	{
 		super.update(elapsed);
 		if (dontUpdate) return;
+
+		// the prompt owns the input while it's up; if the load quietly finished behind it,
+		// drop the prompt and let the normal path switch states
+		if (stallPromptOpen)
+		{
+			if (checkLoaded()) hideStallPrompt();
+			else
+			{
+				if (controls.UI_UP_P) changeStallSelection(-1);
+				if (controls.UI_DOWN_P) changeStallSelection(1);
+				if (controls.ACCEPT) confirmStallSelection();
+				refreshDetails();
+				return;
+			}
+		}
+
+		// segmented loading hands out the next batch only after the last one is done
+		if (!transitioning && !finishedLoading) dispatchSegment();
 
 		if (!transitioning)
 		{
@@ -210,6 +418,13 @@ class LoadingState extends MusicBeatState
 				else stateChangeDelay = Math.max(0, stateChangeDelay - elapsed);
 			}
 			intendedPercent = loaded / loadMax;
+		}
+
+		refreshDetails();
+		if (!transitioning && !finishedLoading && !hasModLoadScreen())
+		{
+			stallTimer += elapsed;
+			if (stallTimer >= STALL_SECONDS) showStallPrompt();
 		}
 
 		if (curPercent != intendedPercent)
@@ -339,6 +554,14 @@ class LoadingState extends MusicBeatState
 		if (threadPool != null) threadPool.shutdown(); // kill all workers safely
 		threadPool = null;
 		mutex = null;
+
+		segmented = false;
+		loadQueue = [];
+		segmentActive = 0;
+		currentLabel = '';
+		currentBytes = 0;
+		loadedBytes = 0;
+		totalBytes = 0;
 	}
 
 	public static function checkLoaded():Bool
@@ -385,6 +608,7 @@ class LoadingState extends MusicBeatState
 
 		while(true)
 		{
+			dispatchSegment(); // no-op unless the pref is on and a batch just finished
 			if(checkLoaded())
 			{
 				_loaded();
@@ -672,13 +896,89 @@ class LoadingState extends MusicBeatState
 	static function _threadFunc()
 	{
 		_startPool();
-		for (sound in soundsToPrepare) initThread(() -> preloadSound('sounds/$sound'), 'sound $sound');
-		for (music in musicToPrepare) initThread(() -> preloadSound('music/$music'), 'music $music');
+		segmented = ClientPrefs.data.segmentedLoading;
+		loadQueue = [];
+		segmentActive = 0;
+		loadedBytes = 0;
+		currentLabel = '';
+		currentBytes = 0;
+
+		// same order as ever: effects, then music, then the long song tracks, images last.
+		// Sizes are read here once so the screen can show a real total; failed lookups count
+		// as zero and the file gets dropped later anyway.
+		for (sound in soundsToPrepare) queueSound('sounds/$sound', null);
+		for (music in musicToPrepare) queueSound('music/$music', 'music');
 		if (!skipSongPreload())
-			for (song in songsToPrepare) initThread(() -> preloadSound(song, 'songs', true, false), 'song $song');
+			for (song in songsToPrepare) queueSound(song, 'songs', null, true, false);
 
 		// for images, they get to have their own thread
-		for (image in imagesToPrepare) initThread(() -> preloadGraphic(image), 'image $image');
+		for (image in imagesToPrepare) queueGraphic(image);
+
+		totalBytes = 0;
+		for (job in loadQueue) totalBytes += job.bytes;
+
+		if (!segmented)
+		{
+			// the whole list goes to the pool at once, like it always did
+			var jobs:Array<LoadingJob> = loadQueue;
+			loadQueue = [];
+			for (job in jobs) startJob(job);
+		}
+		else dispatchSegment();
+	}
+
+	// Segmented mode: hand out SEGMENT_FILES entries (or SEGMENT_BYTES worth of them) and
+	// wait for those to finish before the next batch. Called from update(), and from the
+	// blocking wait in getNextState() when the loading screen is skipped.
+	public static function dispatchSegment():Void
+	{
+		if (!segmented || loadQueue.length == 0 || threadPool == null) return;
+
+		var batch:Array<LoadingJob> = [];
+		if (mutex != null) mutex.acquire();
+		if (segmentActive == 0 && loadQueue.length > 0)
+		{
+			var bytes:Float = 0;
+			while (loadQueue.length > 0 && batch.length < SEGMENT_FILES)
+			{
+				var job:LoadingJob = loadQueue[0];
+				if (batch.length > 0 && bytes + job.bytes > SEGMENT_BYTES) break;
+
+				loadQueue.shift();
+				bytes += job.bytes;
+				batch.push(job);
+			}
+			segmentActive += batch.length;
+		}
+		if (mutex != null) mutex.release();
+
+		// handed to the pool outside the lock, the workers take it from here
+		for (job in batch) startJob(job);
+	}
+
+	static function queueSound(key:String, parent:Null<String>, ?label:String = null, ?modsAllowed:Bool = true, ?beepOnNull:Bool = true):Void
+	{
+		if (label == null) label = key;
+		var file:String = soundPath(key, parent, modsAllowed);
+		loadQueue.push(new LoadingJob(label, fileSize(file), () -> preloadSound(key, parent, modsAllowed, beepOnNull)));
+	}
+
+	static function queueGraphic(key:String):Void
+	{
+		var file:String = Paths.getPath(graphicKey(key), IMAGE);
+		loadQueue.push(new LoadingJob(graphicKey(key), fileSize(file), () -> preloadGraphic(key)));
+	}
+
+	static function fileSize(path:String):Float
+	{
+		#if sys
+		try
+		{
+			if (FileSystem.exists(path)) return FileSystem.stat(path).size;
+		}
+		catch(e:Dynamic) {}
+		#end
+		return 0;
 	}
 
 	// Streaming reads the song tracks off disk while playing, so decoding them here would
@@ -687,31 +987,40 @@ class LoadingState extends MusicBeatState
 		return ClientPrefs.data.streamAudio
 			&& !PlayState.stageWantsAudioViz(PlayState.SONG != null ? PlayState.SONG.stage : null);
 
-	static function initThread(func:Void->Dynamic, traceData:String)	{
-		// trace('scheduled $func in threadPool');
+	static function startJob(job:LoadingJob):Void
+	{
 		#if debug
 		var threadSchedule = Sys.time();
 		#end
 		threadPool.run(() -> {
 			#if debug
 			var threadStart = Sys.time();
-			trace('$traceData took ${threadStart - threadSchedule}s to start preloading');
+			trace('${job.label} took ${threadStart - threadSchedule}s to start preloading');
 			#end
+			currentLabel = job.label;
+			currentBytes = job.bytes;
 
 			try {
-				if (func() != null) {
+				if (job.run() != null) {
 					#if debug
-					var diff = Sys.time() - threadStart;
-					trace('finished preloading $traceData in ${diff}s');
+					trace('finished preloading ${job.label} in ${Sys.time() - threadStart}s');
 					#end
-				} else trace('ERROR! fail on preloading $traceData ');
+				} else trace('ERROR! fail on preloading ${job.label} ');
 			}
 			catch(e:Dynamic) {
-				trace('ERROR! fail on preloading $traceData: $e');
+				trace('ERROR! fail on preloading ${job.label}: $e');
 			}
-			// mutex.acquire();
-			loaded++;
-			// mutex.release();
+
+			// several jobs run at once, so the counters go through the same mutex the
+			// loaders use. _loaded() nulls it out when the pool is torn down
+			if (mutex != null)
+			{
+				mutex.acquire();
+				loadedBytes += job.bytes;
+				loaded++;
+				if (segmentActive > 0) segmentActive--; // only counted up in segmented mode
+				mutex.release();
+			}
 		});
 	}
 
@@ -773,10 +1082,21 @@ class LoadingState extends MusicBeatState
 		}
 	}
 
+	static inline function soundPath(key:String, parent:Null<String>, ?modsAllowed:Bool = true):String
+		return Paths.getPath(Language.getFileTranslation(key) + '.${Paths.SOUND_EXT}', SOUND, parent, modsAllowed);
+
+	static inline function graphicKey(key:String):String
+	{
+		var requestKey:String = 'images/$key';
+		#if TRANSLATIONS_ALLOWED requestKey = Language.getFileTranslation(requestKey); #end
+		if(requestKey.lastIndexOf('.') < 0) requestKey += '.png';
+		return requestKey;
+	}
+
 	// thread safe sound loader
 	static function preloadSound(key:String, ?path:String, ?modsAllowed:Bool = true, ?beepOnNull:Bool = true):Null<Sound>
 	{
-		var file:String = Paths.getPath(Language.getFileTranslation(key) + '.${Paths.SOUND_EXT}', SOUND, path, modsAllowed);
+		var file:String = soundPath(key, path, modsAllowed);
 
 		//trace('precaching sound: $file');
 		if(!Paths.currentTrackedSounds.exists(file))
@@ -806,9 +1126,7 @@ class LoadingState extends MusicBeatState
 	static function preloadGraphic(key:String):Null<BitmapData>
 	{
 		try {
-			var requestKey:String = 'images/$key';
-			#if TRANSLATIONS_ALLOWED requestKey = Language.getFileTranslation(requestKey); #end
-			if(requestKey.lastIndexOf('.') < 0) requestKey += '.png';
+			var requestKey:String = graphicKey(key);
 
 			if (!Paths.currentTrackedAssets.exists(requestKey))
 			{
@@ -850,4 +1168,19 @@ class LoadingState extends MusicBeatState
         	return -1;
     	}
     	#end
+}
+
+// one file waiting on the loading queue; the size is kept so the screen can show it
+private class LoadingJob
+{
+	public var label:String;
+	public var bytes:Float;
+	public var run:Void->Dynamic;
+
+	public function new(label:String, bytes:Float, run:Void->Dynamic)
+	{
+		this.label = label;
+		this.bytes = bytes;
+		this.run = run;
+	}
 }

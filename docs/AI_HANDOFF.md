@@ -215,6 +215,43 @@ Animate 2019+ 图集、对象过桥、每首歌重建 context、vanilla 无自�
 
 回归：Lua isolation 12 条、QuickJS smoke 28 / selfremove 29 / child 2，全绿。
 
+### 0.0.7 2026-11-23 晚：分段加载、加载屏详情、卡死询问
+
+**分段加载**（Options → Graphics → Segmented Loading，默认关，紧挨 Stream Audio）：
+`LoadingState` 以前是把 `soundsToPrepare` / `imagesToPrepare` 整个列表一次性丢进
+`FixedThreadPool`，所有解码挤在同一瞬间，内存峰值最高。现在按
+`ClientPrefs.data.segmentedLoading` 分两条路：
+
+- **关**：`_threadFunc` 还是把整份列表交给池子，行为和以前一致（只多量了一遍文件大小）。
+- **开**：列表先进 `loadQueue`，`dispatchSegment()` 一次只放 `SEGMENT_FILES`(3) 个、
+  或累计到 `SEGMENT_BYTES`(24MB) 为止的一批，这批全部 `loaded++` 完才放下一批。
+  峰值就是一批的解码量，不会同时摊开十几张图。
+
+`dispatchSegment()` 有**两个**调用点，少一个就死等：`LoadingState.update()`，以及
+`getNextState()` 里 `intrusive=false` 那个 `while(true)` 忙等（PlayState 的 retry 走这条）。
+冒烟实测 bopeebo 两种模式都能进歌，整体耗时 11.3s vs 11.7s（都含 5s 性能探针），
+差别可以忽略。
+
+**加载屏左上角**：`detailText` 三行 —— 当前文件、本文件大小 + 已完成/总数、
+已读字节/总字节。总字节在 `_threadFunc` 建队列时用 `sys.FileSystem.stat().size` 量一次
+（`FileStat.size` 是 Int，单个文件 >2GB 会溢出，素材碰不到）。mod 自带
+`LoadingScreen.hx` 时不画这块，那块屏归 mod 管。
+
+**卡死询问**：屏幕上待满 30 秒就盖一层提示（flixel 原生控件，和崩溃屏同一个路子），
+Continue / Quit Game / Quit and Restart Game。退出走 `Sys.exit(0)`；重启是先
+`new sys.io.Process(Sys.programPath(), [])` 拉一份新进程再退出 —— 用 `Process` 而不是
+`cmd /c start`，后者会闪一下黑框。询问期间**停止发批次**（别让人 AFK 的时候还在吃内存），
+这期间要是刚好加载完，下一帧自动收面板继续进歌。
+
+坑：
+
+- `segmentActive` 的加减都走 `mutex`（`preloadSound` 本来就在用同一把锁）。计数错了
+  批次就永远不放行，表现是卡在 99% 然后弹询问。
+- 非分段模式下 `segmentActive` 恒为 0，所以 worker 收尾那段写成
+  `if (segmentActive > 0) segmentActive--`。
+- `LoadingJob` 是 `LoadingState.hx` 里的模块级 private class，`label` 同时就是日志里的
+  文件名（原来 `initThread` 的 `'image $image'` 前缀没了）。
+
 ### 0.1 未解决（2026-11-13 记录，之后没复核）：0.6.3 的 Options → Switch Engine 打不开
 
 **现象**：0.6.3 里选中 Switch Engine，界面不出现（卡住 / 一闪即回）。
