@@ -84,6 +84,18 @@ class Paths
 		#if !html5 openfl.Assets.cache.clear("songs"); #end
 	}
 
+	// 换歌时把上一首的音效也扔掉。clearStoredMemory 里那段清音效的判断用的是上一首的
+	// localTrackedAssets（它要到循环之后才清空），所以旧音效全被当成"还在用"删不掉
+	public static function clearOldSounds()
+	{
+		for (key => asset in currentTrackedSounds)
+		{
+			if (dumpExclusions.contains(key) || asset == null) continue;
+			Assets.cache.clear(key);
+			currentTrackedSounds.remove(key);
+		}
+	}
+
 	public static function freeGraphicsFromMemory()
 	{
 		var protectedGfx:Array<FlxGraphic> = [];

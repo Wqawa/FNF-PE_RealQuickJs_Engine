@@ -407,6 +407,15 @@ class Note extends FlxSprite
 		return made;
 	}
 
+	/**
+	 * 换歌时 Paths.freeGraphicsFromMemory() 会把图集销毁，但上面那个缓存里存的是
+	 * FlxAtlasFrames，destroyGraphic 只 dispose 纹理、bitmap 对象本身还在，
+	 * noteAtlas 的 if 判断就骗过去了，返回一份指向死图的 frames，
+	 * 表现是 note 没贴图 + "Cannot render a destroyed graphic"。
+	 */
+	public static function clearAtlasCache():Void
+		_atlasCache.clear();
+
 	public var originalHeight:Float = 6;
 	public var correctionOffset:Float = 0; //dont mess with this
 	public function reloadNote(texture:String = '', postfix:String = '') {

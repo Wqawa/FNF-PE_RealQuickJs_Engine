@@ -311,6 +311,10 @@ class PlayState extends MusicBeatState
 		{
 			var before:Int = Lambda.count(Paths.currentTrackedAssets);
 			Paths.freeGraphicsFromMemory();
+			Paths.clearOldSounds();
+			// note 的图集缓存存的是 FlxAtlasFrames，图被销毁后 bitmap 对象还在，
+			// 缓存自己的失效判断会放过去，不清的话 note 没贴图
+			Note.clearAtlasCache();
 			var freed:Int = before - Lambda.count(Paths.currentTrackedAssets);
 			if (freed > 0) trace('[assets] freed $freed stale textures');
 		}
