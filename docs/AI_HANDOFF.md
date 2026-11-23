@@ -286,6 +286,20 @@ GC 抖动和脚本多的场景。
   monster 的 `[hud]` 探针显示 `time=2:56 icon1=1 icon2=1 bpm=95`，说明时间文本和图标吸附都正常。
 - 帧时间没有可测变化（1.3 → 1.5ms，属于噪声/不同曲目），本来也不是奔着帧率去的。
 
+**着色器结论（2026-11-23，看过没动）**
+
+- 音符 RGB 是唯一常驻的 shader。四列各一个 `RGBPalette` 实例看着像 4 个 program，
+  但 openfl `Shader.__createGLProgram` 里按「顶点 + 片元源码」在
+  `__context.__programs` 里做缓存（openfl 9.3.3，`Shader.hx:501-513`），
+  四个实例其实共用**同一个 GL program**。所以「合并成一个 program」这个想法没有意义，
+  剩下的每音符开销只有 useProgram(同一 program) + 几个 uniform 上传，这是 per-sprite
+  shader 的固有成本，不做批处理渲染电路不了。
+- A/B 实测（`disableNoteRGB` 的谱面对比，release）：cpu_ms 中位 8 / 9 / 10 / 10，
+  四个样本互相咬在噪声里 —— 隐藏窗口被系统降频，测不出来。结论是这项成本低于
+  现有仪器的噪声底。
+- Philly 的 `RainShader`（全屏 30 波纹 + 4 层噪声）按用户要求**保持原样**，别优化，
+  要原汁原味。
+
 **故意没做**
 
 - 音符的 strum 引用没有缓存在 `Note` 上：mod 会换 strum 对象，省下的只是 2 次数组索引，不值这个风险。
