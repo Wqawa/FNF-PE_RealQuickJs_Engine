@@ -1,6 +1,10 @@
 package debug;
 
+import backend.ClientPrefs;
+import backend.Paths;
 import flixel.FlxG;
+import flixel.input.keyboard.FlxKey;
+import flixel.util.FlxStringUtil;
 import openfl.text.TextField;
 import openfl.text.TextFormat;
 import openfl.system.System;
@@ -20,6 +24,9 @@ class FPSCounter extends TextField
 		The current memory usage (WARNING: this is NOT your total program memory usage, rather it shows the garbage collector memory)
 	**/
 	public var memoryMegas(get, never):Float;
+
+	/** 堆总量，跟 memoryMegas 一起看才知道 GC 离下一次回收还有多远 */
+	public var totalMegas(get, never):Float;
 
 	@:noCompletion private var times:Array<Float>;
 
@@ -43,9 +50,16 @@ class FPSCounter extends TextField
 
 	var deltaTimeout:Float = 0.0;
 
+	// F3 toggles this (bound in Controls, key name 'fps_debug'). Compact is the old two-liner.
+	public var detailed:Bool = false;
+
 	// Event Handlers
 	private override function __enterFrame(deltaTime:Float):Void
 	{
+		var toggle:Array<FlxKey> = (ClientPrefs.keyBinds != null) ? ClientPrefs.keyBinds.get('fps_debug') : null;
+		if (toggle == null) toggle = [F3];
+		if (FlxG.keys.anyJustPressed(toggle)) detailed = !detailed;
+
 		final now:Float = haxe.Timer.stamp() * 1000;
 		times.push(now);
 		while (times[0] < now - 1000) times.shift();
@@ -61,9 +75,32 @@ class FPSCounter extends TextField
 	}
 
 	public dynamic function updateText():Void { // so people can override it in hscript
-		text = 'FPS: ${currentFPS}'
-		+ '\nMemory: ${flixel.util.FlxStringUtil.formatBytes(memoryMegas)}'
-		+ '\n${whereAmI()}';
+		if (detailed)
+		{
+			var texCount:Int = 0;
+			var gpuCount:Int = 0;
+			var texBytes:Float = 0;
+			for (key => g in Paths.currentTrackedAssets)
+			{
+				if (g == null || g.bitmap == null) continue;
+				texCount++;
+				texBytes += g.bitmap.width * g.bitmap.height * 4;
+				// cacheOnGPU 把 CPU 侧像素扔了，image 会是 null，纹理还在显存里
+				if (g.bitmap.image == null) gpuCount++;
+			}
+
+			text = 'FPS: ${currentFPS}'
+			+ '\nHeap: ${FlxStringUtil.formatBytes(memoryMegas)} / ${FlxStringUtil.formatBytes(totalMegas)}'
+			+ '\nTextures: $texCount ($gpuCount on GPU) ~${FlxStringUtil.formatBytes(texBytes)}'
+			+ '\nAudio: ${Lambda.count(Paths.currentTrackedSounds)}'
+			+ '\n${whereAmI()}';
+		}
+		else
+		{
+			text = 'FPS: ${currentFPS}'
+			+ '\nMemory: ${flixel.util.FlxStringUtil.formatBytes(memoryMegas)}'
+			+ '\n${whereAmI()}';
+		}
 
 		textColor = 0xFFFFFFFF;
 		if (currentFPS < FlxG.drawFramerate * 0.5)
@@ -96,4 +133,7 @@ class FPSCounter extends TextField
 
 	inline function get_memoryMegas():Float
 		return cpp.vm.Gc.memInfo64(cpp.vm.Gc.MEM_INFO_USAGE);
+
+	inline function get_totalMegas():Float
+		return cpp.vm.Gc.memInfo64(cpp.vm.Gc.MEM_INFO_RESERVED);
 }

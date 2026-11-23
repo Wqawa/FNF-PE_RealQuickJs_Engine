@@ -166,6 +166,24 @@ class AutoTestState extends MusicBeatState
 			installProfile(Std.parseFloat(profSec));
 		#end
 
+		// 左上角内存显示的取值自检：进歌跑 3 秒后把两种模式的文本抓一次（PE_AUTOTEST_FPSDBG=1）
+		if (Sys.getEnv('PE_AUTOTEST_FPSDBG') == '1')
+		{
+			var n:Int = 0;
+			FlxG.signals.postUpdate.add(function() {
+				n++;
+				if (n == 180 && body.Main.fpsVar != null)
+				{
+					body.Main.fpsVar.detailed = false;
+					body.Main.fpsVar.updateText();
+					trace('[fpsdbg] compact: ' + body.Main.fpsVar.text.replace('\n', ' | '));
+					body.Main.fpsVar.detailed = true;
+					body.Main.fpsVar.updateText();
+					trace('[fpsdbg] detailed: ' + body.Main.fpsVar.text.replace('\n', ' | '));
+				}
+			});
+		}
+
 		LoadingState.prepareToSong();
 		LoadingState.loadAndSwitchState(new PlayState());
 	}
