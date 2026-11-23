@@ -286,6 +286,27 @@ GC 抖动和脚本多的场景。
   monster 的 `[hud]` 探针显示 `time=2:56 icon1=1 icon2=1 bpm=95`，说明时间文本和图标吸附都正常。
 - 帧时间没有可测变化（1.3 → 1.5ms，属于噪声/不同曲目），本来也不是奔着帧率去的。
 
+### 0.0.9 2026-11-23 晚：帧率拆成绘画帧 / 计算帧，FPS 详细模式显示计算帧
+
+- `ClientPrefs`：新增 `drawFramerate`（绘画帧，10~240，默认 60）+ `updateFramerate`
+  （计算帧，60~240，默认 60）。老的 `framerate` 字段**保留**，现在只是 update 的镜像
+  （0.6.3 的 `ClientPrefs.framerate` 转发器和 lua 全局 `framerate` 都还读它）。
+- 老存档迁移在 `loadPrefs` 里：`Reflect.hasField(FlxG.save.data, 'updateFramerate')`
+  为假就用旧的 `framerate` 把两个都填上 —— 老玩家原来 240 就还是 240（两边都写），
+  不会突然掉到 60。顺手删了「首启按显示器刷新率设 framerate」那段，现在首启就是 60/60。
+- `ClientPrefs.applyFramerate()` 统一下发：先 update 再 draw。flixel 的
+  `set_drawFramerate` 在 draw > update 时会 warn，而这是允许的配置（渲染 240 / 逻辑 60
+  只是重复帧），实测 release 下不会刷屏。
+- Options → Graphics：原来那个 Framerate 拆成 `Draw Framerate` 和 `Upd. Framerate` 两行
+  （名字不能太长，选项列宽有限）。`onChangeFramerate` 只调 `applyFramerate()`。
+- FPS 覆盖层：详细模式第一行变成 `FPS: 实际 / 限制`，新增一行 `Calc: 实际 / 限制`。
+  `Calc` 是 `FlxG.signals.postUpdate` 数的逻辑步（固定步长下渲染 1 帧可能跑 6 步）；
+  `currentFPS` 数的其实是**渲染帧**，所以它的 clamp 从 `updateFramerate` 改成了
+  `drawFramerate`（原来 10/240 这种配置会被 clamp 成 60，数字是错的）。
+- 验证：`PE_AUTOTEST_FRAMERATE=10/60` 跑完整首 bopeebo，覆盖层
+  `FPS: 10 / 10 | Calc: 61 / 60`，EXIT=0；60/60 对照 `FPS: 60 / 60 | Calc: 61 / 60`；
+  120/60 也正常退出、没有警告刷屏。
+
 **着色器结论（2026-11-23，看过没动）**
 
 - 音符 RGB 是唯一常驻的 shader。四列各一个 `RGBPalette` 实例看着像 4 个 program，

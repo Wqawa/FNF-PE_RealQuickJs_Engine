@@ -20,6 +20,9 @@ class FPSCounter extends TextField
 	**/
 	public var currentFPS(default, null):Int;
 
+	/** Logic ticks per second (update framerate). Render frames never show this. **/
+	public var calcFPS(default, null):Int = 0;
+
 	/**
 		The current memory usage (WARNING: this is NOT your total program memory usage, rather it shows the garbage collector memory)
 	**/
@@ -46,6 +49,29 @@ class FPSCounter extends TextField
 		text = "FPS: ";
 
 		times = [];
+
+		// Draw framerate and update framerate are separate settings now, so the old
+		// frame counter alone can't tell you whether the game logic is keeping up.
+		FlxG.signals.postUpdate.add(onUpdateTick);
+	}
+
+	// counts logic ticks, one per FlxGame step. With draw 10 / update 60 a render frame
+	// can run several of these, which is exactly what the detailed readout is for.
+	var calcCount:Int = 0;
+	var calcWindowStart:Float = 0;
+
+	function onUpdateTick():Void
+	{
+		var now:Float = haxe.Timer.stamp() * 1000;
+		if (calcWindowStart == 0) calcWindowStart = now;
+
+		calcCount++;
+		if (now - calcWindowStart >= 1000)
+		{
+			calcFPS = calcCount;
+			calcCount = 0;
+			calcWindowStart = now;
+		}
 	}
 
 	var deltaTimeout:Float = 0.0;
@@ -69,7 +95,8 @@ class FPSCounter extends TextField
 			return;
 		}
 
-		currentFPS = times.length < FlxG.updateFramerate ? times.length : FlxG.updateFramerate;		
+		// this counts rendered frames, so cap it at the draw rate, not the update rate
+		currentFPS = times.length < FlxG.drawFramerate ? times.length : FlxG.drawFramerate;
 		updateText();
 		deltaTimeout = 0.0;
 	}
@@ -91,7 +118,8 @@ class FPSCounter extends TextField
 				else ramBytes += bytes;
 			}
 
-			text = 'FPS: ${currentFPS}'
+			text = 'FPS: ${currentFPS} / ${ClientPrefs.data.drawFramerate}'
+			+ '\nCalc: ${calcFPS} / ${ClientPrefs.data.updateFramerate}'
 			+ '\nHeap: ${FlxStringUtil.formatBytes(memoryMegas)} / ${FlxStringUtil.formatBytes(totalMegas)}'
 			+ '\nTextures: $texCount (RAM ${FlxStringUtil.formatBytes(ramBytes)} · VRAM ${FlxStringUtil.formatBytes(vramBytes)})'
 			+ '\nAudio: ${Lambda.count(Paths.currentTrackedSounds)}'

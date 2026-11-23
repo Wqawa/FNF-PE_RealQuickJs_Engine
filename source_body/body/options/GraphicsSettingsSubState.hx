@@ -64,16 +64,23 @@ class GraphicsSettingsSubState extends BaseOptionsMenu
 		addOption(option);
 
 		#if !html5 //Apparently other framerates isn't correctly supported on Browser? Probably it has some V-Sync shit enabled by default, idk
-		var option:Option = new Option('Framerate',
-			"Pretty self explanatory, isn't it?",
-			'framerate',
+		var option:Option = new Option('Draw Framerate',
+			"How many frames per second the game draws.\nLower values take load off the GPU while the game keeps running\nat the Upd. Framerate. Above that the extra frames just repeat.",
+			'drawFramerate',
 			INT);
 		addOption(option);
+		option.minValue = 10;
+		option.maxValue = 240;
+		option.displayFormat = '%v FPS';
+		option.onChange = onChangeFramerate;
 
-		final refreshRate:Int = FlxG.stage.application.window.displayMode.refreshRate;
+		var option:Option = new Option('Upd. Framerate',
+			"How many times per second the game logic runs:\ninput, notes, scripts. 60 is the minimum, going lower\nmakes everything feel delayed.",
+			'updateFramerate',
+			INT);
+		addOption(option);
 		option.minValue = 60;
 		option.maxValue = 240;
-		option.defaultValue = Std.int(FlxMath.bound(refreshRate, option.minValue, option.maxValue));
 		option.displayFormat = '%v FPS';
 		option.onChange = onChangeFramerate;
 		#end
@@ -95,16 +102,7 @@ class GraphicsSettingsSubState extends BaseOptionsMenu
 
 	function onChangeFramerate()
 	{
-		if(ClientPrefs.data.framerate > FlxG.drawFramerate)
-		{
-			FlxG.updateFramerate = ClientPrefs.data.framerate;
-			FlxG.drawFramerate = ClientPrefs.data.framerate;
-		}
-		else
-		{
-			FlxG.drawFramerate = ClientPrefs.data.framerate;
-			FlxG.updateFramerate = ClientPrefs.data.framerate;
-		}
+		ClientPrefs.applyFramerate();
 	}
 
 	override function changeSelection(change:Int = 0)

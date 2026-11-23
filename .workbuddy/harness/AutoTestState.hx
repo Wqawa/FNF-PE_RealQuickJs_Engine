@@ -119,6 +119,18 @@ class AutoTestState extends MusicBeatState
 			});
 		}
 
+		// 帧率分离自检：PE_AUTOTEST_FRAMERATE="绘制/计算"，例如 10/60
+		var fr:Null<String> = Sys.getEnv('PE_AUTOTEST_FRAMERATE');
+		if (fr != null && fr.indexOf('/') > 0)
+		{
+			var parts:Array<String> = fr.split('/');
+			ClientPrefs.data.drawFramerate = Std.parseInt(parts[0]);
+			ClientPrefs.data.updateFramerate = Std.parseInt(parts[1]);
+			ClientPrefs.applyFramerate();
+			trace('[fps] requested=$fr applied draw=' + FlxG.drawFramerate + ' update=' + FlxG.updateFramerate
+				+ ' pref=' + ClientPrefs.data.framerate);
+		}
+
 		// HUD 自检：跑 5 秒后把时间/分数/图标缩放打出来（验证 timeTxt 缓存和图标缩放）
 		if (Sys.getEnv('PE_AUTOTEST_HUD') == '1')
 		{
@@ -131,6 +143,12 @@ class AutoTestState extends MusicBeatState
 					trace('[hud] time=' + ps.timeTxt.text + ' score=' + ps.scoreTxt.text.split('\n').join(' | ')
 						+ ' icon1=' + ps.iconP1.scale.x + ' icon2=' + ps.iconP2.scale.x
 						+ ' bpm=' + Conductor.bpm + ' songPos=' + Std.int(Conductor.songPosition));
+					if (body.Main.fpsVar != null)
+					{
+						body.Main.fpsVar.detailed = true;
+						body.Main.fpsVar.updateText();
+						trace('[hud] fpsvar=' + body.Main.fpsVar.text.split('\n').join(' | '));
+					}
 				}
 			});
 		}

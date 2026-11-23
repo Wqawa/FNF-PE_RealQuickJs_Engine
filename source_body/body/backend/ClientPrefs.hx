@@ -29,7 +29,13 @@ import states.TitleState;
 	// 进歌时把上一首的贴图全扔掉。currentTrackedAssets 只进不出，不手动清的话
 	// 玩过的每首歌的舞台/角色图都会一直留着
 	public var clearOldAssets:Bool = true;
+	// Old single framerate. Kept so saves and mods from before the split still mean
+	// something, it just mirrors updateFramerate now.
 	public var framerate:Int = 60;
+	// 绘画帧: how often the game renders. 10 is fine for a rhythm game, logic keeps running.
+	public var drawFramerate:Int = 60;
+	// 计算帧: how often the game steps (input, notes, audio sync). 60 is the floor.
+	public var updateFramerate:Int = 60;
 	public var camZooms:Bool = true;
 	public var hideHud:Bool = false;
 	public var noteOffset:Int = 0;
@@ -357,6 +363,14 @@ class ClientPrefs {
 		defaultButtons = gamepadBinds.copy();
 	}
 
+	// Pushes the two framerate prefs into flixel. Update rate goes first: flixel warns
+	// whenever draw ends up above it, and that is a legal setting here (draw 240 / logic 60).
+	public static function applyFramerate():Void {
+		data.framerate = data.updateFramerate;
+		if(FlxG.updateFramerate != data.updateFramerate) FlxG.updateFramerate = data.updateFramerate;
+		if(FlxG.drawFramerate != data.drawFramerate) FlxG.drawFramerate = data.drawFramerate;
+	}
+
 	public static function saveSettings() {
 		for (key in Reflect.fields(data))
 			Reflect.setField(FlxG.save.data, key, Reflect.field(data, key));
@@ -386,22 +400,12 @@ class ClientPrefs {
 		#if (!html5 && !switch)
 		FlxG.autoPause = ClientPrefs.data.autoPause;
 
-		if(FlxG.save.data.framerate == null) {
-			final refreshRate:Int = FlxG.stage.application.window.displayMode.refreshRate;
-			data.framerate = Std.int(FlxMath.bound(refreshRate, 60, 240));
-		}
+		// saves from before the draw/update split only have `framerate`, use it for both
+		if(!Reflect.hasField(FlxG.save.data, 'updateFramerate')) data.updateFramerate = data.framerate;
+		if(!Reflect.hasField(FlxG.save.data, 'drawFramerate')) data.drawFramerate = data.framerate;
 		#end
 
-		if(data.framerate > FlxG.drawFramerate)
-		{
-			FlxG.updateFramerate = data.framerate;
-			FlxG.drawFramerate = data.framerate;
-		}
-		else
-		{
-			FlxG.drawFramerate = data.framerate;
-			FlxG.updateFramerate = data.framerate;
-		}
+		applyFramerate();
 
 		if(FlxG.save.data.gameplaySettings != null)
 		{
