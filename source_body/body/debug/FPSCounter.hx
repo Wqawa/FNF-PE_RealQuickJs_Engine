@@ -78,20 +78,22 @@ class FPSCounter extends TextField
 		if (detailed)
 		{
 			var texCount:Int = 0;
-			var gpuCount:Int = 0;
-			var texBytes:Float = 0;
+			var ramBytes:Float = 0;
+			var vramBytes:Float = 0;
 			for (key => g in Paths.currentTrackedAssets)
 			{
 				if (g == null || g.bitmap == null) continue;
 				texCount++;
-				texBytes += g.bitmap.width * g.bitmap.height * 4;
-				// cacheOnGPU 把 CPU 侧像素扔了，image 会是 null，纹理还在显存里
-				if (g.bitmap.image == null) gpuCount++;
+				var bytes:Float = g.bitmap.width * g.bitmap.height * 4;
+				// cacheOnGPU 把 CPU 侧像素扔了（image 变 null），纹理还在显存里。
+				// 分开算，不然开了缓存还显示同一个数，看不出省没省
+				if (g.bitmap.image == null) vramBytes += bytes;
+				else ramBytes += bytes;
 			}
 
 			text = 'FPS: ${currentFPS}'
 			+ '\nHeap: ${FlxStringUtil.formatBytes(memoryMegas)} / ${FlxStringUtil.formatBytes(totalMegas)}'
-			+ '\nTextures: $texCount ($gpuCount on GPU) ~${FlxStringUtil.formatBytes(texBytes)}'
+			+ '\nTextures: $texCount (RAM ${FlxStringUtil.formatBytes(ramBytes)} · VRAM ${FlxStringUtil.formatBytes(vramBytes)})'
 			+ '\nAudio: ${Lambda.count(Paths.currentTrackedSounds)}'
 			+ '\n${whereAmI()}';
 		}
