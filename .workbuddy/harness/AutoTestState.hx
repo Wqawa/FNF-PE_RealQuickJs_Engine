@@ -131,6 +131,23 @@ class AutoTestState extends MusicBeatState
 				+ ' pref=' + ClientPrefs.data.framerate);
 		}
 
+		// 窗口尺寸自检：PE_AUTOTEST_WINSIZE="分辨率/百分比"，例如 720/100、1080/50
+		var ws:Null<String> = Sys.getEnv('PE_AUTOTEST_WINSIZE');
+		if (ws != null && ws.indexOf('/') > 0)
+		{
+			var parts:Array<String> = ws.split('/');
+			ClientPrefs.data.windowRes = Std.parseInt(parts[0]);
+			ClientPrefs.data.windowScale = Std.parseInt(parts[1]);
+			backend.WindowSize.apply(ClientPrefs.data.windowRes, ClientPrefs.data.windowScale);
+			var win = lime.app.Application.current.window;
+			trace('[win] res=' + ClientPrefs.data.windowRes + ' scale=' + ClientPrefs.data.windowScale
+				+ ' window=' + win.width + 'x' + win.height + ' wscale=' + win.scale
+				+ ' dpi=' + win.display.dpi
+				+ ' stage=' + FlxG.stage.stageWidth + 'x' + FlxG.stage.stageHeight
+				+ ' flx=' + FlxG.width + 'x' + FlxG.height
+				+ ' display=' + Std.int(win.display.bounds.width) + 'x' + Std.int(win.display.bounds.height));
+		}
+
 		// HUD 自检：跑 5 秒后把时间/分数/图标缩放打出来（验证 timeTxt 缓存和图标缩放）
 		if (Sys.getEnv('PE_AUTOTEST_HUD') == '1')
 		{
@@ -140,6 +157,14 @@ class AutoTestState extends MusicBeatState
 				if (n == 300 && PlayState.instance != null)
 				{
 					var ps:PlayState = PlayState.instance;
+					var w2 = lime.app.Application.current.window;
+					trace('[hud] window=' + w2.width + 'x' + w2.height
+						+ ' stage=' + FlxG.stage.stageWidth + 'x' + FlxG.stage.stageHeight
+						+ ' flx=' + FlxG.width + 'x' + FlxG.height
+						+ ' cam=' + FlxG.camera.width + 'x' + FlxG.camera.height
+						+ ' gamescale=' + FlxG.game.scaleX + 'x' + FlxG.game.scaleY
+						+ ' scalemode=' + (FlxG.scaleMode == null ? 'null' : Type.getClassName(Type.getClass(FlxG.scaleMode))));
+					shot();
 					trace('[hud] time=' + ps.timeTxt.text + ' score=' + ps.scoreTxt.text.split('\n').join(' | ')
 						+ ' icon1=' + ps.iconP1.scale.x + ' icon2=' + ps.iconP2.scale.x
 						+ ' bpm=' + Conductor.bpm + ' songPos=' + Std.int(Conductor.songPosition));

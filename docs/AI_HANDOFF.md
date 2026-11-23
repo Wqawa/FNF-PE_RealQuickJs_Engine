@@ -327,6 +327,40 @@ GC 抖动和脚本多的场景。
 - `notes.insert(0, ...)` 每次 spawn 的 O(n) 没动：它决定绘制层级，换 `add()` 会改音符互相压盖的顺序。
 - 着色器（音符 RGB 每 sprite 一次 program 绑定、Philly 全屏雨的 30 波纹循环）留到下一轮。
 
+### 0.0.10 2026-11-24 早上：分辨率 / 窗口大小两个设置项
+
+需求原本想要「低分辨率渲染 + 超分到原尺寸」（小黄鸭那种）。查过之后这条路在 flixel 5.6
+上要开 `FLX_POST_PROCESS` 自己写 PostProcess，把整个场景画进低分辨率 FBO 再拉伸，
+相机视口 / HUD / 相机 shader / 视频都得重新验证 —— 用户选了先做窗口版，超分留到下一轮。
+
+**两个选项**（Options → Graphics，接在帧率后面）：
+
+| 选项 | 变量 | 范围 | 说明 |
+|---|---|---|---|
+| Resolution | `windowRes` | 180~显示屏高度，步进 60 | 物理像素高度，宽度按 16:9；超过屏幕会被夹住 |
+| Window Size | `windowScale` | 10~100% | 在 Resolution 上再乘一次 |
+
+实际窗口 = `windowRes * windowScale%` 的物理像素。`windowRes` 默认 0 = 「没设过」，
+`loadPrefs` 时用当前窗口高度认领（`fixScaling()` 已经把窗口设成 1280×dpi），
+所以升级后窗口尺寸不会变。`WindowSize.maxHeight()` 在打开设置时按当前显示器算，
+换显示器后列表跟着变。
+
+**为什么窗口变小不会把画面裁掉**：flixel 默认 `FlxG.scaleMode = RatioScaleMode`，
+`onMeasure` 只改 `gameSize`/`scale`，`FlxG.width/height` 始终回到 `initialWidth/Height`
+（1280x720）。实测 640x360 窗口下 `flx=1280x720 cam=1280x720`，截图确认整幅画面都在
+（`testout/crash_shot.png` 里游戏占左上 640x360，其余是截图画布留白）。
+
+**拖动窗口也会同步**：`WindowSize.installResizeHook()` 挂 `window.onResize`，把
+`windowScale` 改写成实际比例（超过 100% 就把 `windowRes` 抬到最近的 60p 档、比例回 100）。
+自己 `apply()` 时用 `applying` 标志挡掉这层，不会打架。
+
+坑：
+
+- 同一帧里改完窗口，`FlxG.stage.stageWidth` / `FlxG.width` 还是旧值，要等一帧才更新 ——
+  探针是在第 300 帧采样才看到正确数字的。
+- `Main.hx` 的 `fixScaling()` 把窗口设成 `1280*dpi/96`，所以「默认分辨率」在 150% 屏上是
+  1080 而不是 720；认领式默认值就是为了避免这个分歧。
+
 ### 0.1 未解决（2026-11-13 记录，之后没复核）：0.6.3 的 Options → Switch Engine 打不开
 
 **现象**：0.6.3 里选中 Switch Engine，界面不出现（卡住 / 一闪即回）。

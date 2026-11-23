@@ -1,5 +1,6 @@
 package options;
 
+import backend.WindowSize;
 import objects.Character;
 
 class GraphicsSettingsSubState extends BaseOptionsMenu
@@ -83,6 +84,28 @@ class GraphicsSettingsSubState extends BaseOptionsMenu
 		option.maxValue = 240;
 		option.displayFormat = '%v FPS';
 		option.onChange = onChangeFramerate;
+
+		var option:Option = new Option('Resolution',
+			"Size of the game window, picked from what your screen fits.\nThe game lays itself out for this, so smaller is cheaper but\nshows less of the stage. Bigger than the screen gets clamped.",
+			'windowRes',
+			INT);
+		addOption(option);
+		option.minValue = WindowSize.MIN_HEIGHT;
+		option.maxValue = WindowSize.maxHeight();
+		option.changeValue = WindowSize.STEP;
+		option.displayFormat = '%v p';
+		option.onChange = onChangeWindowSize;
+
+		var option:Option = new Option('Window Size',
+			"Scales the window down from the resolution above, 10% to 100%.\nIt multiplies with it, so 720p at 50% is a 640x360 window.",
+			'windowScale',
+			INT);
+		addOption(option);
+		option.minValue = 10;
+		option.maxValue = 100;
+		option.changeValue = 5;
+		option.displayFormat = '%v%';
+		option.onChange = onChangeWindowSize;
 		#end
 
 		super();
@@ -103,6 +126,12 @@ class GraphicsSettingsSubState extends BaseOptionsMenu
 	function onChangeFramerate()
 	{
 		ClientPrefs.applyFramerate();
+	}
+
+	function onChangeWindowSize()
+	{
+		ClientPrefs.data.windowRes = WindowSize.clampHeight(ClientPrefs.data.windowRes);
+		WindowSize.apply(ClientPrefs.data.windowRes, ClientPrefs.data.windowScale);
 	}
 
 	override function changeSelection(change:Int = 0)
