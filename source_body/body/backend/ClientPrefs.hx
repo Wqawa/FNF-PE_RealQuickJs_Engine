@@ -26,6 +26,9 @@ import states.TitleState;
 	public var lowQuality:Bool = false;
 	public var shaders:Bool = true;
 	public var cacheOnGPU:Bool = #if !switch false #else true #end; // GPU Caching made by Raltyro
+	// 进歌时把上一首的贴图全扔掉。currentTrackedAssets 只进不出，不手动清的话
+	// 玩过的每首歌的舞台/角色图都会一直留着
+	public var clearOldAssets:Bool = true;
 	public var framerate:Int = 60;
 	public var camZooms:Bool = true;
 	public var hideHud:Bool = false;

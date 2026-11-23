@@ -304,6 +304,16 @@ class PlayState extends MusicBeatState
 		//trace('Playback Rate: ' + playbackRate);
 		_lastLoadedModDirectory = Mods.currentModDirectory;
 		Paths.clearStoredMemory();
+		// currentTrackedAssets 只进不出，不主动清的话上一首的舞台和角色图会一直留着。
+		// 放在 create 最开头：新 state 还没挂 sprite，freeGraphicsFromMemory 没东西可保护，
+		// 等于把整张表清空，新歌的素材再走正常加载进来
+		if (ClientPrefs.data.clearOldAssets)
+		{
+			var before:Int = Lambda.count(Paths.currentTrackedAssets);
+			Paths.freeGraphicsFromMemory();
+			var freed:Int = before - Lambda.count(Paths.currentTrackedAssets);
+			if (freed > 0) trace('[assets] freed $freed stale textures');
+		}
 		// stages that run a SpectrumAnalyzer on the music need the pcm in memory, so they
 		// opt out of streaming. Set by ABotSpeaker, read when the tracks get loaded.
 		audioVizNeeded = false;

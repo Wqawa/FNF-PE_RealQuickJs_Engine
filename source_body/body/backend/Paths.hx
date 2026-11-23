@@ -137,6 +137,10 @@ class Paths
 				}
 			}
 		}
+
+		// 上面只是把 BitmapData 丢掉，对象本身还挂在堆上。不手动 gc 的话
+		// 换歌时堆只涨不降，看着像没清干净
+		System.gc();
 	}
 
 	inline static function destroyGraphic(graphic:FlxGraphic)

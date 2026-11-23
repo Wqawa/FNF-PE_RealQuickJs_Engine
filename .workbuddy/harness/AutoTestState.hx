@@ -166,20 +166,33 @@ class AutoTestState extends MusicBeatState
 			installProfile(Std.parseFloat(profSec));
 		#end
 
-		// 左上角内存显示的取值自检：进歌跑 3 秒后把两种模式的文本抓一次（PE_AUTOTEST_FPSDBG=1）
+		// 左上角内存显示的取值自检：进歌跑 3 秒后把两种模式的文本抓一次（PE_AUTOTEST_FPSDBG=1）。
+		// 顺便在 5 秒时切到 spookeez，验证换歌时旧贴图有没有被清掉
 		if (Sys.getEnv('PE_AUTOTEST_FPSDBG') == '1')
 		{
 			var n:Int = 0;
+			var switched:Bool = false;
 			FlxG.signals.postUpdate.add(function() {
 				n++;
 				if (n == 180 && body.Main.fpsVar != null)
 				{
-					body.Main.fpsVar.detailed = false;
-					body.Main.fpsVar.updateText();
-					trace('[fpsdbg] compact: ' + body.Main.fpsVar.text.replace('\n', ' | '));
 					body.Main.fpsVar.detailed = true;
 					body.Main.fpsVar.updateText();
-					trace('[fpsdbg] detailed: ' + body.Main.fpsVar.text.replace('\n', ' | '));
+					trace('[fpsdbg] song1: ' + body.Main.fpsVar.text.replace('\n', ' | '));
+				}
+				if (n == 300 && !switched)
+				{
+					switched = true;
+					trace('[fpsdbg] switching to spookeez');
+					PlayState.SONG = Song.loadFromJson('spookeez', 'spookeez');
+					LoadingState.prepareToSong();
+					LoadingState.loadAndSwitchState(new PlayState());
+				}
+				if (n == 600 && body.Main.fpsVar != null)
+				{
+					body.Main.fpsVar.detailed = true;
+					body.Main.fpsVar.updateText();
+					trace('[fpsdbg] song2: ' + body.Main.fpsVar.text.replace('\n', ' | '));
 				}
 			});
 		}

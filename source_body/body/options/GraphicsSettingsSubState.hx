@@ -51,6 +51,12 @@ class GraphicsSettingsSubState extends BaseOptionsMenu
 			BOOL);
 		addOption(option);
 
+		var option:Option = new Option('Clear Old Textures',
+			"If checked, textures from the previous song are freed when a new\none starts. Saves a lot of RAM, but the next song loads a bit slower.",
+			'clearOldAssets',
+			BOOL);
+		addOption(option);
+
 		#if !html5 //Apparently other framerates isn't correctly supported on Browser? Probably it has some V-Sync shit enabled by default, idk
 		var option:Option = new Option('Framerate',
 			"Pretty self explanatory, isn't it?",
