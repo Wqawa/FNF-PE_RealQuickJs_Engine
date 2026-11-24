@@ -365,6 +365,27 @@ GC 抖动和脚本多的场景。
 - `Main.hx` 的 `fixScaling()` 把窗口设成 `1280*dpi/96`，所以「100%」在 150% 屏上是
   1080 高；认领式默认值就是为了不让升级把窗口改小。
 
+### 0.0.11 拉伸填充为什么没做（2026-11-24，查过三条路，都堵死）
+
+需求：低分辨率渲染再上采样填满窗口（小黄鸭那种）。结论是这版 OpenFL 上做不了，
+别再重复踩：
+
+1. **重画一遍**：把 `FlxG.game` 用 `BitmapData.draw()` 抓进小位图，再当 `Bitmap` 拉伸显示。
+   画面是对的，但 flixel 每帧用 Graphics 批次重画相机 canvas，等于场景多渲染一轮：
+   实测同一首歌 100% 时 60fps、50% 时 29fps（隐藏窗口）。省的像素不够付成本，否决。
+2. **flixel 的 post-process**（`FLX_POST_PROCESS` + 自写 `PostProcess`）：它 `import
+   openfl.display.OpenGLView`，而 **openfl 9.3.3 里根本没有 `OpenGLView.hx`**，开宏直接编不过。
+   flixel 源码里那句「only supported on OpenGL legacy」就是这个意思。
+3. **裸 GL 截帧 + 拉伸**：需要「在 openfl 渲染流程里插一个每帧 GL 回调」，这正是
+   OpenGLView 提供的，同样没有。
+
+小黄鸭本身是**外挂**：用 Windows 图形捕获抓游戏窗口已经渲染好的帧，跑一次上采样
+shader（FSR/NIS/Lanczos），可选再补帧。它便宜是因为从不重画场景。
+
+所以省 GPU 的正路是我们已经有的 `Window Size`：50% 就是真的按 960x540 渲染，
+配小黄鸭抓这个窗口拉到全屏，效果和需求描述一致，引擎零改动。
+真要引擎内做，得换/降 OpenFL 渲染后端（恢复 legacy GL 或自己维护 fork），不是一晚的活。
+
 ### 0.1 未解决（2026-11-13 记录，之后没复核）：0.6.3 的 Options → Switch Engine 打不开
 
 **现象**：0.6.3 里选中 Switch Engine，界面不出现（卡住 / 一闪即回）。
