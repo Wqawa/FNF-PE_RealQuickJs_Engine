@@ -85,19 +85,8 @@ class GraphicsSettingsSubState extends BaseOptionsMenu
 		option.displayFormat = '%v FPS';
 		option.onChange = onChangeFramerate;
 
-		var option:Option = new Option('Resolution',
-			"Size of the game window, picked from what your screen fits.\nThe game lays itself out for this, so smaller is cheaper but\nshows less of the stage. Bigger than the screen gets clamped.",
-			'windowRes',
-			INT);
-		addOption(option);
-		option.minValue = WindowSize.MIN_HEIGHT;
-		option.maxValue = WindowSize.maxHeight();
-		option.changeValue = WindowSize.STEP;
-		option.displayFormat = '%v p';
-		option.onChange = onChangeWindowSize;
-
 		var option:Option = new Option('Window Size',
-			"Scales the window down from the resolution above, 10% to 100%.\nIt multiplies with it, so 720p at 50% is a 640x360 window.",
+			"How much of the screen the window takes, 10% to 100%.\n100% is as tall as your display, the game keeps its\n16:9 shape and stays centered while it resizes.",
 			'windowScale',
 			INT);
 		addOption(option);
@@ -130,8 +119,7 @@ class GraphicsSettingsSubState extends BaseOptionsMenu
 
 	function onChangeWindowSize()
 	{
-		ClientPrefs.data.windowRes = WindowSize.clampHeight(ClientPrefs.data.windowRes);
-		WindowSize.apply(ClientPrefs.data.windowRes, ClientPrefs.data.windowScale);
+		WindowSize.apply(ClientPrefs.data.windowScale);
 	}
 
 	override function changeSelection(change:Int = 0)

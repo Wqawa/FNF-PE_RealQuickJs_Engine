@@ -327,39 +327,43 @@ GC 抖动和脚本多的场景。
 - `notes.insert(0, ...)` 每次 spawn 的 O(n) 没动：它决定绘制层级，换 `add()` 会改音符互相压盖的顺序。
 - 着色器（音符 RGB 每 sprite 一次 program 绑定、Philly 全屏雨的 30 波纹循环）留到下一轮。
 
-### 0.0.10 2026-11-24 早上：分辨率 / 窗口大小两个设置项
+### 0.0.10 2026-11-24 早上：窗口大小（百分比）+ FPS 详细模式改到逻辑帧
 
 需求原本想要「低分辨率渲染 + 超分到原尺寸」（小黄鸭那种）。查过之后这条路在 flixel 5.6
 上要开 `FLX_POST_PROCESS` 自己写 PostProcess，把整个场景画进低分辨率 FBO 再拉伸，
 相机视口 / HUD / 相机 shader / 视频都得重新验证 —— 用户选了先做窗口版，超分留到下一轮。
 
-**两个选项**（Options → Graphics，接在帧率后面）：
+**选项**（Options → Graphics，接在帧率后面，只有一个）：
 
 | 选项 | 变量 | 范围 | 说明 |
 |---|---|---|---|
-| Resolution | `windowRes` | 180~显示屏高度，步进 60 | 物理像素高度，宽度按 16:9；超过屏幕会被夹住 |
-| Window Size | `windowScale` | 10~100% | 在 Resolution 上再乘一次 |
+| Window Size | `windowScale` | 10~100% | 相对**屏幕**高度；100% = 屏幕能放的最高 16:9，宽度自动按比例 |
 
-实际窗口 = `windowRes * windowScale%` 的物理像素。`windowRes` 默认 0 = 「没设过」，
-`loadPrefs` 时用当前窗口高度认领（`fixScaling()` 已经把窗口设成 1280×dpi），
-所以升级后窗口尺寸不会变。`WindowSize.maxHeight()` 在打开设置时按当前显示器算，
-换显示器后列表跟着变。
+之前还有个 `Resolution`（180~屏幕高度，步进 60）跟百分比相乘，实测那个数字会被
+`changeValue` 步进搞出 961p 这种怪值，而且和百分比重复，用户要求删掉，只剩百分比。
+`windowScale` 默认 0 = 「没设过」，`loadPrefs` 时按当前窗口高度反算百分比
+（`fixScaling()` 已经把窗口设成 1280×dpi），所以升级后窗口尺寸不变。
 
-**为什么窗口变小不会把画面裁掉**：flixel 默认 `FlxG.scaleMode = RatioScaleMode`，
-`onMeasure` 只改 `gameSize`/`scale`，`FlxG.width/height` 始终回到 `initialWidth/Height`
-（1280x720）。实测 640x360 窗口下 `flx=1280x720 cam=1280x720`，截图确认整幅画面都在
-（`testout/crash_shot.png` 里游戏占左上 640x360，其余是截图画布留白）。
+**缩放围绕窗口中心**：`apply()` 先记住窗口当前中心点，`resize()` 之后把窗口挪回去，
+再 `keepOnScreen()` 夹进屏幕范围。不会每次调小都往左上角爬。
 
-**拖动窗口也会同步**：`WindowSize.installResizeHook()` 挂 `window.onResize`，把
-`windowScale` 改写成实际比例（超过 100% 就把 `windowRes` 抬到最近的 60p 档、比例回 100）。
-自己 `apply()` 时用 `applying` 标志挡掉这层，不会打架。
+**画面不会被裁**：flixel 默认 `FlxG.scaleMode = RatioScaleMode`，`onMeasure` 只改
+`gameSize`/`scale`，`FlxG.width/height` 始终回到 `initialWidth/Height`（1280x720）。
+640x360 窗口下实测 `flx=1280x720 cam=1280x720`，截图确认整幅画面都在。
+
+**拖动窗口也会同步**：`WindowSize.installResizeHook()` 挂 `window.onResize`，按新高度
+反算百分比写回 `windowScale`（自己 apply 时用 `applying` 标志挡掉，不打架）。
+
+**FPS 详细模式的 F3 也顺手修了**：原来在 `FPSCounter.__enterFrame` 里查
+`FlxG.keys.anyJustPressed`，但 `__enterFrame` 只在**绘制帧**跑，`justPressed` 只活一个
+**逻辑帧**。计算帧 120 / 绘画帧 60 时，按键有一半被吃掉，表现为「要按很多下才切换」。
+现在挪到 `FlxG.signals.postUpdate`（每个逻辑帧都跑），一按一个准。
 
 坑：
 
-- 同一帧里改完窗口，`FlxG.stage.stageWidth` / `FlxG.width` 还是旧值，要等一帧才更新 ——
-  探针是在第 300 帧采样才看到正确数字的。
-- `Main.hx` 的 `fixScaling()` 把窗口设成 `1280*dpi/96`，所以「默认分辨率」在 150% 屏上是
-  1080 而不是 720；认领式默认值就是为了避免这个分歧。
+- 同一帧里改完窗口，`FlxG.stage.stageWidth` / `FlxG.width` 还是旧值，要等一帧才更新。
+- `Main.hx` 的 `fixScaling()` 把窗口设成 `1280*dpi/96`，所以「100%」在 150% 屏上是
+  1080 高；认领式默认值就是为了不让升级把窗口改小。
 
 ### 0.1 未解决（2026-11-13 记录，之后没复核）：0.6.3 的 Options → Switch Engine 打不开
 

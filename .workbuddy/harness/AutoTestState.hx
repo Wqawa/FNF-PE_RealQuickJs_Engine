@@ -131,20 +131,15 @@ class AutoTestState extends MusicBeatState
 				+ ' pref=' + ClientPrefs.data.framerate);
 		}
 
-		// 窗口尺寸自检：PE_AUTOTEST_WINSIZE="分辨率/百分比"，例如 720/100、1080/50
+		// 窗口尺寸自检：PE_AUTOTEST_WINSIZE=百分比，例如 50
 		var ws:Null<String> = Sys.getEnv('PE_AUTOTEST_WINSIZE');
-		if (ws != null && ws.indexOf('/') > 0)
+		if (ws != null && ws.length > 0)
 		{
-			var parts:Array<String> = ws.split('/');
-			ClientPrefs.data.windowRes = Std.parseInt(parts[0]);
-			ClientPrefs.data.windowScale = Std.parseInt(parts[1]);
-			backend.WindowSize.apply(ClientPrefs.data.windowRes, ClientPrefs.data.windowScale);
+			ClientPrefs.data.windowScale = Std.parseInt(ws);
+			backend.WindowSize.apply(ClientPrefs.data.windowScale);
 			var win = lime.app.Application.current.window;
-			trace('[win] res=' + ClientPrefs.data.windowRes + ' scale=' + ClientPrefs.data.windowScale
-				+ ' window=' + win.width + 'x' + win.height + ' wscale=' + win.scale
-				+ ' dpi=' + win.display.dpi
-				+ ' stage=' + FlxG.stage.stageWidth + 'x' + FlxG.stage.stageHeight
-				+ ' flx=' + FlxG.width + 'x' + FlxG.height
+			trace('[win] pct=' + ClientPrefs.data.windowScale + ' max=' + backend.WindowSize.maxHeight()
+				+ ' window=' + win.width + 'x' + win.height + ' at ' + win.x + ',' + win.y
 				+ ' display=' + Std.int(win.display.bounds.width) + 'x' + Std.int(win.display.bounds.height));
 		}
 

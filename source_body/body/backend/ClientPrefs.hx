@@ -36,10 +36,8 @@ import states.TitleState;
 	public var drawFramerate:Int = 60;
 	// 计算帧: how often the game steps (input, notes, audio sync). 60 is the floor.
 	public var updateFramerate:Int = 60;
-	// Window size in pixels (height; width is 16:9). 0 = never touched, adopt the current one.
-	public var windowRes:Int = 0;
-	// 10..100%, scales the window down from windowRes on top of it.
-	public var windowScale:Int = 100;
+	// 窗口大小: percent of the screen height, 10..100. 0 = never set, adopt the current window
+	public var windowScale:Int = 0;
 	public var camZooms:Bool = true;
 	public var hideHud:Bool = false;
 	public var noteOffset:Int = 0;

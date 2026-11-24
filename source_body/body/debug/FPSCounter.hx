@@ -59,9 +59,21 @@ class FPSCounter extends TextField
 	// can run several of these, which is exactly what the detailed readout is for.
 	var calcCount:Int = 0;
 	var calcWindowStart:Float = 0;
+	static var defaultToggle:Array<FlxKey> = [F3];
 
 	function onUpdateTick():Void
 	{
+		// The F3 toggle lives here, not in __enterFrame: that one only runs once per drawn
+		// frame, and justPressed lasts for a single logic tick, so at update 120 / draw 60
+		// every other press got eaten.
+		var toggle:Array<FlxKey> = (ClientPrefs.keyBinds != null) ? ClientPrefs.keyBinds.get('fps_debug') : null;
+		if (toggle == null) toggle = defaultToggle;
+		if (FlxG.keys.anyJustPressed(toggle))
+		{
+			detailed = !detailed;
+			updateText();
+		}
+
 		var now:Float = haxe.Timer.stamp() * 1000;
 		if (calcWindowStart == 0) calcWindowStart = now;
 
@@ -82,10 +94,6 @@ class FPSCounter extends TextField
 	// Event Handlers
 	private override function __enterFrame(deltaTime:Float):Void
 	{
-		var toggle:Array<FlxKey> = (ClientPrefs.keyBinds != null) ? ClientPrefs.keyBinds.get('fps_debug') : null;
-		if (toggle == null) toggle = [F3];
-		if (FlxG.keys.anyJustPressed(toggle)) detailed = !detailed;
-
 		final now:Float = haxe.Timer.stamp() * 1000;
 		times.push(now);
 		while (times[0] < now - 1000) times.shift();

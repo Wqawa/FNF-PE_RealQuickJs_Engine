@@ -8,15 +8,14 @@ import lime.ui.Window;
 /**
  * Window sizing for the Graphics settings.
  *
- * The engine lays the game out for whatever size the window is (flixel resizes itself on
- * window resize), so "resolution" here really means "how many pixels the window has".
- * Picking a smaller one is cheaper, it just shows less of the stage.
+ * One percentage, relative to the screen: 100% is as tall as the display can show in 16:9.
+ * The engine lays the game out for whatever size the window is (flixel keeps 1280x720 and
+ * scales the game sprite), so this is purely "how many pixels the window has".
  */
 class WindowSize
 {
 	public static inline var ASPECT:Float = 16 / 9;
-	public static inline var STEP:Int = 60; // 960x540, 1280x720, 1920x1080...
-	public static inline var MIN_HEIGHT:Int = 180;
+	public static inline var MIN_PCT:Int = 10;
 
 	static var applying:Bool = false;
 	static var hooked:Bool = false;
@@ -34,7 +33,7 @@ class WindowSize
 		return System.getDisplay(0);
 	}
 
-	// biggest 16:9 height the screen can hold
+	// biggest 16:9 height the screen can hold; this is what 100% means
 	public static function maxHeight():Int
 	{
 		var d:Null<Display> = display();
@@ -45,12 +44,11 @@ class WindowSize
 		return Std.int(Math.min(byHeight, byWidth));
 	}
 
-	public static function clampHeight(h:Int):Int
+	public static function heightFor(pct:Int):Int
 	{
-		var max:Int = maxHeight();
-		if (h > max) h = max;
-		if (h < MIN_HEIGHT) h = MIN_HEIGHT;
-		return Std.int(Math.round(h / STEP)) * STEP;
+		if (pct < MIN_PCT) pct = MIN_PCT;
+		if (pct > 100) pct = 100;
+		return Std.int(Math.round(maxHeight() * pct / 100));
 	}
 
 	// 0 means "never set": take whatever the window already is, so upgrading changes nothing
@@ -59,26 +57,38 @@ class WindowSize
 		var win:Null<Window> = window();
 		if (win == null) return;
 
-		if (ClientPrefs.data.windowRes <= 0) ClientPrefs.data.windowRes = Std.int(win.height);
-		if (ClientPrefs.data.windowScale <= 0) ClientPrefs.data.windowScale = 100;
+		if (ClientPrefs.data.windowScale <= 0)
+		{
+			var max:Int = maxHeight();
+			var pct:Int = max > 0 ? Std.int(Math.round(win.height * 100 / max)) : 100;
+			if (pct < MIN_PCT) pct = MIN_PCT;
+			if (pct > 100) pct = 100;
+			ClientPrefs.data.windowScale = pct;
+		}
 
-		apply(ClientPrefs.data.windowRes, ClientPrefs.data.windowScale);
+		apply(ClientPrefs.data.windowScale);
 	}
 
-	public static function apply(res:Int, scalePct:Int):Void
+	public static function apply(pct:Int):Void
 	{
 		var win:Null<Window> = window();
 		if (win == null) return;
 
-		res = clampHeight(res);
-		if (scalePct < 10) scalePct = 10;
-		if (scalePct > 100) scalePct = 100;
+		if (pct < MIN_PCT) pct = MIN_PCT;
+		if (pct > 100) pct = 100;
 
-		var h:Int = Std.int(Math.round(res * scalePct / 100));
+		var h:Int = heightFor(pct);
 		var w:Int = Std.int(Math.round(h * ASPECT));
 
+		// grow/shrink around the middle of where the window already is, like a zoom, so it
+		// doesn't crawl into the top-left corner every time
+		var centerX:Float = win.x + win.width * 0.5;
+		var centerY:Float = win.y + win.height * 0.5;
+
 		applying = true;
-		win.resize(w, h); // one resize event instead of two
+		win.resize(w, h);
+		win.x = Std.int(centerX - w * 0.5);
+		win.y = Std.int(centerY - h * 0.5);
 		keepOnScreen(win);
 		applying = false;
 	}
@@ -96,7 +106,7 @@ class WindowSize
 		if (win.y < d.bounds.y) win.y = Std.int(d.bounds.y);
 	}
 
-	// The player can still drag the window edges. When they do, bend the prefs to what they
+	// The player can still drag the window edges. When they do, bend the pref to what they
 	// ended up with instead of snapping the window back on the next load.
 	public static function installResizeHook():Void
 	{
@@ -112,16 +122,12 @@ class WindowSize
 
 	static function syncFromWindow(h:Int):Void
 	{
-		var res:Int = ClientPrefs.data.windowRes;
-		if (res <= 0) res = h;
+		var max:Int = maxHeight();
+		if (max <= 0) return;
 
-		var pct:Int = Std.int(Math.round(h * 100 / res));
-		if (pct > 100)
-		{
-			// dragged past the picked resolution: move the resolution up, stay at 100%
-			ClientPrefs.data.windowRes = clampHeight(h);
-			ClientPrefs.data.windowScale = 100;
-		}
-		else if (pct >= 10) ClientPrefs.data.windowScale = pct;
+		var pct:Int = Std.int(Math.round(h * 100 / max));
+		if (pct < MIN_PCT) pct = MIN_PCT;
+		if (pct > 100) pct = 100;
+		ClientPrefs.data.windowScale = pct;
 	}
 }
