@@ -71,6 +71,8 @@ class Note extends FlxSprite
 	public var nextNote:Note;
 
 	public var spawned:Bool = false;
+	// already queued for destroy, don't judge it again until PlayState drains the queue
+	public var pendingKill:Bool = false;
 
 	public var tail:Array<Note> = []; // for sustains
 	public var parent:Note;

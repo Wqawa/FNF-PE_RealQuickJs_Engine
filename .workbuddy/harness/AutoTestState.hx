@@ -143,6 +143,9 @@ class AutoTestState extends MusicBeatState
 				+ ' display=' + Std.int(win.display.bounds.width) + 'x' + Std.int(win.display.bounds.height));
 		}
 
+		// 拉伸填充(RenderScale)那条路已经否掉了，字段和 backend.RenderScale 都删了，
+		// 这里原来那段自检还引用着，编译不过。要再试的话先把字段加回来。
+
 		// HUD 自检：跑 5 秒后把时间/分数/图标缩放打出来（验证 timeTxt 缓存和图标缩放）
 		if (Sys.getEnv('PE_AUTOTEST_HUD') == '1')
 		{
@@ -365,6 +368,7 @@ class AutoTestState extends MusicBeatState
 	static function installProfile(duration:Float):Void
 	{
 		var cpu:Array<Float> = [];
+		var drawMs:Array<Float> = [];
 		var gap:Array<Float> = [];
 		var memUse:Array<Int> = [];
 		var memCur:Array<Int> = [];
@@ -372,14 +376,25 @@ class AutoTestState extends MusicBeatState
 		var tStart:Float = 0;
 		var tPrev:Float = 0;
 		var tPre:Float = 0;
+		var tUpd:Float = 0;
+		var pendingDraw:Float = 0;
 		var lastMem:Float = -1;
 		var heapLine:String = '';
 
 		trace('[profile] armed, will sample ' + duration + 's after the song starts');
 
+		var tDrawDone:Float = 0;
 		FlxG.signals.preUpdate.add(function() tPre = haxe.Timer.stamp());
+		FlxG.signals.postUpdate.add(function() tUpd = haxe.Timer.stamp());
 
-		FlxG.signals.postDraw.add(function()
+		// 采样挂在 postUpdate 而不是 postDraw：窗口隐藏时根本不渲染，postDraw 永远不触发，
+		// 之前的探针在无人值守跑测里就卡在这里出不来数
+		FlxG.signals.postDraw.add(function() {
+			tDrawDone = haxe.Timer.stamp();
+			if (tUpd > 0) pendingDraw = (tDrawDone - tUpd) * 1000;
+		});
+
+		FlxG.signals.postUpdate.add(function()
 		{
 			var now:Float = haxe.Timer.stamp();
 			var ps:PlayState = PlayState.instance;
@@ -406,7 +421,9 @@ class AutoTestState extends MusicBeatState
 				return;
 			}
 
-			cpu.push((now - tPre) * 1000);
+			// tPre -> tUpd 是 update 段（逻辑），tUpd -> postDraw 是渲染提交段
+			cpu.push((tUpd - tPre) * 1000);
+			if (pendingDraw > 0) { drawMs.push(pendingDraw); pendingDraw = 0; }
 			gap.push((now - tPrev) * 1000);
 			tPrev = now;
 
@@ -440,6 +457,15 @@ class AutoTestState extends MusicBeatState
 
 			sb.add('cpu_ms  avg=' + profileFixed(profileAvg(cpu)) + ' med=' + profileFixed(profilePct(cpuS, 0.5))
 				+ ' p95=' + profileFixed(profilePct(cpuS, 0.95)) + ' max=' + profileFixed(profilePct(cpuS, 1.0)) + '\n');
+			if (drawMs.length > 0)
+			{
+				var drawS:Array<Float> = drawMs.copy();
+				drawS.sort(function(a, b) return a < b ? -1 : (a > b ? 1 : 0));
+				sb.add('draw_ms avg=' + profileFixed(profileAvg(drawMs)) + ' med=' + profileFixed(profilePct(drawS, 0.5))
+					+ ' p95=' + profileFixed(profilePct(drawS, 0.95)) + ' max=' + profileFixed(profilePct(drawS, 1.0))
+					+ ' frames=' + drawMs.length + '/' + cpu.length + '\n');
+			}
+			else sb.add('draw_ms n/a (窗口隐藏，没有真正渲染)\n');
 			sb.add('gap_ms  avg=' + profileFixed(profileAvg(gap)) + ' med=' + profileFixed(profilePct(gapS, 0.5))
 				+ ' p95=' + profileFixed(profilePct(gapS, 0.95)) + ' max=' + profileFixed(profilePct(gapS, 1.0)) + '\n');
 			sb.add('fps_avg=' + profileFixed(1000 / Math.max(0.001, profileAvg(gap))) + '\n');

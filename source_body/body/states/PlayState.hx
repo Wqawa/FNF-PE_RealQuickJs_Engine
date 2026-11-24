@@ -160,8 +160,22 @@ class PlayState extends MusicBeatState
 	public var boyfriend:Character = null;
 
 	public var notes:FlxTypedGroup<Note>;
+	// sustains draw under the strums, taps over them. notes stays a pure logic container
+	// and never goes on the display list, otherwise every note gets drawn twice.
+	public var sustainLayer:FlxTypedGroup<Note>;
+	public var tapLayer:FlxTypedGroup<Note>;
 	public var unspawnNotes:Array<Note> = [];
 	public var eventNotes:Array<EventNote> = [];
+
+	// Hitting or missing a note used to remove and destroy it on the spot. In a dense
+	// section that's several array shifts plus texture releases inside one frame, which
+	// shows up as a stutter. Queue them and let destroyNotes chew through a budget instead.
+	public var killNotes:Array<Note> = [];
+	public var killNotesBudget:Int = 20;
+
+	// reused so spawning a note doesn't allocate a fresh args array every time
+	var spawnNoteArgs:Array<Dynamic> = [0, 0, null, false, 0.0];
+	var noteArg:Array<Dynamic> = [null];
 
 	public var camFollow:FlxObject;
 	private static var prevCamFollow:FlxObject;
@@ -570,7 +584,11 @@ class PlayState extends MusicBeatState
 		uiGroup.add(timeBar);
 		uiGroup.add(timeTxt);
 
+		sustainLayer = new FlxTypedGroup<Note>();
+		tapLayer = new FlxTypedGroup<Note>();
+		noteGroup.add(sustainLayer);
 		noteGroup.add(strumLineNotes);
+		noteGroup.add(tapLayer);
 
 		if(ClientPrefs.data.timeBarType == 'Song Name')
 		{
@@ -1164,6 +1182,8 @@ class PlayState extends MusicBeatState
 			}
 			--i;
 		}
+		// seek / restart path, has to be gone right now instead of on the frame budget
+		destroyNotes(true);
 	}
 
 	// fun fact: Dynamic Functions can be overriden by just doing this
@@ -1390,7 +1410,6 @@ class PlayState extends MusicBeatState
 		FlxG.sound.list.add(inst);
 
 		notes = new FlxTypedGroup<Note>();
-		noteGroup.add(notes);
 
 		try
 		{
@@ -1810,11 +1829,20 @@ class PlayState extends MusicBeatState
 			if(songSpeed < 1) time /= songSpeed;
 			if(unspawnNotes[0].multSpeed < 1) time /= unspawnNotes[0].multSpeed;
 
-			while (unspawnNotes.length > 0 && unspawnNotes[0].strumTime - Conductor.songPosition < time)
+			// count how many are due first, then splice once. shifting one at a time moved
+			// the whole unspawnNotes array for every single note.
+			var spawnCount:Int = 0;
+			var total:Int = unspawnNotes.length;
+			while (spawnCount < total && unspawnNotes[spawnCount].strumTime - Conductor.songPosition < time)
+				spawnCount++;
+
+			var k:Int = 0;
+			while (k < spawnCount)
 			{
-				// always the head of the list, so shift() instead of indexOf() + splice()
-				var dunceNote:Note = unspawnNotes.shift();
-				notes.insert(0, dunceNote);
+				var dunceNote:Note = unspawnNotes[k];
+				notes.add(dunceNote);
+				if (dunceNote.isSustainNote) sustainLayer.add(dunceNote);
+				else tapLayer.add(dunceNote);
 				dunceNote.spawned = true;
 
 				// the index is only for lua, don't scan the whole group when nothing listens
@@ -1822,9 +1850,17 @@ class PlayState extends MusicBeatState
 				#if LUA_ALLOWED
 				if(luaArray != null && luaArray.length > 0) luaIndex = notes.members.indexOf(dunceNote);
 				#end
-				callOnLuas('onSpawnNote', [luaIndex, dunceNote.noteData, dunceNote.noteType, dunceNote.isSustainNote, dunceNote.strumTime]);
-				callOnHScript('onSpawnNote', [dunceNote]);
+				spawnNoteArgs[0] = luaIndex;
+				spawnNoteArgs[1] = dunceNote.noteData;
+				spawnNoteArgs[2] = dunceNote.noteType;
+				spawnNoteArgs[3] = dunceNote.isSustainNote;
+				spawnNoteArgs[4] = dunceNote.strumTime;
+				callOnLuas('onSpawnNote', spawnNoteArgs);
+				noteArg[0] = dunceNote;
+				callOnHScript('onSpawnNote', noteArg);
+				k++;
 			}
+			if (spawnCount > 0) unspawnNotes.splice(0, spawnCount);
 		}
 
 		if (generatedMusic)
@@ -1846,8 +1882,9 @@ class PlayState extends MusicBeatState
 						{
 							var daNote:Note = notes.members[i];
 							// nulls shouldn't happen (invalidateNote splices), but bailing out
-							// without advancing the index used to hang the whole game
-							if(daNote == null) { i++; continue; }
+							// without advancing the index used to hang the whole game.
+							// pendingKill ones are already queued for destroy, don't judge twice
+							if(daNote == null || daNote.pendingKill) { i++; continue; }
 
 							var strumGroup:FlxTypedGroup<StrumNote> = playerStrums;
 							if(!daNote.mustPress) strumGroup = opponentStrums;
@@ -1902,6 +1939,9 @@ class PlayState extends MusicBeatState
 			}
 		}
 		#end
+
+		// every miss / hit for this frame is settled, drain part of the queue
+		destroyNotes();
 
 		setOnScripts('botPlay', cpuControlled);
 		callOnScripts('onUpdatePost', [elapsed]);
@@ -2237,18 +2277,44 @@ class PlayState extends MusicBeatState
 	}
 
 	public function KillNotes() {
-		while(notes.length > 0) {
-			var daNote:Note = notes.members[0];
-			daNote.active = false;
-			daNote.visible = false;
-			invalidateNote(daNote);
-		}
+		// invalidateNote only queues now, so this can't wait for notes.length to shrink.
+		// queue everyone and drain it in one go.
+		var i:Int = notes.length;
+		while(i > 0) invalidateNote(notes.members[--i]);
+		destroyNotes(true);
 		unspawnNotes = [];
 		eventNotes = [];
 	}
 
 	public var totalPlayed:Int = 0;
 	public var totalNotesHit:Float = 0.0;
+
+	// drains a few queued notes per frame. forceAll is for seek / restart paths that
+	// can't wait for the budget.
+	public function destroyNotes(forceAll:Bool = false):Void
+	{
+		var count:Int = killNotes.length;
+		if (count < 1) return;
+
+		var limit:Int = forceAll ? count : killNotesBudget;
+		if (limit < 1 || limit > count) limit = count;
+
+		var idx:Int = 0;
+		while (idx < limit)
+		{
+			var note:Note = killNotes[idx];
+			if (note != null)
+			{
+				note.kill();
+				notes.remove(note, true);
+				if (note.isSustainNote) sustainLayer.remove(note, true);
+				else tapLayer.remove(note, true);
+				note.destroy();
+			}
+			idx++;
+		}
+		killNotes.splice(0, limit);
+	}
 
 	public var showCombo:Bool = false;
 	public var showComboNum:Bool = true;

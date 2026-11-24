@@ -48,7 +48,7 @@ class PlayStateJudge
 
 		// obtain notes that the player can hit
 		var plrInputNotes:Array<Note> = ps.notes.members.filter(function(n:Note):Bool {
-			var canHit:Bool = n != null && !ps.strumsBlocked[n.noteData] && n.canBeHit && n.mustPress && !n.tooLate && !n.wasGoodHit && !n.blockHit;
+			var canHit:Bool = n != null && !n.pendingKill && !ps.strumsBlocked[n.noteData] && n.canBeHit && n.mustPress && !n.tooLate && !n.wasGoodHit && !n.blockHit;
 			return canHit && !n.isSustainNote && n.noteData == key;
 		});
 		plrInputNotes.sort(PlayState.sortHitNotes);
@@ -168,7 +168,7 @@ class PlayStateJudge
 			if (anyHeld && ps.notes.length > 0) {
 				for (n in ps.notes) { // I can't do a filter here, that's kinda awesome
 					// cheapest checks first, this loop runs over every spawned note
-					if (n == null || !n.isSustainNote || !n.canBeHit) continue;
+					if (n == null || n.pendingKill || !n.isSustainNote || !n.canBeHit) continue;
 					if (!n.mustPress || n.tooLate || n.wasGoodHit || n.blockHit) continue;
 					if (ps.strumsBlocked[n.noteData]) continue;
 					if (ps.guitarHeroSustains && (n.parent == null || !n.parent.wasGoodHit)) continue;
@@ -454,9 +454,12 @@ class PlayStateJudge
 	}
 
 	public static function invalidateNote(ps:PlayState, note:Note):Void {
+		if(note == null || note.pendingKill) return;
+		note.pendingKill = true;
+		// kill it now (exists / active off) so forEachAlive and the group stop touching it.
+		// the actual remove + destroy is left to PlayState.destroyNotes.
 		note.kill();
-		ps.notes.remove(note, true);
-		note.destroy();
+		ps.killNotes.push(note);
 	}
 
 	public static function spawnNoteSplashOnNote(ps:PlayState, note:Note) {
