@@ -60,7 +60,7 @@ bash manage.sh --zh audit  # 原 tools/lua_compat_audit.py --ref .workbuddy/upst
 ## 三、修复记录
 
 每轮都是：写 0.6.3 风格 + 1.0.4 风格的 Lua 脚本 → 自动开局跑 → 看哪条炸了或值不对 → 改 → 重新编译再跑。
-脚本在 `.workbuddy/luatest/scripts/`（不入库），结果写 `.workbuddy/testout/`。
+回归脚本和结果目录在 2026-11-24 清掉了，下面的记录留作历史。
 
 ### 第 1 轮
 

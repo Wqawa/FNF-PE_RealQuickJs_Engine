@@ -3,14 +3,14 @@
 #  FNF-PE RealQuickJS —— 唯一的脚本。
 #
 #  环境体检 / 补库 / 编译 / 铺素材 / 资产校验 / Lua 兼容审计 / vanilla import 表生成 /
-#  三条回归 / 安卓构建，全在这里，不互相调用。.workbuddy/ 下只留测试数据和工具链。
+#  QuickJS 静态库，全在这里，不互相调用。自动回归已删，验收靠手动进歌。
 #  带动作调用时自己裹 conhost --headless，无控制台也不弹窗。
 #
 #  用法：
 #    bash manage.sh                 交互式：先选语言，再选功能
 #    bash manage.sh --zh            跳过语言选择
 #    bash manage.sh --en 2          直接跑 2 号功能（CI / 快捷方式）
-#    bash manage.sh --zh 7 lua bopeebo  回归带参数（子命令 + 歌名）
+#    bash manage.sh --zh build debug    带参数跳过二级询问
 #    bash manage.sh --zh release    名字别名也行（编号重排也不受影响）
 #
 #  Windows 双击 manage.bat；它只负责找到 bash 然后转给这里（batch 干不了
@@ -22,7 +22,22 @@ set -uo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$ROOT" || exit 1
 
-MODE=release
+usage() {
+	cat <<'EOF'
+FNF-PE RealQuickJS 工具箱
+
+  bash manage.sh                 交互式菜单
+  bash manage.sh --zh            菜单，中文
+  bash manage.sh --en            菜单，English
+  bash manage.sh --zh 2          直接跑功能 2
+  bash manage.sh --zh release    名字别名（编号变了也不失效）
+  bash manage.sh --zh build debug    带参数跳过二级询问
+  bash manage.sh --zh audit 1    审计选基准：1=0.6.3 / 2=0.7.3 / 直接给路径
+EOF
+}
+
+# PE_BUILD=debug 让默认构建走 debug，命令行 build debug / release 仍然覆盖它
+MODE="${PE_BUILD:-release}"
 L=""
 ACTION=""
 EXTRA=()
@@ -31,10 +46,10 @@ for arg in "$@"; do
 	case "$arg" in
 		--zh|zh) L=zh ;;
 		--en|en) L=en ;;
-		# release/debug 交给下面的 * 当动作名处理（run_action 里已有 2|release / 3|debug），
-		# 原来在这里截成 MODE 会导致 ACTION 为空、直接掉进交互菜单
-		-h|--help|-help) sed -n '2,17p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
-		# 第一个位置参数是动作，后面的是它的参数（如 test 的歌名）
+		# release/debug 交给下面的 * 当动作名处理，别在这里截成 MODE，
+		# 否则 ACTION 为空、直接掉进交互菜单
+		-h|--help|-help) usage; exit 0 ;;
+		# 第一个位置参数是动作，后面的是它的参数（如 build debug）
 		*) if [ -z "$ACTION" ]; then ACTION="$arg"; else EXTRA+=("$arg"); fi ;;
 	esac
 done
@@ -55,8 +70,8 @@ fi
 
 say()  { if [ "$L" = "en" ]; then printf '%s\n' "$2"; else printf '%s\n' "$1"; fi; }
 ok()   { printf '  ok    %s\n' "$*"; }
-bad()  { printf '  缺失  %s\n' "$*"; BAD=$((BAD + 1)); }
-warn() { printf '  注意  %s\n' "$*"; }
+bad()  { if [ "$L" = en ]; then printf '  miss  %s\n' "$*"; else printf '  缺失  %s\n' "$*"; fi; BAD=$((BAD + 1)); }
+warn() { if [ "$L" = en ]; then printf '  note  %s\n' "$*"; else printf '  注意  %s\n' "$*"; fi; }
 head_(){ printf '\n== %s ==\n' "$*"; }
 BAD=0
 
@@ -306,7 +321,7 @@ cmd_env() {
 		if ! check_libs; then
 			say "  库不全，自动补齐（要网络）…" "  libraries incomplete, repairing (needs network)..."
 			if fix_libs; then
-				head_ "复查 haxelib 依赖" "re-check haxelib"
+				head_ "复查 haxelib 依赖"
 				check_libs || true
 			else
 				warn "自动补库失败，检查网络，或手动装 git 源的库"
@@ -335,7 +350,7 @@ cmd_env() {
 	fi
 	printf '\n'
 	[ "$BAD" -eq 0 ] && say "环境完整。" "Environment looks fine." || say "有 $BAD 项缺失。" "$BAD problem(s)."
-	return $([ "$BAD" -eq 0 ] && echo 0 || echo 1)
+	[ "$BAD" -eq 0 ] && return 0 || return 1
 }
 
 # ---------------------------------------------------------------- 编译
@@ -671,49 +686,69 @@ cmd_quickjs() {
 	local libtool="$M/bin/Hostx64/x64/lib.exe"
 	[ -f "$cl" ] || { bad "找不到 cl.exe：$cl"; return 1; }
 
-	mkdir -p "$src/build"
+	mkdir -p "$src/build" "$ROOT/.cache"
 	echo "  编译 quickjs.c / libregexp.c / libunicode.c …"
 	# MSYS 会把 /nologo 这类参数当成路径改写掉，必须关掉参数转换 + 用 - 前缀
-	if ! (cd "$src" && MSYS2_ARG_CONV_EXCL='*' "$cl" -nologo -c -O2 -std:c11 -utf-8 -Fo:build\\ quickjs.c libregexp.c libunicode.c dtoa.c >/dev/null 2>&1); then
-		bad "编译失败（看上面 MSVC 输出）"
+	# cl 的输出留进 .cache，失败时把末尾打出来，别吞掉报错
+	if ! (cd "$src" && MSYS2_ARG_CONV_EXCL='*' "$cl" -nologo -c -O2 -std:c11 -utf-8 -Fo:build\\ quickjs.c libregexp.c libunicode.c dtoa.c >"$ROOT/.cache/quickjs-cl.log" 2>&1); then
+		tail -20 "$ROOT/.cache/quickjs-cl.log"
+		bad "编译失败（完整输出 .cache/quickjs-cl.log）"
 		return 1
 	fi
-	(cd "$src" && MSYS2_ARG_CONV_EXCL='*' "$libtool" -nologo -OUT:build/quickjs-ng.lib build/quickjs.obj build/libregexp.obj build/libunicode.obj build/dtoa.obj >/dev/null 2>&1) \
-		|| { bad "打包 .lib 失败"; return 1; }
+	if ! (cd "$src" && MSYS2_ARG_CONV_EXCL='*' "$libtool" -nologo -OUT:build/quickjs-ng.lib build/quickjs.obj build/libregexp.obj build/libunicode.obj build/dtoa.obj >"$ROOT/.cache/quickjs-lib.log" 2>&1); then
+		tail -20 "$ROOT/.cache/quickjs-lib.log"
+		bad "打包 .lib 失败（完整输出 .cache/quickjs-lib.log）"
+		return 1
+	fi
 
 	ok "third_party/quickjs-ng/build/quickjs-ng.lib（$(du -h "$src/build/quickjs-ng.lib" | cut -f1)）"
 	return 0
 }
 
 # ---------------------------------------------------------------- 兼容审计
-# 只比函数名（add_callback 注册的那些），够看出「上游有、我们没有」
+# 只比函数名（add_callback / addLocalCallback 注册的那些），够看出「上游有、我们没有」
 collect_lua_funcs() {
-	grep -rhoE 'add_callback\(lua,[[:space:]]*"[^"]+"' "$1" 2>/dev/null |
+	# body 树有些回调走 addLocalCallback；0.6.3 参照里有几段整块注释掉的注册。
+	# 两种都不剥掉就会误报缺失，所以先去注释再比。
+	find "$1" -name '*.hx' -print0 2>/dev/null | xargs -0 -r awk '
+		FNR == 1 { blk = 0 }
+		/^[ \t]*\/\// { next }
+		/\/\*/ { blk = 1 }
+		!blk { print }
+		/\*\// { blk = 0 }
+	' 2>/dev/null |
+		grep -oE '(add_callback\(lua,|addLocalCallback\()[[:space:]]*"[^"]+"' |
 		sed -e 's/^[^"]*"//' -e 's/"$//' | LC_ALL=C sort -u
 }
 
 cmd_audit() {
 	head_ "Lua / HScript 兼容审计（函数名级）"
 	# 上游参照默认用仓库内的 .workbuddy/upstream/；换机器可用 PE_REF063 / PE_REF073
-	# 指到任意检出目录，不用改脚本。
+	# 指到任意检出目录，不用改脚本。带参数或 PE_REF 时不读 stdin，headless 才不会
+	# 卡在 read 上然后静默返回 0。
 	local ref063="${PE_REF063:-$ROOT/.workbuddy/upstream/pe063/source}"
 	local ref073="${PE_REF073:-$ROOT/.workbuddy/upstream/pe073/source}"
-	local ref
-	printf '  基准树：\n'
-	printf '    1) %s\n' "$ref063"
-	printf '    2) %s\n' "$ref073"
-	printf '    3) 手输路径\n'
-	printf '  > '
-	read -r ref || return 0
+	local ref="${1:-${PE_REF:-}}"
+	if [ -z "$ref" ] && [ ! -t 0 ]; then ref=1; fi
+	if [ -z "$ref" ]; then
+		printf '  基准树：\n'
+		printf '    1) %s\n' "$ref063"
+		printf '    2) %s\n' "$ref073"
+		printf '    3) 手输路径\n'
+		printf '  > '
+		read -r ref || return 0
+	fi
 	case "$ref" in
 		1) ref="$ref063" ;;
 		2) ref="$ref073" ;;
-		3) printf '  path> '; read -r ref ;;
+		3) printf '  path> '; read -r ref || return 0 ;;
 	esac
 	[ -d "$ref" ] || { bad "目录不存在：$ref"; return 1; }
 
+	mkdir -p .cache
 	collect_lua_funcs "$ref" > .cache/ref.txt
-	collect_lua_funcs "source" > .cache/ours.txt
+	# 回调注册全在 body 树（source/ 是公共层，一个 add_callback 都没有）
+	collect_lua_funcs "source_body" > .cache/ours.txt
 	local a b
 	a=$(wc -l < .cache/ref.txt); b=$(wc -l < .cache/ours.txt)
 	ok "基准 $a 个 / 我们 $b 个"
@@ -761,9 +796,8 @@ print_menu() {
 		printf '  4)  Lua compat audit    function-name diff against an upstream tree\n'
 		printf '  5)  Rebuild import map  regenerate the vanilla HScript import table\n'
 		printf '  6)  QuickJS library     Windows\n'
-		printf '  7)  Regression          Lua / QuickJS (sub-menu)\n'
 		printf '  0)  Quit\n'
-		printf '\n  Names also work: release debug clean verify audit imports luatest qjstest\n'
+		printf '\n  Names also work: release debug clean verify audit imports quickjs\n'
 	else
 		printf '  1)  环境体检       桌面\n'
 		printf '  2)  编译           release / debug / 全量重编（二级菜单）\n'
@@ -771,9 +805,8 @@ print_menu() {
 		printf '  4)  Lua 兼容审计   拿上游源码树当基准，比 add_callback 注册的函数名\n'
 		printf '  5)  重建 import 表 扫 source_vanilla 重生成 HScript 的 import 隔离表\n'
 		printf '  6)  QuickJS 静态库 Windows\n'
-		printf '  7)  回归测试       Lua / QuickJS（二级菜单）\n'
 		printf '  0)  退出\n'
-		printf '\n  名字也能用：release debug clean verify audit imports luatest qjstest\n'
+		printf '\n  名字也能用：release debug clean verify audit imports quickjs\n'
 	fi
 	printf '\n  > '
 }
@@ -787,15 +820,13 @@ ask_sub() {
 	printf '%s' "$pick"
 }
 
-# 统一命令（带子参数跳过二级询问）与连续编号 1-9 都落到这里。
-# 数字编号 2026-11-19 重排成连续的 1-9（见菜单）；旧数字编号语义冲突，已移除，
-# 但名字别名全部保留 —— 老脚本用 --zh release / --zh luatest 这些不会坏。
+# 统一命令（带子参数跳过二级询问）和菜单编号都落到这里。
+# 编号连续 1-6；名字别名是稳定接口，改编号不影响老脚本。
 run_action() {
-	# shift 掉动作本身，剩下的参数透传给测试函数（歌名）
 	local act="$1"; shift
 	case "$act" in
-		# ---- 统一入口：带参数直接用，不带参数才进二级询问 ———
-		env) cmd_env desktop ;;
+		# ---- 带参数直接用，不带参数才进二级询问 ———
+		env) cmd_env ;;
 		build)
 			local mode="${1:-}"
 			[ -z "$mode" ] && mode="$(ask_sub "  编译模式 [1]release / [2]debug / [3]全量重编（回车=release）: " 1)"
@@ -810,32 +841,24 @@ run_action() {
 			[ "$how" = 2 ] && cmd_assets 1 || cmd_assets 0 ;;
 		quickjs)
 			cmd_quickjs ;;
-		test)
-			local which="${1:-}"
-			if [ -n "$which" ]; then shift; fi
-			[ -z "$which" ] && which="$(ask_sub "  回归 [1]Lua / [2]QuickJS（回车=Lua）: " 1)"
-			case "$which" in
-				2|qjs)   cmd_qjstest "$@" ;;
-				*)       cmd_test "$@" ;;
-			esac ;;
-		# ---- 连续编号 1-9（和菜单一一对应）———
+
+		# ---- 菜单编号 ———
 		1) run_action env ;;
 		2) run_action build ;;
 		3) run_action assets ;;
-		4|audit)    cmd_audit ;;
+		4) cmd_audit "${1:-}" ;;
 		5|imports)  cmd_imports ;;
 		6) run_action quickjs ;;
-		7) run_action test "$@" ;;
 
-		# ---- 名字别名（稳定接口，换编号也不受影响）———
+		# ---- 名字别名 ———
 		release)     MODE=release; cmd_build 0 ;;
 		debug)       MODE=debug;   cmd_build 0 ;;
 		clean)       MODE=release; cmd_build 1 ;;
 		verify)      cmd_assets 1 ;;
 		assets-full) cmd_assets 0 ;;
 		quickjs-win) cmd_quickjs ;;
-		luatest)     cmd_test "$@" ;;
-		qjstest)     cmd_qjstest "$@" ;;
+		audit)       cmd_audit "${1:-}" ;;
+		help)        usage ;;
 		0|q|Q)       return 99 ;;
 		*)           say "  没有这个编号" "  no such item"; return 2 ;;
 	esac
@@ -850,17 +873,11 @@ if [ -n "$ACTION" ]; then
 	exit "$rc"
 fi
 
-# 菜单编号现已连续 1-9，和 run_action 一一对应，直接转发即可。
-# 保留这层是为了以后调整菜单顺序时只改这里，不用动 run_action。
-menu_action() {
-	run_action "$@"
-}
-
 while true; do
 	print_menu
 	read -r choice || exit 0
 	printf '\n'
-	menu_action "$choice"; rc=$?
+	run_action "$choice"; rc=$?
 	[ "$rc" -eq 99 ] && exit 0
 	printf '\n'
 	say "  回车继续…" "  press enter to continue…"

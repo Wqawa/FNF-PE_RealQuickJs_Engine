@@ -234,23 +234,6 @@ Lua 那边是同一个两层结构（`FunkinLua.getVar` 走 `get(name)`，脚本
 
 ## 12. 怎么验证它真的在跑
 
-```bash
-bash manage.sh --zh qjstest bopeebo
-```
-
-流程：注入 `AutoTestState` → 编译（窗口最小化 + 静音 + 挪屏幕外，不抢焦点）→
-把 `.workbuddy/luatest/qjs/*.js` 放进 `bin/mods/scripts/` → 以 `PE_AUTOTEST_JSENGINE=QuickJS`
-自动开局 → 等结果文件 → 关进程 → 清走测试脚本。
-
-产物在 `.workbuddy/testout/`：
-
-| 文件 | 内容 |
-|---|---|
-| `qjs_smoke.txt` | 主结果，一行一条 PASS / FAIL，末尾 `DONE\|qjs` |
-| `qjs_child.txt` | 第二个脚本（同名回调）自己写的，证明一文件一 context |
-| `qjs_selfremove.txt` | 自卸之后那一帧还活着 |
-| `qjs_js_log.txt` | 运行期 `js_log.txt` 的副本（trace / 报错 / 脚本装载记录） |
-
-冒烟脚本覆盖：eval 生效、seedGlobals、共享变量表、属性读写、`Function_Stop` 拦下倒计时、
-`addLuaScript` / `removeLuaScript` / `isRunning`、跨脚本读全局、timer 回调、同名回调不互顶、
-回调里自卸不崩。
+自动回归（`qjstest` + `AutoTestState` + `luatest/qjs/`）在 2026-11-24 删掉了。
+现在手动验：`bash manage.sh --zh release` 编完，把 `.js` 放进 `bin/mods/body/scripts/`，
+正常进歌看效果。trace 和报错在 `bin/testout/js_log.txt`。

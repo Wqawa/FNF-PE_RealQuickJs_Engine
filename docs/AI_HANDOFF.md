@@ -1,5 +1,8 @@
 > **2026-11-13 晚：** 所有编译/素材/审计脚本已合并进仓库根目录的 `manage.sh` + `manage.bat`，
 > 本文里出现的 `building/*.sh`、`tools/*.py`、`setup/*` 命令都已作废，只当历史记录看。
+>
+> **2026-11-24：** 自动回归入口（`AutoTestState` / `apply_hook.py` / `luatest/`）和版本探针已删。
+> 本文里 `luatest` / `qjstest` / `PE_AUTOTEST_*` 的部分也是历史记录，现在验收只能手动进歌。
 
 # AI 交接文档 — FNF-PE_RealQuickJs_Engine
 
@@ -518,26 +521,10 @@ bash manage.sh env                     # 环境体检，缺库会自动补
   `manage.sh` 的铺素材步骤现在只是把 `assets/<版本>` 逐文件硬链接到 `bin/assets/<版本>`。
 - 无控制台环境（编辑器 / CI / 后台任务）带动作调用时会自动裹 `conhost --headless`，
   否则 haxe、cl、link 各弹一个黑框；真退出码走临时文件带出来（`conhost` 会把退出码吃成 0）
-- 跑游戏/跑测试一律不弹窗：`AutoTestState` 把窗口最小化 + 挪屏幕外 + 静音，
-  只有 `PE_AUTOTEST_SHOW=1` 才显示画面
+- 自动回归入口已删（2026-11-24）：验收就是编译完手动进歌，mod 放 `bin/mods/<版本>/`
+- 脚本报错仍写 `bin/testout/js_log.txt`，舞台调试写 `bin/testout/stage_dbg.txt`
 
-回归（两条，别混）：
-
-```bash
-bash manage.sh --zh luatest [song]  # Lua / 兼容层（7 号）
-bash manage.sh --zh qjstest [song]  # QuickJS 真运行时
-PE_BUILD=debug bash manage.sh --zh luatest
-NOPATCH=1 bash manage.sh --zh luatest   # 不给谱面打补丁
-```
-
-- 测试入口 `AutoTestState.hx` 由 `harness/apply_hook.py on/off` 临时拷进 `source_body/body/`，跑完自动撤
-- 脚本放 `bin/mods/body/scripts/` —— **按版本分目录**，`bin/mods/scripts` 是扫不到的
-- 结果写 `.workbuddy/testout/*.txt`，格式 `PASS|名字` / `FAIL|名字` / `ERR|...`
-- 两个 runner 都会把 `engine.txt` 强制成 `body`、跑完还原：不强制的话 `Main.main()`
-  走进 pe063/vanilla 分支，测试入口那个补丁不在那条路上，一个结果文件都不会有
-- **cleanup 是白名单**：新增测试脚本必须同时加进 cleanup，否则会留在 `bin/mods` 里
-
-**最近一次全绿（2026-11-16）**
+**最后一次自动回归全绿（2026-11-16，工具已删，仅存档）**
 
 ```
 edge 10/0   more 37/0   v073 58/0   v104 32/0   jssyntax 1/0

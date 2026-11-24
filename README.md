@@ -45,8 +45,6 @@ mods/xxx/scripts/legacy-thing(%run_v_0.6.3).lua
 
 ```
 manage.sh / manage.bat                 中心脚本入口
-.workbuddy/harness/                    测试入口注入（apply_hook.py）
-.workbuddy/luatest/                    Lua / JS / HScript 测试脚本与谱面补丁
 .workbuddy/toolchain/                  安卓 JDK17 + SDK + NDK（不入库）
 .workbuddy/upstream/                   上游参照（pe063 / pe073 / pe104 / novaflare）
 .workbuddy/memory/                     逐日流水账
@@ -65,10 +63,9 @@ source_body/body/                      改版 1.0.4（本体），包 backend.* 
 └── states/PlayState.hx                uiGroup 展开、旧容器、退出清理
 
 source_vanilla/vanilla/                原版 1.0.4，全部 vanilla.* 前缀
-└── psychlua/IsolatedImports.hx        import 别名表（manage.sh 功能 8 重建）
+└── psychlua/IsolatedImports.hx        import 别名表（manage.sh 功能 5 重建）
 
 source_063/pe063/                      Psych Engine 0.6.3，全部 pe063.* 前缀
-└── debug/Probe.hx                     路径探针
 
 docs/                                  见下一节
 third_party/quickjs-ng/                JS 运行时源码 + 静态库（产物不入库）

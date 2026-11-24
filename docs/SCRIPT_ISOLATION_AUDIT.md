@@ -145,12 +145,11 @@ Adobe Animate 2018 的单个 `spritemap.json`，碰到 2019+ 的 `spritemap1.jso
 
 ## 怎么验证
 
-```bash
-bash manage.sh --zh luatest                # Lua/兼容层，含 isolation.txt（10 条）
-bash manage.sh --zh qjstest                # QuickJS 通道
-```
+自动回归在 2026-11-24 删掉了，`luatest` / `qjstest` 命令已不存在。现在只能
+`bash manage.sh --zh release` 之后把脚本放进 `bin/mods/<版本>/scripts/` 手动进歌验，
+结果看 `bin/testout/js_log.txt`。
 
-`isolation.txt` 覆盖：`Paths.VERSION_DIR` 是 body、`vanilla.*` 类拿不到、assets 根脚本的
+下面这些是原来的 `isolation.txt` 覆盖内容，留作历史：`Paths.VERSION_DIR` 是 body、`vanilla.*` 类拿不到、assets 根脚本的
 `isRunning`、大小写不同的 `isRunning`、`scripts/` 目录脚本的 `isRunning`、`addHScript` 不重复建实例、
 hscript 的 `%run_v_` 版本标记（带/不带两种）、`removeHScript` 之后 `isRunning` 立刻为 false。
 
