@@ -24,7 +24,7 @@ class FPSCounter extends TextField
 	**/
 	public var currentFPS(default, null):Int;
 
-	/** Logic ticks per second (update framerate). Render frames never show this. **/
+	// logic ticks per second; render frames never show this
 	public var calcFPS(default, null):Int = 0;
 
 	/**
@@ -32,12 +32,10 @@ class FPSCounter extends TextField
 	**/
 	public var memoryMegas(get, never):Float;
 
-	/** 堆总量，跟 memoryMegas 一起看才知道 GC 离下一次回收还有多远 */
+	// reserved heap, useful next to memoryMegas
 	public var totalMegas(get, never):Float;
 
-	// F3 cycles through pages instead of dumping everything at once. The game window is
-	// never tall enough for the full texture list, and a second OS window turned out to
-	// wreck the main GL context, so the overlay stays in-window and scrolls instead.
+	// F3 cycles pages: one window and a scroll, the full list never fits on screen
 	public static inline var PAGE_OFF:Int = 0;
 	public static inline var PAGE_SUMMARY:Int = 1;
 	public static inline var PAGE_GAME:Int = 2;
@@ -48,9 +46,7 @@ class FPSCounter extends TextField
 	public var page:Int = PAGE_OFF;
 	public var detailed:Bool = false;
 
-	// What you actually see: one box per block, stacked under each other like the MC debug
-	// screen. Main adds this right below the text field, which stays empty and only carries
-	// the position and visibility, so Main.fpsVar keeps working for scripts.
+	// the visible boxes. the text field stays empty and only carries x/y and visibility
 	public var panel:Sprite;
 
 	static inline var PAD:Float = 3;
@@ -115,8 +111,7 @@ class FPSCounter extends TextField
 			labels.push(label);
 		}
 
-		// Logic and render rates are separate settings, so a lone frame counter can't tell
-		// you whether the game itself is keeping up.
+		// logic and draw rates are separate settings, show both
 		FlxG.signals.preUpdate.add(onUpdateStart);
 		FlxG.signals.postUpdate.add(onUpdateTick);
 		FlxG.signals.preDraw.add(onDrawStart);
@@ -125,7 +120,7 @@ class FPSCounter extends TextField
 		FlxG.signals.focusGained.add(onFocusGained);
 	}
 
-	// Losing focus pauses the game (autoPause), so repainting the overlay is pure churn.
+	// autoPause stops update on focus loss, no point repainting
 	var focused:Bool = true;
 
 	function onFocusLost():Void focused = false;
@@ -164,9 +159,7 @@ class FPSCounter extends TextField
 	{
 		updateUs = Perf.micros() - updateStart;
 
-		// The F3 toggle lives here, not in __enterFrame: that one only runs once per drawn
-		// frame, and justPressed lasts for a single logic tick, so at update 120 / draw 60
-		// every other press got eaten.
+		// here, not __enterFrame: justPressed lasts one logic tick, draw can be slower
 		var toggle:Array<FlxKey> = (ClientPrefs.keyBinds != null) ? ClientPrefs.keyBinds.get('fps_debug') : null;
 		if (toggle == null) toggle = defaultToggle;
 		if (FlxG.keys.anyJustPressed(toggle))
@@ -178,7 +171,7 @@ class FPSCounter extends TextField
 			updateText();
 		}
 
-		// wheel scrolls the open page. Nothing else in the game uses it, so no key to steal.
+		// wheel scrolls the open page
 		if (page != PAGE_OFF)
 		{
 			var wheel:Int = FlxG.mouse.wheel;
@@ -232,13 +225,12 @@ class FPSCounter extends TextField
 		text = '';
 		layout(pageBlocks());
 
-		// same idea as before: drop below half the draw rate and the top block goes red
+		// below half the draw rate and the top block goes red
 		var color:Int = (currentFPS < FlxG.drawFramerate * 0.5) ? 0xFFFF0000 : 0xFFFFFFFF;
 		if (labels[0].textColor != color) labels[0].textColor = color;
 	}
 
-	// Keeps the panel on the game's stage. One placement, done every refresh so a state
-	// switch that rebuilds the stage cannot leave it orphaned.
+	// reattach on every refresh: state switches can rebuild the stage
 	function attachPanel():Void
 	{
 		var want:DisplayObjectContainer = this.parent;
@@ -255,8 +247,7 @@ class FPSCounter extends TextField
 		}
 	}
 
-	// Lays the page out top to bottom, hugging the left edge, scrolled by scrollY. Blocks
-	// that scroll past the screen are skipped instead of drawn off-screen.
+	// left aligned, top to bottom, scrolled by scrollY. skip fully off-screen blocks
 	function layout(blocks:Array<String>):Void
 	{
 		var screenH:Float = (panel.stage != null) ? panel.stage.stageHeight : FlxG.height;
@@ -362,8 +353,7 @@ class FPSCounter extends TextField
 	var jsHeap:Float = 0;
 	var statNext:Float = 0;
 
-	// Blocks that only change once per collect. Rebuilding a few hundred lines five times a
-	// second for the same text is pure garbage, so they are built here and reused.
+	// rebuilt once per collect, not once per frame
 	var scriptBlock:String = '';
 	var charBlock:String = '';
 	var texBlock:String = '';
@@ -376,8 +366,7 @@ class FPSCounter extends TextField
 		if (now < statNext) return;
 		statNext = now + STAT_INTERVAL;
 
-		// A state switch can free the characters / scripts mid-walk. Swallow it: the panel
-		// is a debug toy and must never be the reason a song change blows up.
+		// a state switch can free things mid-walk; the debug panel must never break a song
 		try
 		{
 			jsHeap = jsruntime.QuickJSHandler.heapBytes();
@@ -409,8 +398,8 @@ class FPSCounter extends TextField
 
 			var bd = g.bitmap;
 			var bytes:Float = bd.width * bd.height * 4;
-			// cacheOnGPU 把 CPU 侧像素扔了（image 变 null），纹理还在显存里。
-			// 分开算，不然开了缓存还显示同一个数，看不出省没省
+			// cacheOnGPU drops the CPU pixels (image is null), the texture stays on the GPU.
+			// count them apart so the saving is actually visible
 			var gpu:Bool = (bd.image == null);
 			if (gpu) texVram += bytes;
 			else texRam += bytes;
@@ -433,8 +422,7 @@ class FPSCounter extends TextField
 		audioCount = Lambda.count(Paths.currentTrackedSounds);
 	}
 
-	// bf / dad / gf only. Modchart characters live inside their own groups and walking those
-	// means poking at typed groups through reflection, not worth it on a debug line.
+	// bf / dad / gf only; modchart characters live in their own groups
 	function collectChars():Void
 	{
 		charBlock = '';
@@ -503,11 +491,11 @@ class FPSCounter extends TextField
 		buf.add('scripts   lua $luaCount · hx $hxCount · js $jsCount   ${fmtMs(scriptUs)}');
 		if (jsHeap > 0) buf.add('\njs heap ${FlxStringUtil.formatBytes(jsHeap)}');
 
-		// no cap on purpose: hiding half the scripts is how a slow one stays unnoticed
+		// no cap: a slow script in the second half would stay unnoticed
 		for (i in 0...rows.length)
 		{
 			var r = rows[i];
-			// HScript and JS can't report their own heap, so say nothing instead of "0 B"
+			// hx / js can't report per-script heap, show '-' instead of 0 B
 			var size:String = (r.bytes > 0) ? FlxStringUtil.formatBytes(r.bytes) : '-';
 			buf.add('\n${r.name}  ${size}  ${fmtMs(r.us)}  x${r.calls}');
 		}
@@ -515,8 +503,7 @@ class FPSCounter extends TextField
 		scriptBlock = buf.toString();
 	}
 
-	// Song, rhythm and judgement state. Everything here comes straight off PlayState, so it
-	// is also the page that tells you whether a slow frame is engine work or mod work.
+	// song state straight off PlayState: tells engine work from mod work
 	function collectGame():Void
 	{
 		gameBlock = '';
@@ -571,7 +558,7 @@ class FPSCounter extends TextField
 
 	static function fmtMs(us:Float):String
 	{
-		// a bare Lua callback is a few microseconds, "0ms" would look like the probe is dead
+		// a Lua callback is a few us, "0ms" would look like a dead probe
 		if (us <= 0) return '0us';
 		if (us < 1000) return '${Math.round(us)}us';
 
@@ -580,7 +567,7 @@ class FPSCounter extends TextField
 		return '${Math.round(ms * 10) / 10}ms';
 	}
 
-	// Where you are + song name, in the same overlay. Reflect keeps this tree-free.
+	// where you are + song name, via Reflect so this stays tree-free
 	static function whereAmI():String
 	{
 		var state:Dynamic = FlxG.state;

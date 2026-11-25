@@ -1,8 +1,7 @@
 package debug;
 
-// Clock + per-script totals for the F3 overlay. Windows' Sys.time() only moves in big
-// steps, way too coarse for callbacks that take 20us, so this reads the performance
-// counter directly. Callers check `on` first, so a normal build pays one bool read.
+// clock + per-script totals for the F3 overlay. Sys.time() is too coarse for 20us callbacks,
+// so use the performance counter
 @:cppFileCode('
 #ifdef HX_WINDOWS
 #define WIN32_LEAN_AND_MEAN

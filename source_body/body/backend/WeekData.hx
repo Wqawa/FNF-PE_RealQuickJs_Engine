@@ -161,7 +161,7 @@ class WeekData {
 	}
 
 	private static function getWeekFile(path:String):WeekFile {
-		// 磁盘优先（mods），manifest 兜底
+		// disk first (mods), manifest as fallback
 		var rawJson:String = Paths.getTextFile(path);
 
 		if(rawJson != null && rawJson.length > 0) {

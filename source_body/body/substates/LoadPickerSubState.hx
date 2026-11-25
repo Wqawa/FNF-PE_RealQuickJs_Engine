@@ -4,8 +4,7 @@ import backend.LoadSkip;
 import flixel.math.FlxMath;
 import flixel.text.FlxText;
 
-// Shown before a mod song loads. Unticked = load, ticked = skip. Nothing ticked (and the
-// 10 second timeout lands here) means everything loads like it always did.
+// shown before a song loads. ticked rows are skipped; nothing ticked loads everything
 class LoadPickerSubState extends MusicBeatSubstate
 {
 	public static inline var TIMEOUT:Float = 10;
@@ -22,7 +21,7 @@ class LoadPickerSubState extends MusicBeatSubstate
 	var scripts:Array<{path:String, label:String, group:String}> = [];
 	var cats:Array<String> = [];
 
-	// Right column is rebuilt whenever a category is expanded, so it can't be a fixed list.
+	// rebuilt on expand, so it can't be a fixed list
 	var rightRows:Array<{cat:String, label:String, isCat:Bool, skipIndex:Int}> = [];
 
 	var scriptTexts:Array<FlxText> = [];
@@ -129,7 +128,7 @@ class LoadPickerSubState extends MusicBeatSubstate
 			return;
 		}
 
-		// the countdown only runs while you are not doing anything
+		// inputs reset the countdown; it runs otherwise
 		timeLeft -= elapsed;
 		if (timeLeft <= 0)
 		{
@@ -158,17 +157,17 @@ class LoadPickerSubState extends MusicBeatSubstate
 			{
 				col = 0;
 				sel = 0;
+				scroll = 0; // the script row 0 must be on screen after coming back
 				timeLeft = TIMEOUT;
 			}
 			if (controls.UI_RIGHT_P)
 			{
 				col = 1;
 				sel = 0;
+				scroll = 0;
 				timeLeft = TIMEOUT;
 			}
-			// SPACE ticks, and only SPACE. controls.ACCEPT also covers ENTER, so using it
-			// here meant ENTER ticked the highlighted row on its way to starting the song -
-			// the first script in the list got skipped every single time.
+			// SPACE only: ACCEPT also covers ENTER, which would tick a row on the way out
 			if (FlxG.keys.justPressed.SPACE)
 			{
 				toggle(sel);
@@ -325,8 +324,7 @@ class LoadPickerSubState extends MusicBeatSubstate
 		}
 	}
 
-	// Backs out to the song list without loading anything. The parent's closeSubState puts
-	// persistentUpdate back, so freeplay keeps working straight away.
+	// backs out to the song list. the parent's closeSubState restores persistentUpdate
 	function cancel():Void
 	{
 		if (started) return;
@@ -351,8 +349,7 @@ class LoadPickerSubState extends MusicBeatSubstate
 		for (i in 0...cats.length)
 			if (catSkip[i]) LoadSkip.skipped.set(cats[i], true);
 
-		// the engine resolves scripts through Paths.findScriptFile, which can come back with a
-		// different prefix, so register the bare name as a safety net too
+		// Paths.findScriptFile can add a prefix, so register the bare name too
 		for (i in 0...scripts.length)
 		{
 			if (!scriptSkip[i]) continue;

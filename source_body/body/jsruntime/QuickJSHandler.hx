@@ -291,7 +291,7 @@ class QuickJSHandler
 		return h;
 	}
 
-	/** Heap the JS runtime is holding, all contexts together. 0 when it was never started. */
+	// heap held by the runtime, all contexts together; 0 if it never started
 	public static function heapBytes():Float
 		return untyped __cpp__('js_heap_bytes()');
 

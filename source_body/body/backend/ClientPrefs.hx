@@ -26,17 +26,16 @@ import states.TitleState;
 	public var lowQuality:Bool = false;
 	public var shaders:Bool = true;
 	public var cacheOnGPU:Bool = #if !switch false #else true #end; // GPU Caching made by Raltyro
-	// 进歌时把上一首的贴图全扔掉。currentTrackedAssets 只进不出，不手动清的话
-	// 玩过的每首歌的舞台/角色图都会一直留着
+	// drop the last song's art on entry; currentTrackedAssets only grows otherwise
 	public var clearOldAssets:Bool = true;
 	// Old single framerate. Kept so saves and mods from before the split still mean
 	// something, it just mirrors updateFramerate now.
 	public var framerate:Int = 60;
-	// 绘画帧: how often the game renders. 10 is fine for a rhythm game, logic keeps running.
+	// draw framerate: how often the game renders. 10 is fine for a rhythm game.
 	public var drawFramerate:Int = 60;
-	// 计算帧: how often the game steps (input, notes, audio sync). 60 is the floor.
+	// update framerate: input, notes and audio sync. 60 is the floor.
 	public var updateFramerate:Int = 60;
-	// 窗口大小: percent of the screen height, 10..100. 0 = never set, adopt the current window
+	// window size: percent of screen height, 10..100. 0 = keep the current window
 	public var windowScale:Int = 0;
 	public var camZooms:Bool = true;
 	public var hideHud:Bool = false;

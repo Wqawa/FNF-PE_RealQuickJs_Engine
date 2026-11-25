@@ -130,13 +130,13 @@ class JSPlayer
 		return ret;
 	}
 
-		// One script: args go over the string/number bridge in a few fixed shapes, max three.
-	// Sentinels come back as strings; no return is null.
+	// one script: args go over the string/number bridge in a few fixed shapes, max three
+	// sentinels come back as strings; no return is null
 	public static function emitTo(host:JSScriptHost, name:String, args:Array<Dynamic>):Dynamic
 	{
 		if (!active || host == null || host.closed || !QuickJSHandler.isReady(host.handle)) return null;
 
-		// timed here rather than in JSScriptHost.emit: forward() comes straight in too
+		// here, not JSScriptHost.emit: forward() comes in directly too
 		var t0:Float = debug.Perf.begin();
 
 		var n:Int = (args == null) ? 0 : args.length;

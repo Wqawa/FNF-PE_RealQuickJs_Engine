@@ -45,7 +45,7 @@ class StoryMenuState extends MusicBeatState
 
 	override function create()
 	{
-		// coming back to the menus means the next song asks again
+		// back to the menus: the next song asks again
 		backend.LoadSkip.forgetSong();
 		Song.forceEngineVersion = null; //chart version override only lasts for the current song
 		Paths.clearStoredMemory();

@@ -167,9 +167,7 @@ class PlayState extends MusicBeatState
 	public var unspawnNotes:Array<Note> = [];
 	public var eventNotes:Array<EventNote> = [];
 
-	// Hitting or missing a note used to remove and destroy it on the spot. In a dense
-	// section that's several array shifts plus texture releases inside one frame, which
-	// shows up as a stutter. Queue them and let destroyNotes chew through a budget instead.
+	// notes are queued here instead of destroyed on the spot; destroyNotes eats them by budget
 	public var killNotes:Array<Note> = [];
 	public var killNotesBudget:Int = 20;
 
@@ -321,16 +319,14 @@ class PlayState extends MusicBeatState
 		//trace('Playback Rate: ' + playbackRate);
 		_lastLoadedModDirectory = Mods.currentModDirectory;
 		Paths.clearStoredMemory();
-		// currentTrackedAssets 只进不出，不主动清的话上一首的舞台和角色图会一直留着。
-		// 放在 create 最开头：新 state 还没挂 sprite，freeGraphicsFromMemory 没东西可保护，
-		// 等于把整张表清空，新歌的素材再走正常加载进来
+		// currentTrackedAssets only grows. do this at the top of create, before any sprite
+		// is added, so freeGraphicsFromMemory can drop everything from the last song
 		if (ClientPrefs.data.clearOldAssets)
 		{
 			var before:Int = Lambda.count(Paths.currentTrackedAssets);
 			Paths.freeGraphicsFromMemory();
 			Paths.clearOldSounds();
-			// note 的图集缓存存的是 FlxAtlasFrames，图被销毁后 bitmap 对象还在，
-			// 缓存自己的失效判断会放过去，不清的话 note 没贴图
+			// cached note frames can outlive their texture; drop them with the graphics
 			Note.clearAtlasCache();
 			var freed:Int = before - Lambda.count(Paths.currentTrackedAssets);
 			if (freed > 0) trace('[assets] freed $freed stale textures');
@@ -2722,8 +2718,7 @@ class PlayState extends MusicBeatState
 			if(exclusions.contains(script.scriptName))
 				continue;
 
-			// The F3 overlay times every channel here, because this loop is the path scripts
-			// actually run through - host.emit() only fires from a few direct call sites.
+			// the F3 overlay times calls here: this is the loop scripts actually run through
 			var t0:Float = debug.Perf.begin();
 			var myValue:Dynamic = script.call(funcToCall, args);
 			debug.Perf.end(script, t0);

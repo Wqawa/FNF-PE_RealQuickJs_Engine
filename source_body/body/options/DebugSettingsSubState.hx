@@ -1,6 +1,6 @@
 package options;
 
-// script channel debug switches. used to sit inside Gameplay, buried between gameplay options.
+// debug-only switches, split out of Gameplay
 class DebugSettingsSubState extends BaseOptionsMenu
 {
 	public function new()

@@ -111,7 +111,7 @@ class BaseOptionsMenu extends MusicBeatSubstate
 		return option;
 	}
 
-	// every SUBMENU option goes through here, the name picks the page
+	// SUBMENU options land here; the name picks the page
 	public function openSubMenu(name:String)
 	{
 		if(name == null || subState != null) return;

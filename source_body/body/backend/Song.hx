@@ -309,11 +309,8 @@ class Song
 		if(Reflect.field(songJson, 'player2') == null) Reflect.setField(songJson, 'player2', 'dad');
 		if(Reflect.field(songJson, 'gfVersion') == null) Reflect.setField(songJson, 'gfVersion', 'gf');
 
-		// Old charts (the 0.6.x base game) have no stage field. This used to default to 'stage',
-		// putting everything on the Week 1 stage: stageback forever, no stage events.
-		// Now it infers from the song name (spookeez -> spooky, pico -> philly, ...).
-		// This must happen before StageData.loadDirectory, otherwise forceNextDirectory stays
-		// empty, LoadingState will not switch currentLevel, and assets stay missing.
+		// old charts have no stage field, infer it from the song name (spookeez -> spooky)
+		// before StageData.loadDirectory, or the assets never switch
 		var stageField:String = cast Reflect.field(songJson, 'stage');
 		if(stageField == null || stageField.length < 1)
 		{

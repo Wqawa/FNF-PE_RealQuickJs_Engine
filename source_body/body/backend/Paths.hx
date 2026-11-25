@@ -84,8 +84,8 @@ class Paths
 		#if !html5 openfl.Assets.cache.clear("songs"); #end
 	}
 
-	// 换歌时把上一首的音效也扔掉。clearStoredMemory 里那段清音效的判断用的是上一首的
-	// localTrackedAssets（它要到循环之后才清空），所以旧音效全被当成"还在用"删不掉
+	// drop the last song's sounds too. clearStoredMemory checks localTrackedAssets, which
+	// still holds the old keys at that point, so those sounds never get removed
 	public static function clearOldSounds()
 	{
 		for (key => asset in currentTrackedSounds)
@@ -150,13 +150,12 @@ class Paths
 			}
 		}
 
-		// 上面只是把 BitmapData 丢掉，对象本身还挂在堆上。不手动 gc 的话
-		// 换歌时堆只涨不降，看着像没清干净
+		// that only drops the BitmapData, the objects stay on the heap until gc runs
 		System.gc();
 	}
 
-	// 任何一张图被 destroyGraphic 掉，这个就置 true。缓存里持有 FlxAtlasFrames 的地方
-	// （Note.noteAtlas）下次取用前先清一遍，否则会拿到指向死纹理的 frames，表现是黑块。
+	// set when a graphic is freed. atlas caches clear themselves before reuse, otherwise
+	// a frame keeps pointing at a dead texture and draws black
 	public static var graphicsDirty:Bool = false;
 
 	inline static function destroyGraphic(graphic:FlxGraphic)
@@ -203,7 +202,7 @@ class Paths
 	{
 		#if MODS_ALLOWED
 		#end
-		// 桌面端保持原样，不去翻包里的资源
+		// keep desktop as it was, don't look inside the package
 		#if MODS_ALLOWED
 		return FileSystem.exists(path);
 		#else
@@ -245,8 +244,8 @@ class Paths
 		var root:String = 'assets/$VERSION_DIR/$file';
 		if(existsOnDiskOrManifest(root)) return root;
 
-		// applicationDirectory 在某些环境下是只读路径，过早碰会在 liblime 里空指针，
-		// 所以这段重试只在 sys 下走
+		// applicationDirectory can be read-only and crash liblime in some setups,
+		// so only touch it on sys
 		#if sys
 		var appDir:String = lime.system.System.applicationDirectory;
 		if(appDir != null)
@@ -351,7 +350,7 @@ class Paths
 	{
 		key = Language.getFileTranslation('images/$key') + '.png';
 
-		// The picker ticked this category - but only mod files are fair game.
+		// ticked category, but only mod files are fair game
 		if (skippedByPicker(key, parentFolder))
 			return LoadSkip.placeholder();
 
@@ -495,9 +494,7 @@ class Paths
 		return path;
 	}
 
-	// Only mod files may be swapped for a placeholder. The engine's own art has to keep
-	// working even when a whole category is ticked, otherwise the loading screen, pause
-	// menu and the default arrows vanish along with the mod's stage.
+	// only mod files get a placeholder; engine art must survive a whole category being ticked
 	public static function skippedByPicker(fullKey:String, ?parentFolder:String):Bool
 	{
 		if (!LoadSkip.skipImage(fullKey)) return false;
@@ -518,9 +515,7 @@ class Paths
 		var xmlText:String = readTextOrPath(getPath(Language.getFileTranslation('images/$key') + '.xml', TEXT, parentFolder));
 		#end
 
-		// Skipped category: keep the real frame rects from the xml, put one transparent pixel
-		// behind them. Note skins are handled a level up, in Note.noteAtlas, where the actual
-		// skin name is known.
+		// skipped: real frame rects, transparent texture. note skins are handled in Note.noteAtlas
 		var fullKey:String = Language.getFileTranslation('images/$key') + '.png';
 		if (skippedByPicker(fullKey, parentFolder))
 			return LoadSkip.placeholderAtlas(xmlText, key, LoadSkip.KIND_SPARROW);

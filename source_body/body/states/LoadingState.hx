@@ -673,9 +673,8 @@ class LoadingState extends MusicBeatState
 			if(threadsCompleted == threadsMax)
 			{
 				clearInvalids();
-				// the picker already decided some categories are not worth the memory;
-				// skipping them here means the threads never decode the files at all.
-				// Same rule as Paths.image, so preload and the real load never disagree.
+				// skip what the picker ruled out, so the threads never decode it.
+				// same rule as Paths.image, so preload and runtime agree
 				if (backend.LoadSkip.active)
 					imagesToPrepare = imagesToPrepare.filter(function(k) return !Paths.skippedByPicker('images/$k.png'));
 				startThreads();

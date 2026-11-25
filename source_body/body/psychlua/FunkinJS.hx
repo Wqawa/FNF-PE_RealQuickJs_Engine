@@ -921,9 +921,7 @@ class FunkinJS
 		#if MODS_ALLOWED
 		if(!FileSystem.exists(jsPath)) return null;
 
-		// Gameplay -> JS Engine = QuickJS takes the real runtime: no transpile, no Lua.
-		// This used to transpile unconditionally, so any JS using `+` came out as
-		// "unexpected symbol near '+'" while the error still said "lua script".
+		// QuickJS takes the real runtime: no transpile, no Lua in between
 		if(ClientPrefs.data.jsEngine == 'QuickJS')
 		{
 			jsruntime.JSPlayer.loadFile(jsPath);

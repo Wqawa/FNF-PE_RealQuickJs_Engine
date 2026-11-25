@@ -5,14 +5,9 @@ import flixel.graphics.FlxGraphic;
 import flixel.graphics.frames.FlxAtlasFrames;
 import openfl.display.BitmapData;
 
-// What the "load options" picker decided for this run. Scoped to one visit to a song:
-// choosing a difficulty, opening settings and coming back all keep the same choice, and
-// only going back to freeplay / story throws it away.
-//
-// Skipped atlases still get their frame definitions, only the texture is a 1x1 red pixel -
-// so a character keeps its exact bounds and just draws as a red box, for one pixel of
-// memory. Skipped single images do get a full-size red bitmap, because their size lives in
-// the texture itself and losing it would break every placement that reads width / height.
+// What the load picker decided for this song visit. Changing difficulty or opening a
+// substate keeps the answer; going back to freeplay / story clears it.
+// Skipped art keeps its frame rects but draws as one transparent pixel, so bounds stay put.
 class LoadSkip
 {
 	public static inline var CAT_STAGE:String = 'stage';
@@ -29,7 +24,7 @@ class LoadSkip
 		CAT_CHARS => 'Characters',
 		CAT_NOTES => 'Arrows / notes',
 		CAT_SPLASH => 'Note splashes',
-		CAT_UI 	  => 'UI / icons / bars',
+		CAT_UI => 'UI / icons / bars',
 		CAT_OTHER => 'Other images'
 	];
 
@@ -55,10 +50,11 @@ class LoadSkip
 		skippedScripts = new Map();
 	}
 
-	/** Called when leaving the song menus, so the next visit asks again. */
+	// called when leaving the song menus, so the next visit asks again
 	public static function forgetSong():Void
 	{
 		askedKey = null;
+		imageIndex = null; // the next song can be from another mod, rescan its images
 		reset();
 	}
 
@@ -72,13 +68,12 @@ class LoadSkip
 
 	public static function needsAsk(song:String, difficulty:String):Bool
 	{
-		// one answer per visit to a song. Base game songs get asked too - their list is just
-		// empty on both columns, and pressing enter is the whole interaction.
+		// one answer per song visit. base game songs get asked too, with empty lists
 		var key:String = songKey(song, difficulty);
 		return askedKey != key;
 	}
 
-	/** Category an image key belongs to. Keys come in as the short form Paths takes. */
+	// category for a short image key, the form Paths uses
 	public static function catOf(key:String):String
 	{
 		if (key == null) return CAT_OTHER;
@@ -105,18 +100,15 @@ class LoadSkip
 		if (!active || path == null) return false;
 		if (skippedScripts.exists(path)) return true;
 
-		// also match on the file name alone: the engine hands over full paths
+		// the engine's path and the picker's path can differ, so match the bare name too
 		var cut:Int = path.lastIndexOf('/');
 		if (cut >= 0 && skippedScripts.exists(path.substr(cut + 1))) return true;
 		return false;
 	}
 
-	// One transparent pixel for everything that was skipped.
-	//
-	// Deliberately NOT registered in FlxG.bitmap: Paths.clearStoredMemory() walks that cache
-	// and destroys anything with useCount 0, which left this static field pointing at a dead
-	// graphic. Every sprite built from it then had a null bitmap - the Null Object Reference
-	// that only showed up once enough categories were skipped.
+	// one transparent pixel shared by everything that was skipped.
+	// not in FlxG.bitmap: clearStoredMemory() destroys unused cached graphics and left this
+	// static field pointing at a dead one.
 	public static function placeholder():FlxGraphic
 	{
 		if (placeholderGraphic != null && placeholderGraphic.bitmap != null) return placeholderGraphic;
@@ -126,8 +118,7 @@ class LoadSkip
 		return placeholderGraphic;
 	}
 
-	// Frame rects come straight from the atlas text, so bounds stay correct; the texture
-	// behind them is a single transparent pixel and every uv lands inside it.
+	// frame rects come from the atlas text, so bounds stay correct on a 1x1 texture
 	public static inline var KIND_SPARROW:String = 'sparrow';
 	public static inline var KIND_PACKER:String = 'packer';
 	public static inline var KIND_JSON:String = 'json';
@@ -155,7 +146,7 @@ class LoadSkip
 		return frames;
 	}
 
-	/** Runs fn with skipping temporarily off, so a fallback can load for real. */
+	// run fn with skipping off, so a fallback can load for real
 	public static function withSkipDisabled<T>(fn:Void->T):T
 	{
 		var wasActive:Bool = active;
@@ -170,8 +161,8 @@ class LoadSkip
 		return out;
 	}
 
-	// Preview only: what a category would actually cover. Scanned from disk because the
-	// engine has not resolved stage / character keys yet at picker time.
+	// preview rows for a category. scanned from disk: the engine has no stage / character
+	// keys resolved yet at picker time
 	static var imageIndex:Map<String, Array<String>> = null;
 
 	public static function listImages(cat:String):Array<String>
@@ -192,7 +183,7 @@ class LoadSkip
 		#end
 	}
 
-	/** The mod this song belongs to, as a path ending in a slash. */
+	// mod folder for this song, with a trailing slash
 	static function modRoot():String
 	{
 		var d:String = Mods.currentModDirectory;
@@ -203,34 +194,42 @@ class LoadSkip
 	static function walkImages(dir:String, rel:String):Void
 	{
 		#if sys
+		var names:Array<String> = null;
 		try
 		{
 			if (!sys.FileSystem.exists(dir)) return;
-			for (name in sys.FileSystem.readDirectory(dir))
-			{
-				var full:String = dir + '/' + name;
-				var key:String = (rel.length > 0) ? rel + '/' + name : name;
-
-				if (sys.FileSystem.isDirectory(full))
-				{
-					walkImages(full, key);
-					continue;
-				}
-
-				if (!name.toLowerCase().endsWith('.png')) continue;
-				var cat:String = catOf('images/' + key);
-				var list:Array<String> = imageIndex.get(cat);
-				if (list == null) { list = []; imageIndex.set(cat, list); }
-				list.push(key);
-			}
+			names = sys.FileSystem.readDirectory(dir);
 		}
-		catch (e:Dynamic) {}
+		catch (e:Dynamic) return;
+
+		if (names == null) return;
+		for (name in names)
+		{
+			var full:String = dir + '/' + name;
+			var key:String = (rel.length > 0) ? rel + '/' + name : name;
+
+			var isDir:Bool = false;
+			try
+			{
+				isDir = sys.FileSystem.isDirectory(full);
+			}
+			catch (e:Dynamic) {}
+			if (isDir)
+			{
+				walkImages(full, key);
+				continue;
+			}
+
+			if (!name.toLowerCase().endsWith('.png')) continue;
+			var cat:String = catOf('images/' + key);
+			var list:Array<String> = imageIndex.get(cat);
+			if (list == null) { list = []; imageIndex.set(cat, list); }
+			list.push(key);
+		}
 		#end
 	}
 
-	// The folders PlayState actually reads scripts from, one group each. The enumeration is
-	// the same call the engine makes, so every path listed here is a path skipScript gets
-	// handed later - no guessing from the tree, and no rows for files that never load.
+	// same folders PlayState reads, grouped. paths here are the ones skipScript gets later
 	public static function listScripts(song:String):Array<{path:String, label:String, group:String}>
 	{
 		var out:Array<{path:String, label:String, group:String}> = [];
@@ -252,13 +251,12 @@ class LoadSkip
 	}
 
 	#if sys
-	// Flat read, exactly like PlayState does it - it never recurses into subfolders either,
-	// so listing those would only offer rows that never get loaded.
+	// flat read, same as PlayState: subfolders never load, so don't list them
 	static function addFromDirectories(out:Array<{path:String, label:String, group:String}>, sub:String, group:String):Void
 	{
 		for (folder in Mods.directoriesWithFile(Paths.getSharedPath(), sub))
 		{
-			// engine / base game folders are not the user's to skip
+			// engine / base folders are not ours to skip
 			if (folder.indexOf('mods/') < 0) continue;
 
 			var names:Array<String> = null;

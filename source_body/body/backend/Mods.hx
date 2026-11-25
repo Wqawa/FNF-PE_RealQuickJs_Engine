@@ -79,7 +79,7 @@ class Mods
 	{
 		var foldersToCheck:Array<String> = [];
 		//Main folder
-		// 打包后的 base 资源不在磁盘上，manifest 也要查一遍
+		// packaged base assets aren't on disk, check the manifest too
 		if(Paths.existsOnDiskOrManifest(path + fileToFind))
 			foldersToCheck.push(path + fileToFind);
 

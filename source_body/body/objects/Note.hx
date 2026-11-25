@@ -386,25 +386,20 @@ class Note extends FlxSprite
 	var _lastNoteOffX:Float = 0;
 	static var _lastValidChecked:String; //optimization
 
-	// Every note used to parse its skin's xml on its own, so a 1000-note chart read and split
-	// the same file 1000 times and kept 1000 identical frame lists alive. One collection is
-	// shared now, like any other sprite atlas. Keyed by mod because the same skin name
-	// resolves into whichever mod is loaded.
+	// one frame list per skin, like any other sprite atlas. keyed by mod because the same
+	// name can resolve to a different skin in another mod
 	static var _atlasCache:Map<String, FlxAtlasFrames> = new Map<String, FlxAtlasFrames>();
 
 	public static function noteAtlas(skin:String):FlxAtlasFrames
 	{
-		// anything freed since the last call may be one of the atlases below, and destroyGraphic
-		// only disposes the texture - the FlxAtlasFrames still looks alive. Drop the lot.
+		// a freed graphic leaves its cached frames looking alive; drop the lot
 		if(Paths.graphicsDirty)
 		{
 			_atlasCache.clear();
 			Paths.graphicsDirty = false;
 		}
 
-		// A skipped skin falls back to the engine's own arrows instead of going blank, so the
-		// chart still reads. Judged here rather than in Paths because this is where the real
-		// skin name lives; Paths only sees whatever path the caller built.
+		// skipped skin: use the engine's own arrows. decided here, where the real skin name is
 		if(skin != null && skin != defaultNoteSkin && backend.LoadSkip.skipImage('images/' + skin + '.png'))
 		{
 			var fallback:FlxAtlasFrames = backend.LoadSkip.withSkipDisabled(function() return noteAtlas(defaultNoteSkin));
@@ -426,12 +421,8 @@ class Note extends FlxSprite
 		return made;
 	}
 
-	/**
-	 * 换歌时 Paths.freeGraphicsFromMemory() 会把图集销毁，但上面那个缓存里存的是
-	 * FlxAtlasFrames，destroyGraphic 只 dispose 纹理、bitmap 对象本身还在，
-	 * noteAtlas 的 if 判断就骗过去了，返回一份指向死图的 frames，
-	 * 表现是 note 没贴图 + "Cannot render a destroyed graphic"。
-	 */
+	// clear on song change: destroyGraphic disposes the texture but leaves the bitmap
+	// object alive, so the cached frames still look valid and notes lose their art
 	public static function clearAtlasCache():Void
 		_atlasCache.clear();
 

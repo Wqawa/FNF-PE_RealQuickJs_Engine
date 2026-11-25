@@ -66,7 +66,7 @@ class Main extends Sprite
 	{
 		super();
 
-		// Used to live in Main.main()'s body branch; moved into the constructor with the entry split
+		// hash check runs here, before either engine tree starts
 		#if sys
 		psychlua.FunkinJS.verifyUtilsIntegrity();
 		#end

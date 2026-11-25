@@ -6,9 +6,9 @@ import backend.StageData;
 class OptionsState extends MusicBeatState
 {
 	var options:Array<String> = [
-		// Gameplay 现在是总入口：Visuals / Language / Note Colors / 延迟校准都并在里面了
+		// Gameplay holds Visuals / Language / Note Colors / delay calibration now
 		'Gameplay',
-		// 安卓这边按键就是那几个虚拟键，没有改键的必要
+		// mobile uses on-screen touch buttons, no rebinding there
 		#if !mobile 'Controls', #end
 		'Graphics',
 		'Switch Engine',
