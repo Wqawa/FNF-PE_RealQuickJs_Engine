@@ -394,6 +394,23 @@ class Note extends FlxSprite
 
 	public static function noteAtlas(skin:String):FlxAtlasFrames
 	{
+		// anything freed since the last call may be one of the atlases below, and destroyGraphic
+		// only disposes the texture - the FlxAtlasFrames still looks alive. Drop the lot.
+		if(Paths.graphicsDirty)
+		{
+			_atlasCache.clear();
+			Paths.graphicsDirty = false;
+		}
+
+		// A skipped skin falls back to the engine's own arrows instead of going blank, so the
+		// chart still reads. Judged here rather than in Paths because this is where the real
+		// skin name lives; Paths only sees whatever path the caller built.
+		if(skin != null && skin != defaultNoteSkin && backend.LoadSkip.skipImage('images/' + skin + '.png'))
+		{
+			var fallback:FlxAtlasFrames = backend.LoadSkip.withSkipDisabled(function() return noteAtlas(defaultNoteSkin));
+			if(fallback != null) return fallback;
+		}
+
 		var key:String = (Mods.currentModDirectory == null ? '' : Mods.currentModDirectory) + '|' + skin;
 
 		var cached:FlxAtlasFrames = _atlasCache.get(key);

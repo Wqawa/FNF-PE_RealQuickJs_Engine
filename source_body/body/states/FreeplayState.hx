@@ -54,6 +54,8 @@ class FreeplayState extends MusicBeatState
 
 	override function create()
 	{
+		// coming back to the menus means the next song asks again
+		backend.LoadSkip.forgetSong();
 		Song.forceEngineVersion = null; //chart version override only lasts for the current song
 		//Paths.clearStoredMemory();
 		//Paths.clearUnusedMemory();
@@ -445,15 +447,25 @@ class FreeplayState extends MusicBeatState
 				trace('CHANGED MOD DIRECTORY, RELOADING STUFF');
 				Paths.freeGraphicsFromMemory();
 			}
-			LoadingState.prepareToSong();
-			LoadingState.loadAndSwitchState(new PlayState());
-			#if !SHOW_LOADING_SCREEN FlxG.sound.music.stop(); #end
-			stopMusicPlay = true;
+			function startSong():Void
+			{
+				LoadingState.prepareToSong();
+				LoadingState.loadAndSwitchState(new PlayState());
+				#if !SHOW_LOADING_SCREEN FlxG.sound.music.stop(); #end
+				stopMusicPlay = true;
 
-			destroyFreeplayVocals();
-			#if (MODS_ALLOWED && DISCORD_ALLOWED)
-			DiscordClient.loadModRPC();
-			#end
+				destroyFreeplayVocals();
+				#if (MODS_ALLOWED && DISCORD_ALLOWED)
+				DiscordClient.loadModRPC();
+				#end
+			}
+
+			var nowSong:String = (PlayState.SONG != null) ? Std.string(PlayState.SONG.song) : '?';
+			var nowDiff:String = Difficulty.getString();
+			if (backend.LoadSkip.needsAsk(nowSong, nowDiff))
+				openSubState(new substates.LoadPickerSubState(startSong));
+			else
+				startSong();
 		}
 		else if(controls.RESET && !player.playingMusic)
 		{

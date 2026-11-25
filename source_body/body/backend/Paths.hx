@@ -155,12 +155,17 @@ class Paths
 		System.gc();
 	}
 
+	// 任何一张图被 destroyGraphic 掉，这个就置 true。缓存里持有 FlxAtlasFrames 的地方
+	// （Note.noteAtlas）下次取用前先清一遍，否则会拿到指向死纹理的 frames，表现是黑块。
+	public static var graphicsDirty:Bool = false;
+
 	inline static function destroyGraphic(graphic:FlxGraphic)
 	{
 		// free some gpu memory
 		if (graphic != null && graphic.bitmap != null && graphic.bitmap.__texture != null)
 			graphic.bitmap.__texture.dispose();
 		FlxG.bitmap.remove(graphic);
+		graphicsDirty = true;
 	}
 
 	static public var currentLevel:String;
@@ -345,6 +350,11 @@ class Paths
 	static public function image(key:String, ?parentFolder:String = null, ?allowGPU:Bool = true):FlxGraphic
 	{
 		key = Language.getFileTranslation('images/$key') + '.png';
+
+		// The picker ticked this category - but only mod files are fair game.
+		if (skippedByPicker(key, parentFolder))
+			return LoadSkip.placeholder();
+
 		var bitmap:BitmapData = null;
 		if (currentTrackedAssets.exists(key))
 		{
@@ -485,49 +495,80 @@ class Paths
 		return path;
 	}
 
-	inline static public function getSparrowAtlas(key:String, ?parentFolder:String = null, ?allowGPU:Bool = true):FlxAtlasFrames
+	// Only mod files may be swapped for a placeholder. The engine's own art has to keep
+	// working even when a whole category is ticked, otherwise the loading screen, pause
+	// menu and the default arrows vanish along with the mod's stage.
+	public static function skippedByPicker(fullKey:String, ?parentFolder:String):Bool
 	{
-		var imageLoaded:FlxGraphic = image(key, parentFolder, allowGPU);
+		if (!LoadSkip.skipImage(fullKey)) return false;
+		var file:String = getPath(fullKey, IMAGE, parentFolder);
+		return file != null && file.indexOf('mods/') >= 0;
+	}
+
+	static public function getSparrowAtlas(key:String, ?parentFolder:String = null, ?allowGPU:Bool = true):FlxAtlasFrames
+	{
 		#if MODS_ALLOWED
 		var xmlExists:Bool = false;
 
 		var xml:String = modsXml(key);
 		if(FileSystem.exists(xml)) xmlExists = true;
 
-		return FlxAtlasFrames.fromSparrow(imageLoaded, (xmlExists ? File.getContent(xml) : readTextOrPath(getPath(Language.getFileTranslation('images/$key') + '.xml', TEXT, parentFolder))));
+		var xmlText:String = (xmlExists ? File.getContent(xml) : readTextOrPath(getPath(Language.getFileTranslation('images/$key') + '.xml', TEXT, parentFolder)));
 		#else
-		return FlxAtlasFrames.fromSparrow(imageLoaded, getPath(Language.getFileTranslation('images/$key') + '.xml', TEXT, parentFolder));
+		var xmlText:String = readTextOrPath(getPath(Language.getFileTranslation('images/$key') + '.xml', TEXT, parentFolder));
 		#end
+
+		// Skipped category: keep the real frame rects from the xml, put one transparent pixel
+		// behind them. Note skins are handled a level up, in Note.noteAtlas, where the actual
+		// skin name is known.
+		var fullKey:String = Language.getFileTranslation('images/$key') + '.png';
+		if (skippedByPicker(fullKey, parentFolder))
+			return LoadSkip.placeholderAtlas(xmlText, key, LoadSkip.KIND_SPARROW);
+
+		var imageLoaded:FlxGraphic = image(key, parentFolder, allowGPU);
+		return FlxAtlasFrames.fromSparrow(imageLoaded, xmlText);
 	}
 
-	inline static public function getPackerAtlas(key:String, ?parentFolder:String = null, ?allowGPU:Bool = true):FlxAtlasFrames
+	static public function getPackerAtlas(key:String, ?parentFolder:String = null, ?allowGPU:Bool = true):FlxAtlasFrames
 	{
-		var imageLoaded:FlxGraphic = image(key, parentFolder, allowGPU);
 		#if MODS_ALLOWED
 		var txtExists:Bool = false;
-		
+
 		var txt:String = modsTxt(key);
 		if(FileSystem.exists(txt)) txtExists = true;
 
-		return FlxAtlasFrames.fromSpriteSheetPacker(imageLoaded, (txtExists ? File.getContent(txt) : readTextOrPath(getPath(Language.getFileTranslation('images/$key') + '.txt', TEXT, parentFolder))));
+		var txtText:String = (txtExists ? File.getContent(txt) : readTextOrPath(getPath(Language.getFileTranslation('images/$key') + '.txt', TEXT, parentFolder)));
 		#else
-		return FlxAtlasFrames.fromSpriteSheetPacker(imageLoaded, getPath(Language.getFileTranslation('images/$key') + '.txt', TEXT, parentFolder));
+		var txtText:String = readTextOrPath(getPath(Language.getFileTranslation('images/$key') + '.txt', TEXT, parentFolder));
 		#end
+
+		var fullKey:String = Language.getFileTranslation('images/$key') + '.png';
+		if (skippedByPicker(fullKey, parentFolder))
+			return LoadSkip.placeholderAtlas(txtText, key, LoadSkip.KIND_PACKER);
+
+		var imageLoaded:FlxGraphic = image(key, parentFolder, allowGPU);
+		return FlxAtlasFrames.fromSpriteSheetPacker(imageLoaded, txtText);
 	}
 
-	inline static public function getAsepriteAtlas(key:String, ?parentFolder:String = null, ?allowGPU:Bool = true):FlxAtlasFrames
+	static public function getAsepriteAtlas(key:String, ?parentFolder:String = null, ?allowGPU:Bool = true):FlxAtlasFrames
 	{
-		var imageLoaded:FlxGraphic = image(key, parentFolder, allowGPU);
 		#if MODS_ALLOWED
 		var jsonExists:Bool = false;
 
 		var json:String = modsImagesJson(key);
 		if(FileSystem.exists(json)) jsonExists = true;
 
-		return FlxAtlasFrames.fromTexturePackerJson(imageLoaded, (jsonExists ? File.getContent(json) : getPath(Language.getFileTranslation('images/$key') + '.json', TEXT, parentFolder)));
+		var jsonText:String = (jsonExists ? File.getContent(json) : getPath(Language.getFileTranslation('images/$key') + '.json', TEXT, parentFolder));
 		#else
-		return FlxAtlasFrames.fromTexturePackerJson(imageLoaded, getPath(Language.getFileTranslation('images/$key') + '.json', TEXT, parentFolder));
+		var jsonText:String = getPath(Language.getFileTranslation('images/$key') + '.json', TEXT, parentFolder);
 		#end
+
+		var fullKey:String = Language.getFileTranslation('images/$key') + '.png';
+		if (skippedByPicker(fullKey, parentFolder))
+			return LoadSkip.placeholderAtlas(jsonText, key, LoadSkip.KIND_JSON);
+
+		var imageLoaded:FlxGraphic = image(key, parentFolder, allowGPU);
+		return FlxAtlasFrames.fromTexturePackerJson(imageLoaded, jsonText);
 	}
 
 	inline static public function formatToSongPath(path:String) {
