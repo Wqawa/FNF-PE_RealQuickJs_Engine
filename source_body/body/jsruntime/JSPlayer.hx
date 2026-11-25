@@ -136,6 +136,9 @@ class JSPlayer
 	{
 		if (!active || host == null || host.closed || !QuickJSHandler.isReady(host.handle)) return null;
 
+		// timed here rather than in JSScriptHost.emit: forward() comes straight in too
+		var t0:Float = debug.Perf.begin();
+
 		var n:Int = (args == null) ? 0 : args.length;
 		if (n == 0 || args[0] == null)
 		{
@@ -162,8 +165,9 @@ class JSPlayer
 		}
 
 		var ret:String = QuickJSHandler.lastReturn();
-		if (ret == null || ret.length == 0) return null;
-		return QuickJSHandler.coerce(ret);
+		var out:Dynamic = (ret == null || ret.length == 0) ? null : QuickJSHandler.coerce(ret);
+		debug.Perf.end(host, t0);
+		return out;
 	}
 
 	static inline function isNumArg(v:Dynamic):Bool

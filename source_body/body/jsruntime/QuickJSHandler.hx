@@ -218,6 +218,15 @@ static bool js_invoke(int h, const char *name, int mode, double num, const char 
 	g_cur = -1;
 	return ok;
 }
+
+// One heap for every context, so this is a runtime total and not a per-file number.
+static double js_heap_bytes() {
+	if (g_js_rt == nullptr) return 0;
+	JSMemoryUsage u;
+	memset(&u, 0, sizeof(u));
+	JS_ComputeMemoryUsage(g_js_rt, &u);
+	return (double)u.malloc_size;
+}
 ')
 class QuickJSHandler
 {
@@ -281,6 +290,10 @@ class QuickJSHandler
 		untyped __cpp__('h = g_cur;');
 		return h;
 	}
+
+	/** Heap the JS runtime is holding, all contexts together. 0 when it was never started. */
+	public static function heapBytes():Float
+		return untyped __cpp__('js_heap_bytes()');
 
 	/** Pumps the runtime's microtasks (all contexts). */
 	public static function pump():Void

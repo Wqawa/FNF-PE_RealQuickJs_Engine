@@ -22,6 +22,9 @@ interface IScriptHost
 	// Reads a global from the script, null when missing.
 	public function getVar(name:String):Dynamic;
 
+	// Bytes this script's own runtime is holding. 0 when it can't be measured.
+	public function scriptBytes():Float;
+
 	// Ends and releases resources; isClosed() is true afterwards.
 	public function shutdown():Void;
 }

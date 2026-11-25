@@ -43,6 +43,7 @@ import flixel.input.gamepad.FlxGamepadInputID;
 
 import haxe.Json;
 
+@:access(llua.Lua)
 class FunkinLua implements IScriptHost {
 	public var lua:State = null;
 	public var camTarget:FlxCamera;
@@ -1829,6 +1830,13 @@ class FunkinLua implements IScriptHost {
 
 	public function getVar(name:String):Dynamic
 		return get(name);
+
+	// Heap held by this state, straight from the collector. The F3 overlay reads it.
+	public function scriptBytes():Float
+	{
+		if (lua == null) return 0;
+		return Lua.gc(lua, Lua.LUA_GCCOUNT, 0) * 1024.0 + Lua.gc(lua, Lua.LUA_GCCOUNTB, 0);
+	}
 
 	public function shutdown():Void
 		stop();

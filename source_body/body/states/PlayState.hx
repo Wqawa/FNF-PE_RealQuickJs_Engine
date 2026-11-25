@@ -515,6 +515,7 @@ class PlayState extends MusicBeatState
 			for (file in FileSystem.readDirectory(folder))
 			{
 				var scriptPath:String = folder + file;
+				if(backend.LoadSkip.skipScript(scriptPath)) continue;
 
 				#if LUA_ALLOWED
 				if(file.toLowerCase().endsWith('.lua'))
@@ -698,6 +699,8 @@ class PlayState extends MusicBeatState
 		for (folder in Mods.directoriesWithFile(Paths.getSharedPath(), 'data/$songName/'))
 			for (file in FileSystem.readDirectory(folder))
 			{
+				if(backend.LoadSkip.skipScript(folder + file)) continue;
+
 				#if LUA_ALLOWED
 				if(file.toLowerCase().endsWith('.lua'))
 					new FunkinLua(folder + file);
@@ -2559,6 +2562,7 @@ class PlayState extends MusicBeatState
 		{
 			var jsFile:String = luaFile.substr(0, luaFile.lastIndexOf('.')) + psychlua.FunkinJS.EXTENSION;
 			var jsToLoad:String = Paths.findScriptFile(jsFile);
+			if(jsToLoad != null && backend.LoadSkip.skipScript(jsToLoad)) return false;
 			if(jsToLoad != null)
 			{
 				var luaScript:FunkinLua = psychlua.FunkinJS.start(jsToLoad);
@@ -2571,6 +2575,7 @@ class PlayState extends MusicBeatState
 
 		if(luaToLoad != null)
 		{
+			if(backend.LoadSkip.skipScript(luaToLoad)) return false;
 			if(isLuaScriptRunning(luaToLoad)) return false;
 
 			new FunkinLua(luaToLoad);
@@ -2595,6 +2600,7 @@ class PlayState extends MusicBeatState
 		var scriptToLoad:String = Paths.findScriptFile(scriptFile);
 		if(scriptToLoad != null)
 		{
+			if(backend.LoadSkip.skipScript(scriptToLoad)) return false;
 			// Dedupe only looks at scripts alive in this state. Iris.instances is process wide, so a
 			// leftover from the last song (or a stale key for the same path) made the new song's
 			// script look loaded: it never ran and the log looked fine.
@@ -2716,7 +2722,12 @@ class PlayState extends MusicBeatState
 			if(exclusions.contains(script.scriptName))
 				continue;
 
+			// The F3 overlay times every channel here, because this loop is the path scripts
+			// actually run through - host.emit() only fires from a few direct call sites.
+			var t0:Float = debug.Perf.begin();
 			var myValue:Dynamic = script.call(funcToCall, args);
+			debug.Perf.end(script, t0);
+
 			if((myValue == LuaUtils.Function_StopLua || myValue == LuaUtils.Function_StopAll) && !excludeValues.contains(myValue) && !ignoreStops)
 			{
 				returnVal = myValue;
@@ -2754,7 +2765,9 @@ class PlayState extends MusicBeatState
 			if(script == null || script.isClosed() || !script.exists(funcToCall) || exclusions.contains(script.origin))
 				continue;
 
+			var t0:Float = debug.Perf.begin();
 			var callValue = script.call(funcToCall, args);
+			debug.Perf.end(script, t0);
 			if(callValue != null)
 			{
 				var myValue:Dynamic = callValue.returnValue;

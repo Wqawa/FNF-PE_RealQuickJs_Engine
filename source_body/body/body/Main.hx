@@ -157,11 +157,14 @@ class Main extends Sprite
 
 		#if !mobile
 		fpsVar = new FPSCounter(10, 3, 0xFFFFFF);
+		// the counters live in their own boxes, under the text field that only holds x/y
+		addChild(fpsVar.panel);
 		addChild(fpsVar);
 		Lib.current.stage.align = "tl";
 		Lib.current.stage.scaleMode = StageScaleMode.NO_SCALE;
 		if(fpsVar != null) {
 			fpsVar.visible = ClientPrefs.data.showFPS;
+			fpsVar.panel.visible = fpsVar.visible;
 		}
 		#end
 

@@ -85,7 +85,7 @@ class BaseOptionsMenu extends MusicBeatSubstate
 				checkbox.ID = i;
 				checkboxGroup.add(checkbox);
 			}
-			else
+			else if(optionsArray[i].type != SUBMENU) // submenus have nothing to show on the right
 			{
 				optionText.x -= 80;
 				optionText.startPosition.x -= 80;
@@ -109,6 +109,25 @@ class BaseOptionsMenu extends MusicBeatSubstate
 		if(optionsArray == null || optionsArray.length < 1) optionsArray = [];
 		optionsArray.push(option);
 		return option;
+	}
+
+	// every SUBMENU option goes through here, the name picks the page
+	public function openSubMenu(name:String)
+	{
+		if(name == null || subState != null) return;
+		FlxG.sound.play(Paths.sound('scrollMenu'));
+
+		switch(name)
+		{
+			case 'noteColors':
+				openSubState(new NotesColorSubState());
+			case 'visuals':
+				openSubState(new VisualsSettingsSubState());
+			case 'language':
+				openSubState(new LanguageSubState());
+			case 'delayCombo':
+				MusicBeatState.switchState(new NoteOffsetState());
+		}
 	}
 
 	var nextAccept:Int = 5;
@@ -182,6 +201,10 @@ class BaseOptionsMenu extends MusicBeatSubstate
 						ClientPrefs.toggleVolumeKeys(false);
 						FlxG.sound.play(Paths.sound('scrollMenu'));
 					}
+
+				case SUBMENU:
+					if(controls.ACCEPT)
+						openSubMenu(curOption.subMenu);
 
 				default:
 					if(controls.UI_LEFT || controls.UI_RIGHT)
@@ -461,6 +484,9 @@ class BaseOptionsMenu extends MusicBeatSubstate
 	}
 
 	function updateTextFrom(option:Option) {
+		if(option.type == SUBMENU)
+			return;
+
 		if(option.type == KEYBIND)
 		{
 			updateBind(option);

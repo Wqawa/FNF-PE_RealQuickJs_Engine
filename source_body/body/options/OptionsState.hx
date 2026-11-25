@@ -6,16 +6,13 @@ import backend.StageData;
 class OptionsState extends MusicBeatState
 {
 	var options:Array<String> = [
-		'Note Colors',
+		// Gameplay 现在是总入口：Visuals / Language / Note Colors / 延迟校准都并在里面了
+		'Gameplay',
 		// 安卓这边按键就是那几个虚拟键，没有改键的必要
 		#if !mobile 'Controls', #end
-		'Adjust Delay and Combo',
 		'Graphics',
-		'Visuals',
-		'Gameplay',
-		'Switch Engine'
-		// 桌面版没有触屏按键，这一项只对真正跑在手机上的构建有意义
-		#if TRANSLATIONS_ALLOWED , 'Language' #end
+		'Switch Engine',
+		'Debug'
 	];
 	private var grpOptions:FlxTypedGroup<Alphabet>;
 	private static var curSelected:Int = 0;
@@ -25,22 +22,16 @@ class OptionsState extends MusicBeatState
 	function openSelectedSubstate(label:String) {
 		switch(label)
 		{
-			case 'Note Colors':
-				openSubState(new options.NotesColorSubState());
 			case 'Controls':
 				openSubState(new options.ControlsSubState());
 			case 'Graphics':
 				openSubState(new options.GraphicsSettingsSubState());
-			case 'Visuals':
-				openSubState(new options.VisualsSettingsSubState());
 			case 'Gameplay':
 				openSubState(new options.GameplaySettingsSubState());
 			case 'Switch Engine':
 				openSubState(new options.EngineSelectSubState());
-			case 'Adjust Delay and Combo':
-				MusicBeatState.switchState(new options.NoteOffsetState());
-			case 'Language':
-				openSubState(new options.LanguageSubState());
+			case 'Debug':
+				openSubState(new options.DebugSettingsSubState());
 		}
 	}
 

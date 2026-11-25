@@ -38,6 +38,9 @@ class JSScriptHost implements IScriptHost
 		return QuickJSHandler.getGlobal(handle, name);
 	}
 
+	// QuickJS shares one heap across every context, so a single file can't own a number.
+	public function scriptBytes():Float return 0;
+
 	public function shutdown():Void
 	{
 		if (closed) return;

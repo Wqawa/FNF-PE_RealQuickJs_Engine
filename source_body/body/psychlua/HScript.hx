@@ -644,6 +644,9 @@ class HScript extends Iris implements IScriptHost
 	public function getVar(name:String):Dynamic
 		return get(name);
 
+	// Iris keeps its values in an interpreter scope, nothing to measure cheaply.
+	public function scriptBytes():Float return 0;
+
 	public function shutdown():Void
 		destroy();
 

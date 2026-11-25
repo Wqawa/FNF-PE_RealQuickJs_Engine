@@ -14,6 +14,8 @@ enum OptionType {
 	PERCENT;
 	STRING;
 	KEYBIND;
+	// doesn't hold a value, just opens another menu (see BaseOptionsMenu.openSubMenu)
+	SUBMENU;
 }
 
 class Option
@@ -41,6 +43,8 @@ class Option
 	public var defaultKeys:Keybind = null; //Only used in keybind type
 	public var keys:Keybind = null; //Only used in keybind type
 
+	public var subMenu:String = null; //Only used in submenu type, see BaseOptionsMenu.openSubMenu
+
 	public function new(name:String, description:String = '', variable:String, type:OptionType = BOOL, ?options:Array<String> = null, ?translation:String = null)
 	{
 		_name = name;
@@ -51,7 +55,7 @@ class Option
 		this.type = type;
 		this.options = options;
 
-		if(this.type != KEYBIND) this.defaultValue = Reflect.getProperty(ClientPrefs.defaultData, variable);
+		if(this.type != KEYBIND && this.type != SUBMENU) this.defaultValue = Reflect.getProperty(ClientPrefs.defaultData, variable);
 		switch(type)
 		{
 			case BOOL:
@@ -76,11 +80,14 @@ class Option
 				defaultValue = '';
 				defaultKeys = {gamepad: 'NONE', keyboard: 'NONE'};
 				keys = {gamepad: 'NONE', keyboard: 'NONE'};
+
+			case SUBMENU:
+				defaultValue = '';
 		}
 
 		try
 		{
-			if(getValue() == null)
+			if(type != SUBMENU && getValue() == null)
 				setValue(defaultValue);
 	
 			switch(type)
@@ -104,6 +111,7 @@ class Option
 
 	dynamic public function getValue():Dynamic
 	{
+		if(type == SUBMENU) return null;
 		var value = Reflect.getProperty(ClientPrefs.data, variable);
 		if(type == KEYBIND) return !Controls.instance.controllerMode ? value.keyboard : value.gamepad;
 		return value;
@@ -111,6 +119,7 @@ class Option
 
 	dynamic public function setValue(value:Dynamic)
 	{
+		if(type == SUBMENU) return value;
 		if(type == KEYBIND)
 		{
 			var keys = Reflect.getProperty(ClientPrefs.data, variable);

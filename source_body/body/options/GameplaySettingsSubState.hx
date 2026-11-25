@@ -7,6 +7,37 @@ class GameplaySettingsSubState extends BaseOptionsMenu
 		title = Language.getPhrase('gameplay_menu', 'Gameplay Settings');
 		rpcTitle = 'Gameplay Settings Menu'; //for Discord Rich Presence
 
+		// entries pulled in from the top level menu, kept at the very top
+		var option:Option = new Option('Note Colors',
+			'Pick the color of each note column.',
+			'',
+			SUBMENU);
+		option.subMenu = 'noteColors';
+		addOption(option);
+
+		option = new Option('Adjust Delay and Combo',
+			'Calibrate audio/visual delay and the combo popup position.',
+			'',
+			SUBMENU);
+		option.subMenu = 'delayCombo';
+		addOption(option);
+
+		option = new Option('Visuals',
+			'Background, camera and effects settings.',
+			'',
+			SUBMENU);
+		option.subMenu = 'visuals';
+		addOption(option);
+
+		#if TRANSLATIONS_ALLOWED
+		option = new Option('Language',
+			'Change the language of the game.',
+			'',
+			SUBMENU);
+		option.subMenu = 'language';
+		addOption(option);
+		#end
+
 		//I'd suggest using "Downscroll" as an example for making your own option since it is the simplest here
 		var option:Option = new Option('Downscroll', //Name
 			'If checked, notes go Down instead of Up, simple enough.', //Description
@@ -32,13 +63,6 @@ class GameplaySettingsSubState extends BaseOptionsMenu
 			BOOL);
 		addOption(option);
 		
-		var option:Option = new Option('JS Engine',
-			"Which engine runs .js scripts in mods.\nTroll = the joke 'interpreter' that has always been there,\nQuickJS = the real QuickJS-NG runtime.",
-			'jsEngine',
-			STRING,
-			['Troll', 'QuickJS']);
-		addOption(option);
-
 		var option:Option = new Option('Auto Pause',
 			"If checked, the game automatically pauses if the screen isn't on focus.",
 			'autoPause',
@@ -121,18 +145,6 @@ class GameplaySettingsSubState extends BaseOptionsMenu
 		option.minValue = 2;
 		option.maxValue = 10;
 		option.changeValue = 0.1;
-		addOption(option);
-
-		var option:Option = new Option('More Lua Errors',
-			'If checked, every Lua error gets printed instead of only the first one of its kind.',
-			'moreLuaErrors',
-			BOOL);
-		addOption(option);
-
-		var option:Option = new Option('Show HScript Errors',
-			'If checked, HScript errors show on screen.\nUnchecked, they only go to testout/js_log.txt.',
-			'hscriptErrors',
-			BOOL);
 		addOption(option);
 
 		// ---- legacy fallbacks. These had their own Compat page, but the top level of the
