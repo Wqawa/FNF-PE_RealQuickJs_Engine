@@ -6,7 +6,7 @@
 
 # AI 交接文档 — FNF-PE_RealQuickJs_Engine
 
-> 最后更新 2026-11-17。逐条修复记录在 `docs/LUA_COMPAT.md`（**改兼容层必须同步更新它**），
+> 最后更新 2026-11-25。逐条修复记录在 `docs/LUA_COMPAT.md`（**改兼容层必须同步更新它**），
 > 逐日流水账在 `.workbuddy/memory/YYYY-MM-DD.md`。
 >
 > - `docs/JS_TRANSPILE_HISTORY.md`（2026-11-17）：FunkinJS 转译器的原始说明和 issue 存档。
@@ -64,18 +64,21 @@ mod 同样分组：`mods/body`、`mods/1.0.4`、`mods/0.6.3`，各版本只读�
 **编译**（全程纯命令行，不弹窗）：
 
 ```bash
-bash manage.sh release                # 增量（= 2 号功能）
-bash manage.sh env                    # 环境体检（= 1 号功能）
-bash manage.sh debug                  # = 3 号功能
+bash manage.sh release                # 增量（2 号功能）
+bash manage.sh debug                  # debug
+bash manage.sh env                    # 环境体检（1 号功能）
+bash manage.sh clean                  # 全量重编
 ```
 
-从没有控制台的环境（编辑器 / CI / 后台任务）启动编译时，Windows 会给 haxe/cl/link
-各分配一个控制台窗口，屏幕上一排黑框闪。`manage.sh` 在「带动作调用」时自己用
-`conhost --headless` 包一层 —— 它会把子进程退出码吃成 0，所以真结果走临时文件带出来。
-交互菜单（双击 manage.bat）不包，那时有控制台，且 headless 下读不到 stdin。
+菜单是 1-6：1 体检、2 编译、3 素材、4 兼容审计、5 重建 import 表、6 QuickJS 静态库。
+名字别名是稳定接口，带参数能跳过二级菜单，比如 `bash manage.sh --zh build debug`。
 
-跑游戏/跑测试一律不弹窗：`AutoTestState` 会把窗口最小化 + 挪到屏幕外 + 静音，
-只有设 `PE_AUTOTEST_SHOW=1` 才显示画面。
+从没有控制台的环境（编辑器 / CI / 后台任务）启动编译时，Windows 会给 haxe/cl/link
+各分配一个控制台窗口，屏幕上一排黑框闪。`manage.sh` 在带动作调用时自己用
+`conhost --headless` 包一层 —— 退出码会被它吃成 0，真结果走临时文件带出来。
+双击 manage.bat 进交互菜单时不包，那时有控制台，headless 下也读不到 stdin。
+
+跑游戏不弹窗、不抢焦点、不出声。自动测试入口 2026-11-24 删了，现在验收只能编译完手动进歌。
 
 ### 0.0.1 2026-11-16 这一轮做了什么
 
@@ -490,7 +493,7 @@ Psych Engine 1.0.4 的源码 fork，目标是让 0.6.3 / 0.7.3 时代的老 mod�
 
 - 仓库：`D:\FNF\FNF-PE_RealQuickJs_Engine`
 - 上游参照：`.workbuddy/upstream/`（pe063 / pe073 / pe104 完整，novaflare 只有 `source/`）
-- 审计工具：`bash manage.sh audit`（7 号功能，拿 `.workbuddy/upstream/` 当基准比 Lua 函数名）
+- 审计工具：`bash manage.sh --zh audit 1`（4 号功能，拿 `.workbuddy/upstream/` 当基准比 Lua 函数名；1/2 是 pe063/pe073，也能直接传路径或设 `PE_REF`）
 
 ## 2. 用户偏好（务必遵守）
 
@@ -634,21 +637,21 @@ QuickJS 冒烟 26 项（run_qjs_test.sh）
 - 备选没做：virtualPad 移植、lua 报错去重、`NotesSubState` —— 用户没点头就不要动。
 - ~~`run_test.sh` 跑不起来~~ —— 2026-11-16 修好：`patch_chart.py`、测试脚本目录、
   素材目录全都停在双引擎改造前，要加 `mods/body/`、`assets/body/` 这一层。修完 140 条断言全绿。
-- `run_test.sh` / `run_qjs_test.sh` 都在 `.workbuddy/` 里，**git 不跟踪**，换机器要自己带。
+- ~~`run_test.sh` / `run_qjs_test.sh` 换机器要自己带~~ —— 这俩连同整个自动回归 2026-11-24 删了，现在没有这回事。
 - JS 那三个 Haxe 互操作函数（`runHaxeCode` / `runHaxeFunction` / `addHaxeLibrary`）没做，
   要做的话得给 `JSScriptHost` 挂一个嵌入式 HScript（`HScript.new` 的 parent 是 `Dynamic`，
   只用 `scriptName` / `modFolder` / `lastCalledFunction` / `hscript` / `get` 五个东西）。
 
 ## 7. git 状态
 
-2026-11-16 之后的四笔（都在 master 上，已推不推看用户）：
+分支 main，最新一笔 `b5ab73d6`（2026-11-25）。11-23 到 11-25 那批改动（分段加载、
+帧率拆分、窗口大小、F3 面板、选择性加载等）都在这条线上，逐条看每日流水账。
 
 ```
-f4a79b3 compat: 修 0.7.3 的 getObjectOrder 在 HUD 元素上必崩
-353852b mods: 去掉 mods/global 全局机制，每个引擎只读自己的
-e1b57fe engine: global mod 三树通用、崩溃拦截器、兼容开关并进 gameplay
-e0a7aab js: QuickJS 通道补完取值/停止/装卸，宿主函数对齐 Lua
+b5ab73d6 chore: 统一注释风格，顺手修加载页两处小 bug（只改 body）
+91cf72f6 feat: 进歌前选择性加载，脚本和贴图类别都能跳（只改 body）
+78c4f6bd perf: F3 面板改分页，加逐脚本耗时与内存（只改 body）
 ```
 
-工作区干净。`export/` 里是编译产物，`.workbuddy/` 整个被 ignore（测试脚本、记忆、构建壳都在
-里面，搬机器要单独拷）。
+工作区干净，`origin/main` 已对齐。`export/` 里是编译产物，`.workbuddy/` 整个被 ignore
+（上游参照、工具链、记忆在里面，搬机器要单独拷）。

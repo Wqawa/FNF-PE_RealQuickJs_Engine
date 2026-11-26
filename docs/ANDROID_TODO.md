@@ -1,8 +1,12 @@
-# 安卓端待办（2026-11-20 起）
+# 安卓端待办（2026-11-20 起，2026-11-21 整条线废弃）
 
-设备：PFUM10（OPPO，Android 12 / SDK 31，arm64-v8a）。
-构建：`bash manage.sh --zh 8`（工具链在 `D:/android-tc`，见 `docs/BUILDING.md`）。
-调试脚本：`.workbuddy/android-dev/dev.sh`（git 忽略）。
+这个文件是安卓构建线还活着时写的待办。11-21 那天 `16640515` 把安卓构建从 `Project.xml`
+和 `manage.sh` 里剥掉了，`manage.sh` 现在只有 1-6 号功能、没有 8 号。下面的待办除了
+Switch Engine 那类界面问题可能还成立，其余暂时都没人做。留作历史，别照着敲命令。
+
+当时的环境：设备 PFUM10（OPPO，Android 12 / SDK 31，arm64-v8a）；构建走
+`bash manage.sh --zh 8`（旧命令已失效）；工具链在 `.workbuddy/toolchain/`；调试脚本是
+`.workbuddy/android-dev/dev.sh`（git 忽略，已随清理删掉）。
 
 ## 已经跑通的
 

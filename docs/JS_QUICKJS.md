@@ -92,7 +92,8 @@ JS 脚本
 3. **编号只能往后加**，不许插队 —— 编号是硬编码在 `WRAPPERS` 字符串里的，改前面的等于
    把后面全错位。目前用到 `-1`（trace）和 `0..229`。
 4. 参数想拿真类型就自己 `coerce()` / `fnum()` / `inum()` / `truthy()` 转一把。
-5. 改完跑 `bash manage.sh --zh qjstest`。
+5. 改完编译一遍，把 `.js` 丢进 `bin/mods/body/scripts/` 手动进歌，
+   报错看 `bin/testout/js_log.txt`。原来的 `qjstest` 自动回归 2026-11-24 删了。
 
 `default:` 分支会打一条 `[warn] 未实现的宿主函数编号`，编号漏了能立刻看出来。
 

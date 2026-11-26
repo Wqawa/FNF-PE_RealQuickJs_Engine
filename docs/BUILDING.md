@@ -7,28 +7,30 @@
 
 # 本仓库额外要求（JS 运行时 / QuickJS-NG）
 
-引擎里带一个 JS 脚本运行时（mod 的 `.js` 走它，Gameplay → JS Engine 里切）。它**不需要你另外下载**：
+引擎里带一个 JS 脚本运行时，mod 的 `.js` 走它，Gameplay → JS Engine 里切。不用另外下载：
 
-- 源码已经随仓库提交在 `third_party/quickjs-ng/`（约 12.8 万行，MIT）。
-  仓库里这个目录必须存在，否则编译会在链接阶段失败。
-- 编译产物 `third_party/quickjs-ng/build/quickjs-ng.lib` **不进版本库**（在 `.gitignore` 里），
-  由本机 MSVC 现场编译。
-- `bash manage.sh` 的第 2/3/4 项（编译）会**自动检查**：静态库不存在、或
-  `quickjs.c` / `libregexp.c` / `libunicode.c` / `dtoa.c` 比它新，就先编译静态库再编引擎。
-  想强制重编用 9 号功能。
+- 源码随仓库提交在 `third_party/quickjs-ng/`（约 12.8 万行，MIT）。这个目录必须在，
+  否则编译在链接阶段挂。
+- 编译产物 `third_party/quickjs-ng/build/quickjs-ng.lib` 不进版本库（在 `.gitignore` 里），
+  由本机 MSVC 现场编。
+- 编译（2 号功能）会自动检查：静态库不存在，或 `quickjs.c` / `libregexp.c` /
+  `libunicode.c` / `dtoa.c` 比它新，就先编静态库再编引擎。想强制重编跑 6 号功能。
 - 编译命令固定为 MSVC `cl /c /O2 /std:c11 /utf-8`，四个源文件，规则写在 `manage.sh` 的
-  `cmd_quickjs()` 里，改了 QuickJS 版本只需要重跑一次第 10 项。
+  `cmd_quickjs()` 里。换了 QuickJS 版本跑一次 6 号功能。
 
-链接方式是 `source/jsruntime/QuickJSHandler.hx` 顶部的 `@:buildXml`，用的是**相对路径**
-（`third_party/quickjs-ng`），所以整个项目挪目录、换机器都不用改。
-
-> Windows 走 MSVC 编的 `quickjs-ng.lib`，安卓走 NDK 编的 `libquickjs-ng.a`，见下面的 Android 段。
+链接方式是 `source/jsruntime/QuickJSHandler.hx` 顶部的 `@:buildXml`，用相对路径
+（`third_party/quickjs-ng`），整个项目挪目录、换机器都不用改。
 
 ---
 
-# Android
+# Android（2026-11-21 起废弃，下面是历史记录）
 
-## 一条命令出包
+安卓构建这条线已经剥掉了：`16640515` 把 `Project.xml` 和 `manage.sh` 里的安卓入口删干净，
+`manage.sh` 现在只有 1-6 号功能，没有 8 号，也没有 qjsandroid。触屏代码只在 063 树里
+留了零星几处 `#if MOBILE_CONTROLS`，body 树的 mobile 目录已删。下面整章留着以后要恢复时参考，
+命令现在全都跑不起来。工具链也不在 `D:/android-tc`，而是在 `.workbuddy/toolchain/`。
+
+## 一条命令出包（旧命令，已失效）
 
 ```bash
 bash manage.sh --zh 8
@@ -80,7 +82,7 @@ $ADB logcat -s HXCPP
 
 ## 从零装工具链（换机器时才需要）
 
-**先跑 `bash manage.sh --zh 9`**：会体检 JDK17 / cmdline-tools / SDK 组件 / NDK / lime 配置 /
+**先跑 `bash manage.sh --zh 9`**（旧命令，已失效）：会体检 JDK17 / cmdline-tools / SDK 组件 / NDK / lime 配置 /
 QuickJS arm64 库，能自动补的都补（JDK 和 cmdline-tools 从 `dl/*.zip` 解压，SDK 组件走
 sdkmanager，QuickJS 库现场编）。只有 `dl/` 里没安装包、要手动下载时才照下面走。
 

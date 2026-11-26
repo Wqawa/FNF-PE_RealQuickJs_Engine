@@ -2,13 +2,17 @@
 > 本文里出现的 `building/*.sh`、`tools/*.py`、`setup/*` 命令都已作废，只当历史记录看。
 >
 > **2026-11-16 变更（读本文前先知道这几条）：**
-> - `mods/global/` 的「全局 mod」机制**已整体删除**。每个版本只读 `mods/<版本>/` 和自己那本
+> - `mods/global/` 的「全局 mod」机制已整体删除。每个版本只读 `mods/<版本>/` 和自己那本
 >   `modsList.txt`，跨版本共享靠手动拷贝。`Paths.globalMods` / `Mods.pushGlobalMods`
 >   这些符号三棵树里都不存在了，别照着旧代码找。
 > - 崩溃拦截器改成三棵树共用（`backend.EngineCrash` + `backend.CrashState`），挂在
 >   `Main.main()` 分叉之前。以前只在 `Main.new()` 里挂，切到原版 / 0.6.3 崩了连 dump 都没有。
 > - 旧版回退那三个开关（Legacy HUD / Health / Icons）并进了 Gameplay 设置，
 >   原来独立的 Compat 页已删除。
+>
+> 文中标"未提交"的地方都是 11-13 当时的状态，那批改动后来已经提交并推上 origin/main，
+> 工作区现在是干净的。第七节那条「下一步」也早就做完了。Linux / 安卓那两节是历史，安卓构建
+> 2026-11-21 已剥离。
 
 # 交接文档：0.6.3 移植 + 原版 1.0.4 双引擎（2026-11-13）
 
@@ -20,7 +24,7 @@
 
 | 位置 | 是什么 | 状态 |
 |---|---|---|
-| `.`（本仓库根，原文写死过 `D:/FNF/FNF-PE_RealQuickJs_Engine`） | 主仓，PE 1.0.4 fork（本体） | 分支 `main`，**有一堆未提交改动**，见第四节 |
+| `.`（本仓库根，原文写死过 `D:/FNF/FNF-PE_RealQuickJs_Engine`） | 主仓，PE 1.0.4 fork（本体） | 分支 `main`，当时有一堆未提交改动，见第四节（现已提交） |
 | `../PsychEngine_0.6.3`（0.6.3 独立移植仓，换机器按实际位置） | 0.6.3 独立移植仓 | 分支 `dev_0.6.3`，已推到 fork，最新 `9659b03` |
 | `https://github.com/Wqawa/FNF-PE_RealQuickJs_Engine` | 两者的远端 | `main` + `dev_0.6.3` 两条分支 |
 
